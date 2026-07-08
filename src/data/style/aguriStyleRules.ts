@@ -58,14 +58,14 @@ export const aguriStyleRules: AguriStyleRules = {
     maxEveryTurns: 5
   },
   bridgeStyle: {
-    maxStyledLinesPerTurn: 2,
+    maxStyledLinesPerTurn: 3,
     calmActs: ["greeting", "ask_new_word", "ask_category", "ask_emotion", "ask_situation", "confirm_meaning", "recall_word", "use_word_in_daily_talk"],
     emphaticActs: ["praise_user", "misunderstanding_joke", "embarrassed_reaction", "happy_reaction"],
     avoidConsecutiveLaugh: true
   },
   constraints: {
-    maxLines: 3,
-    maxLineLength: 34,
+    maxLines: 4,
+    maxLineLength: 38,
     maxLearnedWordsPerTurn: 1
   }
 };

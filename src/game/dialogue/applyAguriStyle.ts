@@ -35,29 +35,29 @@ function buildStyledLines(
   const word = surface ? `「${surface}」` : "その言葉";
   switch (speechAct) {
     case "greeting":
-      return ["おかえりなさい。", "今日はどんな言葉を連れてきたのかなァっ。"];
+      return ["はァっいっ！", "おかえりなさいでございまァっすっ！", "今日はどんな言葉を連れてきたのかなァっ！"];
     case "ask_new_word":
-      return ["新しい言葉、ひとつ教えてくれる？", "短い言葉でもいいよ。ちゃんと覚えるから。"];
+      return ["新しい言葉っ！", "ひとつ教えてくれるとうれしいよォっ！", "アグリっ！ちゃんと覚えまァっすっ！"];
     case "ask_correction":
-      return [`まァっ ${word} のこと、もう少し聞いてもいい？`, "まだ少しふわふわしてるんだよなァっ。"];
+      return [`まァっ ${word} のことっ！`, "もう少し聞いてもいいですかねェっ！", "まだ意味がふわふわしてるんだよなァっ！"];
     case "recall_word":
-      return [`なんかっ 今日は ${word} のことを思い出してたよ。`, "前に教えてくれた言葉だよなァっ。"];
+      return [`なんかっ ${word} のことっ！`, "さっきから思い出してるんだよなァっ！", "教えてくれた言葉っ！残ってるよォっ！"];
     case "use_word_in_daily_talk":
-      if (template.word_slot?.category === "place") return [`${word} って、行ける場所なのかな。`, "それとも心の中の場所かもしれませんねェっ。"];
-      if (template.word_slot?.category === "feeling") return [`${word} って気持ち、少しわかる気がするよォっ。`];
-      return [`${word} のこと、もう少し聞かせてほしいよォっ。`];
+      if (template.word_slot?.category === "place") return [`${word} ってっ！`, "歩いて行ける場所なのかっ！", "心の中の場所なのかっ気になるなァっ！"];
+      if (template.word_slot?.category === "feeling") return [`${word} って気持ちっ！`, "今日はちょっとわかる気がするよォっ！"];
+      return [`${word} の話っ！`, "もう少し聞かせてほしいよォっ！", "それもまた言葉だねっ！"];
     case "praise_user":
-      return ["めっちゃ言葉が増えてきたなァっ！", "アグリ、ちゃんとメモしておきまァっすっ。"];
+      return ["めっちゃ言葉が増えてきたなァっ！", "アグリっ！ちゃんとメモしておりまァっすっ！", "ご協力ありがとうございまァっすっ！"];
     case "lonely_reaction":
       return ["まァっ 少し静かな時間だったね。", "話したくなったら、またここに来てよォっ。"];
     case "sleepy_reaction":
-      return ["なんかっ 少しねむいかもしれませんねェっ。", "でも、声はちゃんと聞いてるよ。"];
+      return ["なんかっ 少しねむいかもしれませんねェっ！", "でもっ声はちゃんと聞いてるよォっ！"];
     case "happy_reaction":
       return ["めっちゃうれしいなァっ！", "その言葉、部屋に置いておきたいよォっ！"];
     case "embarrassed_reaction":
-      return ["あのっそのっ。", "ちょっと照れるかもしれませんねェっ。"];
+      return ["あのっそのっ！", "ちょっと照れるかもしれませんねェっ！"];
     case "goodbye":
-      return ["今日もありがとうなァっ。", "また言葉を教えてねェっ。"];
+      return ["今日もありがとなァっ！", "また言葉を連れてきてくれよォっ！"];
     default:
       return restyleFallback(fallback, intensity);
   }
@@ -86,7 +86,7 @@ function maybeAddLaugh(lines: string[], speechAct: SpeechAct, turnIndex: number,
 }
 
 function normalizeDialogueLines(lines: string[], intensity: StyleIntensity): string {
-  const maxStyled = intensity === "emphatic" ? aguriStyleRules.bridgeStyle.maxStyledLinesPerTurn : 1;
+  const maxStyled = intensity === "emphatic" ? aguriStyleRules.bridgeStyle.maxStyledLinesPerTurn : 2;
   let styledCount = 0;
 
   return lines

@@ -45,7 +45,7 @@ export function TeachWordFlow({ words, onCancel, onSave }: TeachWordFlowProps) {
         <section className="learn-card form-stack">
           <DialogueBox
             speaker="アグリちゃん"
-            text="新しい言葉、ひとつ教えてくれる？ 短い言葉でもいいよ。ちゃんと覚えるから。"
+            text={"新しい言葉っ！\nひとつ教えてくれるとうれしいよォっ！\n短くてもちゃんと覚えまァっすっ！"}
             variant="bubble"
           />
           <TextInputPanel label="教える言葉" submitLabel="質問へ" maxLength={32} onSubmit={handleInput}>

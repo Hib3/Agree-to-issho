@@ -49,7 +49,7 @@ const engine = new TemplateDialogueEngine();
 
 const initialTurn: DialogueTurn = {
   speech_act: "greeting",
-  text: dialogueTemplates[0].text,
+  text: "はァっいっ！\nおかえりなさいでございまァっすっ！\n今日はどんな言葉を連れてきたのかなァっ！",
   expression: "talk_smile",
   used_words: []
 };
@@ -122,7 +122,7 @@ export function App() {
     await refresh();
     setTurn({
       speech_act: "greeting",
-      text: `${characterName}です。あなたの言葉を少しずつ覚えていきます。`,
+      text: `はァっいっ！\n${characterName}でございまァっすっ！\nあなたの言葉っ！めっちゃ覚えていきますよォっ！`,
       expression: "talk_smile",
       used_words: []
     });
@@ -181,7 +181,7 @@ export function App() {
     for (const flag of deriveEventFlags(words)) await eventFlagRepository.save(flag);
     setTurn({
       speech_act: "confirm_meaning",
-      text: `「${word.surface}」を覚えました。まだ自信は育て途中なので、ときどき聞き直します。`,
+      text: `「${word.surface}」っ！\n覚えまァっしたっ！\nまだふわふわしてるからっ、ときどき聞き直しますねェっ！`,
       expression: "proud",
       used_words: []
     });
