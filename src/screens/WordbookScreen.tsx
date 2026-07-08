@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { getCategoryLabel, getConfidenceLabel, getDriftLevelLabel, getEmotionLabel, getMemoryStrengthLabel, getSituationLabel } from "../game/word/labels";
+import { getShiritoriCandidates } from "../game/word/shiritori";
 import { applyReview } from "../game/word/wordMemory";
 import type { WordFrame } from "../types/domain";
 
@@ -11,12 +12,24 @@ type WordbookScreenProps = {
 
 export function WordbookScreen({ words, onBack, onPatchWord }: WordbookScreenProps) {
   const sorted = [...words].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const shiritori = words.length >= 10 ? getShiritoriCandidates(words, 4) : [];
   return (
     <main className="screen">
       <div className="topbar">
         <h1>単語帳</h1>
         <button type="button" onClick={onBack}>戻る</button>
       </div>
+      {shiritori.length > 0 && (
+        <section className="panel word-link-panel" aria-label="しりとり候補">
+          <h2>しりとり候補</h2>
+          <p>読みがつながりそうな言葉です。まだ遊びの入口だけです。</p>
+          <div className="word-link-list">
+            {shiritori.map((item) => (
+              <span key={item.from.id}>{item.from.surface} → {item.next.map((word) => word.surface).join("、")}</span>
+            ))}
+          </div>
+        </section>
+      )}
       {sorted.length === 0 ? (
         <p className="empty">まだ言葉はありません。</p>
       ) : (

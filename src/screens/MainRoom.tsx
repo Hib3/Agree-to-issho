@@ -13,11 +13,14 @@ type MainRoomProps = {
   turn: DialogueTurn;
   onAction: (action: RoomAction) => void;
   onSeedSampleWords: () => Promise<number>;
+  onDriftFeedback: (mode: "correct" | "keep") => void;
 };
 
-export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords }: MainRoomProps) {
+export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords, onDriftFeedback }: MainRoomProps) {
   const name = characterState?.character_name ?? "アグリちゃん";
   const playerName = profile?.player_name ?? "あなた";
+  const reviewTargetCount = words.filter((word) => !word.is_blocked && !word.is_sensitive && !word.forgotten_at && (word.confidence < 0.58 || word.ambiguity_score > 0.72 || word.category === "unknown")).length;
+  const canGiveDriftFeedback = turn.used_words.length > 0 && (turn.speech_act === "misunderstanding_joke" || turn.speech_act === "ask_correction");
   const backgroundImage = `${import.meta.env.BASE_URL}assets/backgrounds/aguri_room_desk.webp`;
   const roomStyle = {
     backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.03), rgba(47, 33, 23, 0.08)), url("${backgroundImage}")`
@@ -33,8 +36,8 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
         </header>
 
         <div className="room-stage">
-          <CharacterStage name={name} expression={turn.expression} wordCount={words.length} />
-          <DialogueBox speaker={name} text={turn.text} variant="bubble" />
+          <CharacterStage name={name} expression={turn.expression} motionHint={turn.motion_hint} wordCount={words.length} />
+          <DialogueBox speaker={name} text={turn.text} variant="bubble" emotionCode={turn.emotion_code} />
         </div>
 
         {words.length === 0 && (
@@ -43,6 +46,21 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
             <span>おためし用の言葉を入れると、会話と日記の動きをすぐ見られます。</span>
             <button type="button" onClick={onSeedSampleWords}>おためし単語を100こ入れる</button>
           </section>
+        )}
+
+        {words.length > 0 && reviewTargetCount > 0 && (
+          <section className="sample-word-note review-note" aria-label="復習メモ">
+            <strong>聞き直したい言葉があります</strong>
+            <span>{reviewTargetCount}この言葉が、まだ少しふわふわしています。</span>
+            <button type="button" onClick={() => onAction("wordbook")}>単語帳で見る</button>
+          </section>
+        )}
+
+        {canGiveDriftFeedback && (
+          <div className="drift-actions" aria-label="言葉の直し方">
+            <button type="button" onClick={() => onDriftFeedback("correct")}>直す</button>
+            <button type="button" onClick={() => onDriftFeedback("keep")}>そのままでいい</button>
+          </div>
         )}
 
         <div className="primary-actions" aria-label="メイン操作">

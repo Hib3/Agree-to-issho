@@ -1,6 +1,6 @@
-import type { DialogueTemplate, WordFrame } from "../../types/domain";
+import type { DialogueLog, DialogueTemplate, WordFrame } from "../../types/domain";
 
-export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate, now = new Date()): number {
+export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate, now = new Date(), recentLogs: DialogueLog[] = [], words: WordFrame[] = []): number {
   if (word.is_blocked || word.is_sensitive || word.forgotten_at) return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.category && word.category !== template.word_slot.category) return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.situation && !word.situation_tags.includes(template.word_slot.situation)) return Number.NEGATIVE_INFINITY;
@@ -13,18 +13,28 @@ export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate
   const importantEmotionBonus = word.emotion_tags.some((tag) => tag === "happy" || tag === "proud" || tag === "embarrassed" || tag === "lonely")
     ? 0.8
     : 0;
+  const recentWordIds = new Set(recentLogs.slice(-3).flatMap((log) => log.used_word_ids));
+  const recentCategoryIds = new Set(
+    recentLogs
+      .slice(-3)
+      .flatMap((log) => log.used_word_ids)
+      .map((id) => words.find((item) => item.id === id)?.category)
+      .filter(Boolean)
+  );
+  const repeatedWordPenalty = recentWordIds.has(word.id) ? 2.2 : 0;
+  const repeatedCategoryPenalty = recentCategoryIds.has(word.category) ? 0.8 : 0;
   const confidenceBonus = word.confidence * 3;
   const memoryBonus = word.memory_strength * 1.5;
   const favoriteBonus = word.favorite_score * 1.2;
   const ambiguityPenalty = word.ambiguity_score > 0.75 && template.speech_act !== "ask_correction" ? 0.9 : 0;
   const usePenalty = Math.min(word.use_count, 12) * 0.38;
-  return confidenceBonus + memoryBonus + favoriteBonus + unusedPeriodBonus + situationMatchBonus + importantEmotionBonus - ambiguityPenalty - usePenalty - recentPenalty;
+  return confidenceBonus + memoryBonus + favoriteBonus + unusedPeriodBonus + situationMatchBonus + importantEmotionBonus - ambiguityPenalty - usePenalty - recentPenalty - repeatedWordPenalty - repeatedCategoryPenalty;
 }
 
-export function selectWordForTemplate(words: WordFrame[], template: DialogueTemplate, nowIso?: string): WordFrame | null {
+export function selectWordForTemplate(words: WordFrame[], template: DialogueTemplate, nowIso?: string, recentLogs: DialogueLog[] = []): WordFrame | null {
   const now = nowIso ? new Date(nowIso) : new Date();
   const scored = words
-    .map((word) => ({ word, score: scoreWordForTemplate(word, template, now) }))
+    .map((word) => ({ word, score: scoreWordForTemplate(word, template, now, recentLogs, words) }))
     .filter((item) => Number.isFinite(item.score))
     .sort((a, b) => b.score - a.score || a.word.use_count - b.word.use_count || a.word.created_at.localeCompare(b.word.created_at) || a.word.id.localeCompare(b.word.id));
   return scored[0]?.word ?? null;

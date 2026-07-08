@@ -1,17 +1,18 @@
-import type { CharacterExpression } from "../../types/domain";
+import type { CharacterExpression, MotionHint } from "../../types/domain";
 import { getCharacterImagePath, getFallbackCharacterImagePath } from "../../data/initial/assetManifest";
 
 type CharacterStageProps = {
   name: string;
   expression: CharacterExpression;
+  motionHint?: MotionHint;
   wordCount: number;
 };
 
-export function CharacterStage({ name, expression, wordCount }: CharacterStageProps) {
+export function CharacterStage({ name, expression, motionHint = "none", wordCount }: CharacterStageProps) {
   const characterImage = `${import.meta.env.BASE_URL}${getCharacterImagePath(expression)}`;
   const fallbackImage = `${import.meta.env.BASE_URL}${getFallbackCharacterImagePath()}`;
   return (
-    <section className={`character-stage mood-${expression}`} aria-label={`${name}の部屋`}>
+    <section className={`character-stage mood-${expression} motion-${motionHint}`} aria-label={`${name}の部屋`}>
       <div className="character-stand">
         <img
           src={characterImage}

@@ -347,6 +347,36 @@ h2 {
   filter: drop-shadow(0 12px 18px rgba(42, 31, 25, 0.24));
 }
 
+.motion-bounce .character-stand img,
+.motion-sparkle .character-stand img {
+  animation: aguri-bounce 2.8s ease-in-out infinite;
+}
+
+.motion-sway .character-stand img,
+.motion-sleepy .character-stand img {
+  animation: aguri-sway 3.4s ease-in-out infinite;
+}
+
+.motion-shake .character-stand img {
+  animation: aguri-shake 380ms ease-in-out 1;
+}
+
+@keyframes aguri-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes aguri-sway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-1.2deg); }
+}
+
+@keyframes aguri-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
 .stage-note {
   position: absolute;
   right: 14px;
@@ -368,6 +398,28 @@ h2 {
 .speech-bubble {
   background: rgba(255, 253, 248, 0.94);
   border-color: rgba(75, 93, 66, 0.34);
+}
+
+.speech-bubble.emotion-heart_warming,
+.speech-bubble.emotion-proud {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(255, 241, 207, 0.95));
+}
+
+.speech-bubble.emotion-sad_awkward,
+.speech-bubble.emotion-sleepy {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(225, 238, 246, 0.95));
+}
+
+.speech-bubble.emotion-inquisitive,
+.speech-bubble.emotion-surprised {
+  border-color: rgba(123, 90, 142, 0.45);
+}
+
+.speech-bubble.emotion-embarrassed {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(248, 224, 230, 0.94));
 }
 
 .room-stage .speech-bubble {
@@ -503,6 +555,21 @@ h2 {
   background: var(--color-choice);
 }
 
+.drift-actions {
+  position: relative;
+  z-index: 7;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: -2px 12px 8px;
+}
+
+.drift-actions button {
+  min-height: 38px;
+  background: rgba(255, 243, 215, 0.96);
+  font-weight: 900;
+}
+
 .form-stack {
   display: flex;
   flex-direction: column;
@@ -579,6 +646,30 @@ h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 10px;
+}
+
+.word-link-panel {
+  display: grid;
+  gap: 8px;
+  background: rgba(255, 248, 232, 0.96);
+}
+
+.word-link-panel p {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.word-link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.word-link-list span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(220, 235, 207, 0.86);
+  font-weight: 800;
 }
 
 .summary-list,
@@ -719,5 +810,16 @@ dd {
   .form-actions button,
   .topbar-actions button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
   }
 }

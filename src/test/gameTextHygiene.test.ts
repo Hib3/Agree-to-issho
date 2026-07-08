@@ -4,9 +4,15 @@ import { sanitizeGameText } from "../utils/sanitizeGameText";
 
 describe("game text hygiene", () => {
   it("removes technical lines from visible play text", () => {
-    const text = sanitizeGameText("こんにちは\nschema_version: 1\nDebugPanel\nまた話そうね");
+    const text = sanitizeGameText("こんにちは\nschema_version: 1\nDebugPanel\nTypeError: broken\nまた話そうね");
 
     expect(text).toBe("こんにちは\nまた話そうね");
+  });
+
+  it("falls back when all visible lines are technical", () => {
+    const text = sanitizeGameText("undefined\n[object Object]\nJSON schema");
+
+    expect(text).toContain("選び直します");
   });
 
   it("does not use pointer-events rules on choice buttons", () => {

@@ -4,6 +4,7 @@ import { DialogueBox } from "../components/DialogueBox";
 import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { dialogueTemplates } from "../data/templates/dialogueTemplates";
 import { TemplateDialogueEngine } from "../game/dialogue/TemplateDialogueEngine";
+import { applyCorrectionToWord } from "../game/dialogue/drift";
 import { deriveEventFlags } from "../game/events/eventRules";
 import { exportSaveData, importSaveData, previewImport } from "../game/storage/exportImport";
 import {
@@ -29,6 +30,7 @@ import type {
   AppProfile,
   CharacterState,
   DiaryEntry,
+  DialogueLog,
   DialogueTurn,
   EventFlag,
   GameSettings,
@@ -42,6 +44,7 @@ type AppState = {
   characterState: CharacterState | null;
   settings: GameSettings | null;
   words: WordFrame[];
+  dialogueLogs: DialogueLog[];
   diaryEntries: DiaryEntry[];
   eventFlags: EventFlag[];
 };
@@ -60,6 +63,7 @@ const initialState: AppState = {
   characterState: null,
   settings: null,
   words: [],
+  dialogueLogs: [],
   diaryEntries: [],
   eventFlags: []
 };
@@ -72,11 +76,12 @@ export function App() {
   const [error, setError] = useState("");
 
   async function refresh() {
-    const [profile, characterState, settings, words, diaryEntries, eventFlags] = await Promise.all([
+    const [profile, characterState, settings, words, dialogueLogs, diaryEntries, eventFlags] = await Promise.all([
       profileRepository.get(),
       characterStateRepository.get(),
       settingsRepository.get(),
       wordRepository.list(),
+      dialogueLogRepository.list(),
       diaryEntryRepository.list(),
       eventFlagRepository.list()
     ]);
@@ -86,6 +91,7 @@ export function App() {
       characterState: characterState ?? null,
       settings: settings ?? null,
       words: words.sort((a, b) => a.created_at.localeCompare(b.created_at)),
+      dialogueLogs: (dialogueLogs as DialogueLog[]).sort((a, b) => a.created_at.localeCompare(b.created_at)),
       diaryEntries: diaryEntries.sort((a, b) => a.entry_date.localeCompare(b.entry_date)),
       eventFlags: eventFlags as EventFlag[]
     });
@@ -147,6 +153,8 @@ export function App() {
       character_state: state.characterState,
       settings: state.settings,
       words: state.words,
+      dialogue_logs: state.dialogueLogs,
+      diary_entries: state.diaryEntries,
       now: nowIso()
     });
     await persistDialogueTurn(nextTurn);
@@ -172,6 +180,8 @@ export function App() {
       speech_act: nextTurn.speech_act,
       text: nextTurn.text,
       used_word_ids: nextTurn.used_words.map((word) => word.id),
+      emotion_code: nextTurn.emotion_code,
+      motion_hint: nextTurn.motion_hint,
       created_at: now
     });
     if (state.characterState) {
@@ -211,9 +221,38 @@ export function App() {
       character_state: state.characterState,
       settings: state.settings,
       words: state.words,
+      dialogue_logs: state.dialogueLogs,
+      diary_entries: state.diaryEntries,
       now: nowIso()
     });
     await diaryEntryRepository.save(entry);
+    await refresh();
+  }
+
+  async function handleDriftFeedback(mode: "correct" | "keep") {
+    const target = turn.used_words[0];
+    if (!target) return;
+    const saved = await wordRepository.get(target.id);
+    if (!saved) return;
+    const now = nowIso();
+    const nextWord = mode === "correct"
+      ? applyCorrectionToWord(saved)
+      : {
+          ...saved,
+          favorite_score: Math.min(1, saved.favorite_score + 0.03),
+          updated_at: now
+        };
+    await wordRepository.save({ ...nextWord, updated_at: now });
+    setTurn({
+      speech_act: "praise_user",
+      text: mode === "correct"
+        ? `「${saved.surface}」っ、直してくれてありがとォっ！\n前よりちゃんと覚え直しまァっすっ！`
+        : `「${saved.surface}」っ、このままでもいいんですねェっ！\nじゃあ、ちょっと不思議な感じもノートに残しますっ！`,
+      expression: "proud",
+      emotion_code: "proud",
+      motion_hint: "sparkle",
+      used_words: []
+    });
     await refresh();
   }
 
@@ -287,6 +326,7 @@ export function App() {
           turn={turn}
           onAction={handleRoomAction}
           onSeedSampleWords={handleSeedSampleWords}
+          onDriftFeedback={handleDriftFeedback}
         />
       )}
       {screen === "teach-word" && <TeachWordFlow words={state.words} onCancel={() => setScreen("main-room")} onSave={handleWordSaved} />}

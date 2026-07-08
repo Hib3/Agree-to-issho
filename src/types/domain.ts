@@ -69,6 +69,17 @@ export type SpeechAct =
   | "goodbye";
 
 export type DriftLevel = 0 | 1 | 2 | 3;
+export type EmotionCode =
+  | "normal_talk"
+  | "heart_warming"
+  | "sad_awkward"
+  | "surprised"
+  | "inquisitive"
+  | "sleepy"
+  | "embarrassed"
+  | "proud";
+
+export type MotionHint = "none" | "bounce" | "shake" | "sway" | "sleepy" | "sparkle";
 
 export type AppProfile = {
   id: "local";
@@ -137,6 +148,8 @@ export type DialogueLog = {
   speech_act: SpeechAct;
   text: string;
   used_word_ids: Id[];
+  emotion_code?: EmotionCode;
+  motion_hint?: MotionHint;
   created_at: string;
 };
 
@@ -205,6 +218,8 @@ export type DialogueTurn = {
   speech_act: SpeechAct;
   text: string;
   expression: CharacterExpression;
+  emotion_code?: EmotionCode;
+  motion_hint?: MotionHint;
   used_words: WordFrame[];
 };
 
@@ -213,6 +228,8 @@ export type DialogueContext = {
   character_state: CharacterState | null;
   words: WordFrame[];
   settings: GameSettings | null;
+  dialogue_logs?: DialogueLog[];
+  diary_entries?: DiaryEntry[];
   now: string;
 };
 

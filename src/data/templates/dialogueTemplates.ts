@@ -159,10 +159,32 @@ export const dialogueTemplates: DialogueTemplate[] = [
     expression: "happy"
   },
   {
+    id: "diary_prompt_today",
+    speech_act: "diary_entry",
+    text: "今日の「{word}」のこと、あとで日記に書いておきたいです。忘れないうちに、ノートに残してもいいですか？",
+    intent: "diary",
+    word_slot: {},
+    expression: "thinking"
+  },
+  {
     id: "lonely_default",
     speech_act: "lonely_reaction",
     text: "少し静かですね。話したくなったら、ここにいます。",
     intent: "lonely",
     expression: "lonely"
+  },
+  {
+    id: "sleepy_default",
+    speech_act: "sleepy_reaction",
+    text: "ちょっと眠たい時間です。言葉のノートも、今日はゆっくりめくります。",
+    intent: "daily_question",
+    expression: "sleepy"
+  },
+  {
+    id: "goodbye_default",
+    speech_act: "goodbye",
+    text: "今日はたくさん話しました。またあとで、言葉の続き聞かせてください。",
+    intent: "greeting",
+    expression: "talk_smile"
   }
 ];

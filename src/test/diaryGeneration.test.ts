@@ -33,4 +33,27 @@ describe("diary generation", () => {
     expect(entry.body).not.toContain(forgotten.surface);
     expect(entry.body).toContain(usable.surface);
   });
+
+  it("prioritizes words used in today's dialogue logs and records drift notes", () => {
+    const words = createDebugWordSeed().slice(0, 4);
+    const talked = words[3];
+    const entry = generateDiaryEntryFromContext({
+      profile: null,
+      character_state: null,
+      settings: null,
+      words,
+      dialogue_logs: [{
+        id: "log_test",
+        speech_act: "misunderstanding_joke",
+        text: `「${talked.surface}」を少しズレて使いました。`,
+        used_word_ids: [talked.id],
+        created_at: "2026-07-08T09:30:00.000Z"
+      }],
+      now: "2026-07-08T10:00:00.000Z"
+    });
+
+    expect(entry.used_word_ids[0]).toBe(talked.id);
+    expect(entry.body).toContain(talked.surface);
+    expect(entry.body).toContain("ズレた使い方");
+  });
 });
