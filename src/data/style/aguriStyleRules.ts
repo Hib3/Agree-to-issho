@@ -65,7 +65,7 @@ export const aguriStyleRules: AguriStyleRules = {
   },
   constraints: {
     maxLines: 4,
-    maxLineLength: 38,
+    maxLineLength: 54,
     maxLearnedWordsPerTurn: 1
   }
 };

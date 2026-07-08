@@ -5,16 +5,24 @@ export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate
   if (template.word_slot?.category && word.category !== template.word_slot.category) return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.situation && !word.situation_tags.includes(template.word_slot.situation)) return Number.NEGATIVE_INFINITY;
 
-  const recentPenalty = word.last_used_at && now.getTime() - new Date(word.last_used_at).getTime() < 1000 * 60 * 10 ? 4 : 0;
+  const lastUsedMs = word.last_used_at ? new Date(word.last_used_at).getTime() : 0;
+  const elapsedMs = lastUsedMs > 0 ? now.getTime() - lastUsedMs : Number.POSITIVE_INFINITY;
+  const recentPenalty = elapsedMs < 1000 * 60 * 30 ? 5 : 0;
+  const unusedPeriodBonus = !word.last_used_at ? 2.4 : Math.min(3, Math.max(0, elapsedMs / (1000 * 60 * 60 * 24)) * 0.35);
+  const situationMatchBonus = template.word_slot?.situation && word.situation_tags.includes(template.word_slot.situation) ? 1.3 : 0;
+  const importantEmotionBonus = word.emotion_tags.some((tag) => tag === "happy" || tag === "proud" || tag === "embarrassed" || tag === "lonely")
+    ? 0.8
+    : 0;
   const confidenceBonus = word.confidence * 3;
-  const usePenalty = Math.min(word.use_count, 6) * 0.45;
-  return confidenceBonus - usePenalty - recentPenalty;
+  const usePenalty = Math.min(word.use_count, 12) * 0.38;
+  return confidenceBonus + unusedPeriodBonus + situationMatchBonus + importantEmotionBonus - usePenalty - recentPenalty;
 }
 
-export function selectWordForTemplate(words: WordFrame[], template: DialogueTemplate): WordFrame | null {
+export function selectWordForTemplate(words: WordFrame[], template: DialogueTemplate, nowIso?: string): WordFrame | null {
+  const now = nowIso ? new Date(nowIso) : new Date();
   const scored = words
-    .map((word) => ({ word, score: scoreWordForTemplate(word, template) }))
+    .map((word) => ({ word, score: scoreWordForTemplate(word, template, now) }))
     .filter((item) => Number.isFinite(item.score))
-    .sort((a, b) => b.score - a.score || a.word.created_at.localeCompare(b.word.created_at) || a.word.id.localeCompare(b.word.id));
+    .sort((a, b) => b.score - a.score || a.word.use_count - b.word.use_count || a.word.created_at.localeCompare(b.word.created_at) || a.word.id.localeCompare(b.word.id));
   return scored[0]?.word ?? null;
 }

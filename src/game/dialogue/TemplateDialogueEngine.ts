@@ -10,11 +10,11 @@ import { selectWordForTemplate } from "./wordScoring";
 
 export class TemplateDialogueEngine implements DialogueEngine {
   next(context: DialogueContext): DialogueTurn {
-    const speechAct = selectSpeechAct(context);
-    const template = chooseTemplate(speechAct, context.words);
-    const word = template.word_slot || template.text.includes("{word}") ? selectWordForTemplate(context.words, template) : null;
-    const renderedText = renderTemplate(template, word);
     const turnIndex = context.words.reduce((sum, item) => sum + item.use_count, 0);
+    const speechAct = selectSpeechAct(context);
+    const template = chooseTemplate(speechAct, context.words, turnIndex);
+    const word = template.word_slot || template.text.includes("{word}") ? selectWordForTemplate(context.words, template, context.now) : null;
+    const renderedText = renderTemplate(template, word, context.words);
     return {
       speech_act: speechAct,
       text: applyAguriStyle({ template, renderedText, speechAct, word, turnIndex }),
@@ -43,12 +43,13 @@ export class TemplateDialogueEngine implements DialogueEngine {
   }
 }
 
-function chooseTemplate(speechAct: SpeechAct, words: WordFrame[]): DialogueTemplate {
+function chooseTemplate(speechAct: SpeechAct, words: WordFrame[], turnIndex: number): DialogueTemplate {
   const candidates = dialogueTemplates.filter((template) => template.speech_act === speechAct);
   if (candidates.length === 0) return dialogueTemplates[0];
-  const usable = candidates.find((template) => {
+  const usable = candidates.filter((template) => {
     if (!template.word_slot?.category) return true;
     return words.some((word) => !word.is_blocked && !word.is_sensitive && word.category === template.word_slot?.category);
   });
-  return usable ?? candidates[0];
+  const pool = usable.length > 0 ? usable : candidates;
+  return pool[turnIndex % pool.length];
 }
