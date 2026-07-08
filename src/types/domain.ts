@@ -182,6 +182,7 @@ export type GameSettings = {
   reduce_motion: boolean;
   text_speed: "slow" | "normal" | "fast";
   autosave: boolean;
+  auto_talk: boolean;
   debug_panel: boolean;
   updated_at: string;
 };

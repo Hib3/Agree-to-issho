@@ -63,10 +63,25 @@ export const importBackupRepository = createRepository("import_backups");
 export const assetManifestCacheRepository = createRepository("asset_manifest_cache");
 
 export const settingsRepository = {
-  get: () => appDb.get("settings", "local"),
-  save: (settings: GameSettings) => appDb.put("settings", settings),
+  async get() {
+    const settings = await appDb.get("settings", "local");
+    return settings ? migrateSettings(settings) : undefined;
+  },
+  save: (settings: GameSettings) => appDb.put("settings", migrateSettings(settings)),
   remove: () => appDb.delete("settings", "local")
 };
+
+function migrateSettings(settings: Partial<GameSettings> & Pick<GameSettings, "id">): GameSettings {
+  return {
+    id: settings.id,
+    reduce_motion: settings.reduce_motion ?? false,
+    text_speed: settings.text_speed ?? "normal",
+    autosave: settings.autosave ?? true,
+    auto_talk: settings.auto_talk ?? true,
+    debug_panel: settings.debug_panel ?? false,
+    updated_at: settings.updated_at ?? new Date().toISOString()
+  };
+}
 
 export async function getAllSaveRecords() {
   const [

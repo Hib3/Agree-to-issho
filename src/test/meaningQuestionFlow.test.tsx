@@ -7,7 +7,7 @@ import { MeaningQuestionFlow } from "../screens/MeaningQuestionFlow";
 import { applyCategory, applyEmotion, applySituation, createWordFrame } from "../game/word/createWordFrame";
 import type { WordFrame } from "../types/domain";
 
-function renderFlow(step: "category" | "detail" | "emotion" | "situation", word: WordFrame) {
+function renderFlow(step: "category" | "detail" | "emotion" | "situation" | "confirm", word: WordFrame) {
   const onStep = vi.fn();
   let currentWord = word;
   const onWordChange = vi.fn((next: WordFrame) => {
@@ -114,5 +114,20 @@ describe("MeaningQuestionFlow selection changes", () => {
     const buttons = screen.getAllByRole("button").filter((button) => button.closest(".option-grid"));
     expect(buttons.length).toBeGreaterThan(0);
     expect(buttons.every((button) => !button.hasAttribute("disabled"))).toBe(true);
+  });
+
+  it("confirm step shows a player-facing memo instead of internal category values", () => {
+    const food = {
+      ...applyCategory(createWordFrame("カレー"), "food"),
+      user_stance: "like" as const,
+      emotion_tags: ["happy" as const],
+      situation_tags: ["room" as const],
+      relation_tags: []
+    };
+
+    renderFlow("confirm", food);
+
+    expect(screen.getByText("好きな食べ物")).toBeTruthy();
+    expect(screen.queryByText("food")).toBeNull();
   });
 });

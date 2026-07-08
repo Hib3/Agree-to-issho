@@ -137,7 +137,7 @@ export function MeaningQuestionFlow({ step, word, onStep, onWordChange, onComple
           <dt>種類</dt>
           <dd>{wordCategoryLabels[word.category]}</dd>
         </div>
-        <div><dt>メモ</dt><dd>{word.relation_tags[0] ?? word.semantic_type ?? "まだ不明"}</dd></div>
+        <div><dt>メモ</dt><dd>{getMeaningMemo(word)}</dd></div>
         <div><dt>気持ち</dt><dd>{word.emotion_tags.map((emotion) => emotionLabels[emotion]).join("、") || "ふつう"}</dd></div>
         <div><dt>場面</dt><dd>{word.situation_tags.map((situation) => situationLabels[situation]).join("、") || "日常"}</dd></div>
         <div><dt>わかった度</dt><dd>{Math.round(word.confidence * 100)}%</dd></div>
@@ -292,4 +292,23 @@ function unknownDetail(): CategoryDetail {
 
 function unique<T>(values: T[]): T[] {
   return Array.from(new Set(values));
+}
+
+function getMeaningMemo(word: WordFrame): string {
+  if (word.category === "food") {
+    if (word.user_stance === "like") return "好きな食べ物";
+    if (word.user_stance === "dislike") return "苦手な食べ物";
+    if (word.emotion_tags.includes("curious")) return "気になる食べ物";
+  }
+  if (word.category === "place") return relationLabel(word.relation_tags[0], { want_to_go: "行きたい場所", calm: "落ち着く場所", event: "にぎやかな場所" });
+  if (word.category === "object") return relationLabel(word.relation_tags[0], { room: "部屋にありそう", outside: "外にありそう", belonging: "持ちもの" });
+  if (word.category === "person") return relationLabel(word.relation_tags[0], { near: "近い人", famous: "有名な人" });
+  if (word.category === "feeling") return relationLabel(word.relation_tags[0], { warm: "あたたかい感じ", lonely: "さみしい感じ", heart: "どきどきする感じ", quiet: "しずかな感じ" });
+  if (word.category === "action") return word.emotion_tags[0] ? `${emotionLabels[word.emotion_tags[0]]}動き` : "動きの言葉";
+  if (word.category === "unknown") return word.relation_tags[0] === "review" ? "あとで直す" : "仮置き";
+  return relationLabel(word.relation_tags[0], { daily: "日常の言葉", important: "大事な言葉" });
+}
+
+function relationLabel(value: string | undefined, labels: Record<string, string>): string {
+  return value ? labels[value] ?? "まだ不明" : "まだ不明";
 }

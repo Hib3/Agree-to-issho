@@ -23,6 +23,14 @@ export function SettingsScreen({ settings, onChange, onBack }: SettingsScreenPro
           />
           動きを控えめにする
         </label>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={settings?.auto_talk !== false}
+            onChange={(event) => onChange({ auto_talk: event.target.checked })}
+          />
+          アグリちゃんが自分から話す
+        </label>
         <label>
           文字速度
           <select value={settings?.text_speed ?? "normal"} onChange={(event) => onChange({ text_speed: event.target.value as GameSettings["text_speed"] })}>

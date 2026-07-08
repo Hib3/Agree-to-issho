@@ -123,6 +123,7 @@ export function App() {
       reduce_motion: false,
       text_speed: "normal",
       autosave: true,
+      auto_talk: true,
       debug_panel: false,
       updated_at: now
     });
@@ -161,6 +162,15 @@ export function App() {
     setTurn(nextTurn);
     await refresh();
   }
+
+  useEffect(() => {
+    if (screen !== "main-room" || !hasStarted || state.settings?.auto_talk === false) return;
+    const delayMs = state.settings?.reduce_motion ? 60000 : 42000;
+    const timer = window.setTimeout(() => {
+      void handleSpeak();
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [screen, hasStarted, state.settings?.auto_talk, state.settings?.reduce_motion, turn.text, state.words.length, state.dialogueLogs.length]);
 
   async function persistDialogueTurn(nextTurn: DialogueTurn) {
     const now = nowIso();
