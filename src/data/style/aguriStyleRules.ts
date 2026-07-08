@@ -13,6 +13,7 @@ export type AguriStyleRules = {
     warm: string[];
     soft: string[];
     polite: string[];
+    emphatic: string[];
   };
   openers: {
     softener: string[];
@@ -25,6 +26,12 @@ export type AguriStyleRules = {
     allowedCounts: number[];
     maxEveryTurns: number;
   };
+  bridgeStyle: {
+    maxStyledLinesPerTurn: number;
+    calmActs: string[];
+    emphaticActs: string[];
+    avoidConsecutiveLaugh: true;
+  };
   constraints: {
     maxLines: number;
     maxLineLength: number;
@@ -34,20 +41,27 @@ export type AguriStyleRules = {
 
 export const aguriStyleRules: AguriStyleRules = {
   endings: {
-    warm: ["だね。", "だよ。", "かな。"],
-    soft: ["かもしれないね。", "少しわかる気がするよ。"],
-    polite: ["覚えておくね。"]
+    warm: ["なァっ。", "よォっ。", "だよなァっ。"],
+    soft: ["かもしれませんねェっ。", "少しわかる気がするよォっ。"],
+    polite: ["覚えておきまァっすっ。"],
+    emphatic: ["なァっ！", "よォっ！", "ですねェっ！"]
   },
   openers: {
-    softener: ["あのね", "えっと", "そうだね"],
-    empathy: ["そうなんだね", "少しわかるよ"],
-    praise: ["いいね"],
-    surprise: ["えっ"]
+    softener: ["まァっ", "なんかっ", "あのっそのっ"],
+    empathy: ["そうなんだよなァっ", "めっちゃわかるよォっ"],
+    praise: ["めっちゃ"],
+    surprise: ["えェっ"]
   },
   laugh: {
-    token: "ふふ",
+    token: "ぎゃ",
     allowedCounts: [4, 6, 8],
     maxEveryTurns: 5
+  },
+  bridgeStyle: {
+    maxStyledLinesPerTurn: 2,
+    calmActs: ["greeting", "ask_new_word", "ask_category", "ask_emotion", "ask_situation", "confirm_meaning", "recall_word", "use_word_in_daily_talk"],
+    emphaticActs: ["praise_user", "misunderstanding_joke", "embarrassed_reaction", "happy_reaction"],
+    avoidConsecutiveLaugh: true
   },
   constraints: {
     maxLines: 3,

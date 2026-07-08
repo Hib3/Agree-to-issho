@@ -34,6 +34,7 @@ describe("Aguri style layer", () => {
 
     const occurrences = turn.text.split("夕焼け").length - 1;
     expect(occurrences).toBeLessThanOrEqual(1);
-    expect(turn.text).not.toMatch(/[ァォェ]っ/);
+    expect(turn.text).toMatch(/[ァォェ]っ/);
+    expect((turn.text.match(/[ァォェ]っ/g) ?? []).length).toBeLessThanOrEqual(2);
   });
 });
