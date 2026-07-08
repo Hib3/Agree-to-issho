@@ -22,7 +22,7 @@ export function TitleScreen({ hasStarted, wordCount, onStart, onContinue, onManu
     <main className="screen title-screen">
       <section className="title-room" style={roomStyle}>
         <header className="title-plate">
-          <h1>With Aguri</h1>
+          <h1>アグリといっしょ</h1>
           <p>言葉を教える小さな部屋</p>
         </header>
 
