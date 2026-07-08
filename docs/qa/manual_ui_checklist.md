@@ -1,0 +1,23 @@
+# Manual UI Checklist
+
+- [ ] Start app fresh.
+- [ ] Click `はじめから`.
+- [ ] Enter player name.
+- [ ] Enter main room.
+- [ ] Confirm the room looks warm and ordinary, not a purple dashboard.
+- [ ] Confirm Aguri appears once, not split, not cropped, not duplicated.
+- [ ] Click `言葉を教える`.
+- [ ] Type `カレー`.
+- [ ] On category step, click `食べ物`, then `場所`, then `気持ち`.
+- [ ] Confirm selected state moves each time.
+- [ ] Click `次へ`.
+- [ ] On emotion step, click `好き`, then `かなしい`, then `大事`.
+- [ ] Confirm selected state moves each time.
+- [ ] Click `次へ`.
+- [ ] On situation step, click `部屋`, then `日常`, then `日記`.
+- [ ] Confirm selected state moves each time.
+- [ ] Save.
+- [ ] Return to main room.
+- [ ] Click `話す` several times.
+- [ ] Confirm no UI becomes unclickable.
+- [ ] Confirm normal gameplay does not show raw labels such as `schema`, `app_id`, or `confidence`.

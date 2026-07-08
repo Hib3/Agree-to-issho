@@ -1,0 +1,256 @@
+export type Id = string;
+
+export type WordCategory =
+  | "person"
+  | "place"
+  | "food"
+  | "object"
+  | "action"
+  | "feeling"
+  | "time"
+  | "idea"
+  | "unknown";
+
+export type EmotionTag =
+  | "happy"
+  | "sad"
+  | "curious"
+  | "lonely"
+  | "sleepy"
+  | "embarrassed"
+  | "proud"
+  | "neutral";
+
+export type SituationTag =
+  | "greeting"
+  | "daily_talk"
+  | "room"
+  | "memory"
+  | "question"
+  | "diary"
+  | "event"
+  | "unknown";
+
+export type CharacterExpression =
+  | "idle_normal"
+  | "idle_smile"
+  | "idle_blink"
+  | "talk_normal"
+  | "talk_smile"
+  | "happy"
+  | "sad"
+  | "surprised"
+  | "angry"
+  | "embarrassed"
+  | "thinking"
+  | "sleepy"
+  | "lonely"
+  | "confused"
+  | "proud";
+
+export type SpeechAct =
+  | "greeting"
+  | "ask_new_word"
+  | "ask_category"
+  | "ask_emotion"
+  | "ask_situation"
+  | "ask_relation"
+  | "confirm_meaning"
+  | "recall_word"
+  | "use_word_in_daily_talk"
+  | "diary_entry"
+  | "misunderstanding_joke"
+  | "ask_correction"
+  | "praise_user"
+  | "lonely_reaction"
+  | "sleepy_reaction"
+  | "happy_reaction"
+  | "embarrassed_reaction"
+  | "goodbye";
+
+export type AppProfile = {
+  id: "local";
+  player_name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CharacterState = {
+  id: "main";
+  character_name: string;
+  expression: CharacterExpression;
+  affection: number;
+  energy: number;
+  last_interaction_at?: string;
+  updated_at: string;
+};
+
+export type WordFrame = {
+  id: Id;
+  surface: string;
+  reading: string;
+  category: WordCategory;
+  semantic_type: string;
+  part_of_speech: "noun" | "verb" | "adjective" | "phrase" | "unknown";
+  user_stance: "like" | "neutral" | "dislike" | "unknown";
+  character_stance: "likes" | "curious" | "confused" | "avoids" | "unknown";
+  emotion_tags: EmotionTag[];
+  situation_tags: SituationTag[];
+  relation_tags: string[];
+  affordances: string[];
+  related_word_ids: Id[];
+  confidence: number;
+  taught_by_user: boolean;
+  source_question_ids: string[];
+  use_count: number;
+  last_used_at?: string;
+  created_at: string;
+  updated_at: string;
+  is_sensitive: boolean;
+  is_blocked: boolean;
+  notes: string;
+};
+
+export type WordRelation = {
+  id: Id;
+  from_word_id: Id;
+  to_word_id: Id;
+  relation_type: "similar" | "opposite" | "used_with" | "user_linked";
+  confidence: number;
+  created_at: string;
+};
+
+export type DialogueLog = {
+  id: Id;
+  speech_act: SpeechAct;
+  text: string;
+  used_word_ids: Id[];
+  created_at: string;
+};
+
+export type DialogueSummary = {
+  id: Id;
+  summary: string;
+  word_ids: Id[];
+  created_at: string;
+};
+
+export type DiaryEntry = {
+  id: Id;
+  entry_date: string;
+  title: string;
+  body: string;
+  used_word_ids: Id[];
+  mood: EmotionTag;
+  created_at: string;
+};
+
+export type EventFlag = {
+  id: Id;
+  key: string;
+  value: boolean | number | string;
+  updated_at: string;
+};
+
+export type GameSettings = {
+  id: "local";
+  reduce_motion: boolean;
+  text_speed: "slow" | "normal" | "fast";
+  autosave: boolean;
+  debug_panel: boolean;
+  updated_at: string;
+};
+
+export type ImportBackup = {
+  id: Id;
+  created_at: string;
+  reason: string;
+  data: ExportedSaveData;
+};
+
+export type AssetManifestItem = {
+  id: string;
+  expression: CharacterExpression;
+  path: string;
+  exists: boolean;
+  status?: "approved" | "pending" | "rejected" | "missing";
+  notes: string;
+};
+
+export type DialogueTemplate = {
+  id: string;
+  speech_act: SpeechAct;
+  text: string;
+  intent?: "greeting" | "learning_prompt" | "memory_recall" | "daily_question" | "correction" | "praise" | "lonely" | "diary";
+  word_slot?: {
+    category?: WordCategory;
+    situation?: SituationTag;
+  };
+  expression: CharacterExpression;
+};
+
+export type DialogueTurn = {
+  speech_act: SpeechAct;
+  text: string;
+  expression: CharacterExpression;
+  used_words: WordFrame[];
+};
+
+export type DialogueContext = {
+  profile: AppProfile | null;
+  character_state: CharacterState | null;
+  words: WordFrame[];
+  settings: GameSettings | null;
+  now: string;
+};
+
+export type LearningQuestion = {
+  id: string;
+  speech_act: SpeechAct;
+  prompt: string;
+  field: "category" | "user_stance" | "situation_tags";
+  options: Array<{ value: string; label: string }>;
+};
+
+export type PendingLearning = {
+  draft_word_id: Id;
+  question_ids: string[];
+  current_question_id?: string;
+};
+
+export type ExportedSaveData = {
+  schema_version: 1;
+  app_id: "aguri-word-room" | "with-agree";
+  exported_at: string;
+  app_version: string;
+  profile: AppProfile | null;
+  character_state: CharacterState | null;
+  words: WordFrame[];
+  word_relations: WordRelation[];
+  diary_entries: DiaryEntry[];
+  dialogue_summaries: DialogueSummary[];
+  event_flags: EventFlag[];
+  settings: GameSettings | null;
+  checksum: string;
+};
+
+export type ImportPreview = {
+  valid: boolean;
+  mode: "replace" | "merge";
+  word_count: number;
+  diary_count: number;
+  conflict_surfaces: string[];
+  errors: string[];
+  data?: ExportedSaveData;
+};
+
+export type Screen =
+  | "title"
+  | "first-start"
+  | "main-room"
+  | "teach-word"
+  | "wordbook"
+  | "diary"
+  | "settings"
+  | "import-export"
+  | "manual";

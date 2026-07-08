@@ -1,0 +1,19 @@
+{
+  "name": "With Aguri",
+  "short_name": "With Aguri",
+  "description": "A fan-made offline word-learning conversation PWA.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#efe5d2",
+  "theme_color": "#7b5a8e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/characters/main/fullbody/approved/aguri_normal.png",
+      "sizes": "640x959",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,311 @@
+# PS1 Data Observations
+
+## 1. 解析対象ファイル一覧
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` size=623327040 bytes ext=.bin
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.CUE` size=76 bytes ext=.cue
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` ISO9660=True sector=2352 payload_offset=24 file_count=9
+- 確認済み: ISO内 `SYSTEM.CNF` size=68 lba=23 offset=54120
+- 確認済み: ISO内 `SCPS_100.92` size=86016 lba=24 offset=56472
+- 確認済み: ISO内 `DOKODEMO.417` size=47087616 lba=66 offset=155256
+- 確認済み: ISO内 `BGM.STR` size=66125824 lba=23058 offset=54232440
+- 確認済み: ISO内 `KANKYOU.STR` size=96370688 lba=55346 offset=130173816
+- 確認済み: ISO内 `XASE.STR` size=23625728 lba=102402 offset=240849528
+- 確認済み: ISO内 `SONG.STR` size=65323008 lba=113938 offset=267982200
+- 確認済み: ISO内 `TV.STR` size=216137728 lba=145834 offset=343001592
+- 確認済み: ISO内 `DUMMY.180` size=27648000 lba=251370 offset=591222264
+
+## 2. 実行したコマンド
+- 確認済み: `git status --short`
+- 確認済み: `.gitignore` のPS1イメージ除外設定確認
+- 確認済み: `python tools/inspect_ps1/inspect_disc_image.py "C:\dev\With_Agree\doko-demo-issyo"`
+- 確認済み: `python tools/inspect_ps1/list_iso9660_files.py "C:\dev\With_Agree\doko-demo-issyo"`
+- 確認済み: `python tools/inspect_ps1/scan_magic_numbers.py "C:\dev\With_Agree\doko-demo-issyo"`
+- 確認済み: `python tools/inspect_ps1/scan_strings.py "C:\dev\With_Agree\doko-demo-issyo"`
+- 確認済み: `python tools/inspect_ps1/scan_iso_regions.py`
+- 確認済み: `python tools/inspect_ps1/scan_cna_archive.py`
+- 確認済み: `python tools/inspect_ps1/scan_cna_natural_text_candidates.py`
+- 確認済み: `python tools/inspect_ps1/scan_cna_format_markers.py`
+- 確認済み: `python tools/inspect_ps1/analyze_entry1_format_xrefs.py`
+- 確認済み: `python tools/inspect_ps1/analyze_entry1_text_regions.py`
+- 確認済み: `python tools/inspect_ps1/analyze_learning_region_links.py`
+- 確認済み: `python tools/inspect_ps1/analyze_entry1_mips_refs.py`
+- 確認済み: `python tools/inspect_ps1/analyze_entry1_call_graph.py`
+- 確認済み: `python tools/inspect_ps1/analyze_entry1_pointer_tables.py`
+- 確認済み: `python tools/inspect_ps1/analyze_entry1_save_load_flow.py`
+- 確認済み: `python tools/inspect_ps1/analyze_speech_slot_links.py`
+- 確認済み: `python tools/inspect_ps1/summarize_findings.py`
+
+## 3. 文字列候補の概要
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` Shift_JIS候補=27755490 短い候補=27290443 ASCII候補=4121695
+
+## 4. 形式候補
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` TIM image candidate count=66994 offsets_sample=[25539, 60731, 60767, 61479, 62159, 63023, 63039, 64323]
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` XA audio sector text marker candidate count=1 offsets_sample=[38680]
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` STR video sector marker candidate count=36 offsets_sample=[51901, 52081, 52198, 52314, 52372, 202333, 202348, 202357]
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` ISO9660 volume descriptor count=3 offsets_sample=[37657, 40009, 223820]
+- 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` PlayStation executable count=2 offsets_sample=[56472, 199944]
+- 確認済み: `SYSTEM.CNF` entropy64k=4.7012 magic={} SJIS候補=0 短い候補=0
+- 確認済み: `SCPS_100.92` entropy64k=7.2614 magic={'tim_image_candidate': 57, 'ps_x_exe': 1} SJIS候補=2396 短い候補=2294 PS-X EXE text_size=83968 text_address=2148663296
+- 確認済み: `DOKODEMO.417` entropy64k=4.3821 magic={'tim_image_candidate': 54872, 'str_marker_candidate': 12, 'ps_x_exe': 1} SJIS候補=710385 短い候補=669770
+- 確認済み: `DUMMY.180` entropy64k=-0.0 magic={} SJIS候補=0 短い候補=0
+- 確認済み: `DOKODEMO.417` は先頭`CNA`、version=1、内部エントリ数=630、tail_padding=10240
+- 確認済み: CNA内部head_class_counts={'lpf_container_candidate': 1, 'ps_x_exe': 1, 'unknown': 628}
+- 確認済み: CNA entry index=0 class=lpf_container_candidate offset=10240 size=28168
+- 確認済み: CNA entry index=1 class=ps_x_exe offset=38912 size=468992
+- 確認済み: CNA文字列密度候補 index=19 offset=8105984 size=597872 SJIS候補=6088 短い候補=4248
+- 確認済み: CNA文字列密度候補 index=55 offset=28647424 size=327680 SJIS候補=5138 短い候補=5099
+- 確認済み: CNA文字列密度候補 index=43 offset=27312128 size=324624 SJIS候補=5065 短い候補=5019
+- 確認済み: CNA文字列密度候補 index=49 offset=27981824 size=320256 SJIS候補=5050 短い候補=5010
+- 確認済み: CNA文字列密度候補 index=46 offset=27648000 size=323408 SJIS候補=5045 短い候補=5007
+- 確認済み: CNA文字列密度候補 index=52 offset=28313600 size=321792 SJIS候補=5001 短い候補=4958
+- 確認済み: CNA文字列密度候補 index=1 offset=38912 size=468992 SJIS候補=3290 短い候補=3271
+- 確認済み: CNA文字列密度候補 index=17 offset=6676480 size=714092 SJIS候補=3110 短い候補=2019
+- 確認済み: CNA自然文候補entry数=462
+- 確認済み: CNA自然文候補 index=1 count=37 runs=1352 lengths={'17-32': 9, '4-8': 11, '9-16': 17}
+- 確認済み: CNA自然文候補 index=15 count=8 runs=4920 lengths={'9-16': 3, '4-8': 5}
+- 確認済み: CNA自然文候補 index=4111 count=8 runs=480 lengths={'4-8': 6, '9-16': 2}
+- 確認済み: CNA自然文候補 index=2125 count=7 runs=489 lengths={'9-16': 3, '4-8': 4}
+- 確認済み: CNA自然文候補 index=2150 count=7 runs=509 lengths={'9-16': 1, '4-8': 6}
+- 確認済み: CNA自然文候補 index=4117 count=7 runs=541 lengths={'4-8': 7}
+- 確認済み: CNA自然文候補 index=4162 count=7 runs=561 lengths={'4-8': 7}
+- 確認済み: CNA自然文候補 index=1157 count=6 runs=541 lengths={'9-16': 3, '4-8': 3}
+- 確認済み: CNA自然文候補 index=1158 count=6 runs=534 lengths={'4-8': 5, '9-16': 1}
+- 確認済み: CNA自然文候補 index=1164 count=6 runs=468 lengths={'4-8': 5, '9-16': 1}
+- 確認済み: CNA format archive_counts={'%s': 212, '%d': 335, '%02d': 4, '%ld': 1, '%c': 191}
+- 確認済み: CNA format marker entry_count=350
+- 確認済み: CNA format index=1 total=143 counts={'%s': 42, '%d': 97, '%02d': 4}
+- 確認済み: CNA format index=1005 total=21 counts={'%s': 21}
+- 確認済み: CNA format index=19 total=8 counts={'%d': 3, '%c': 5}
+- 確認済み: CNA format index=46 total=5 counts={'%s': 2, '%d': 1, '%c': 2}
+- 確認済み: CNA format index=156 total=5 counts={'%s': 1, '%d': 3, '%c': 1}
+- 確認済み: CNA format index=2136 total=5 counts={'%s': 1, '%d': 3, '%c': 1}
+- 確認済み: CNA format index=3151 total=5 counts={'%s': 1, '%d': 3, '%c': 1}
+- 確認済み: CNA format index=149 total=4 counts={'%s': 1, '%d': 2, '%c': 1}
+- 確認済み: CNA format index=1121 total=4 counts={'%s': 1, '%d': 3}
+- 確認済み: CNA format index=1148 total=4 counts={'%s': 1, '%d': 2, '%c': 1}
+- 確認済み: entry 1 format marker_totals={'%d': {'count': 97, 'xref_count': 0}, '%s': {'count': 42, 'xref_count': 18}, '%02d': {'count': 4, 'xref_count': 1}}
+- 確認済み: entry 1 format xref function_start=2147895960 function_size=736 markers=['%s'] xref_count=4
+- 確認済み: entry 1 format xref function_start=2147769112 function_size=284 markers=['%s'] xref_count=3
+- 確認済み: entry 1 format xref function_start=2147887364 function_size=1028 markers=['%s'] xref_count=3
+- 確認済み: entry 1 format xref function_start=2147594084 function_size=604 markers=['%s'] xref_count=2
+- 確認済み: entry 1 format xref function_start=2147626428 function_size=1240 markers=['%s'] xref_count=2
+- 確認済み: entry 1 format xref function_start=2147886004 function_size=640 markers=['%s'] xref_count=1
+- 確認済み: entry 1 format xref function_start=2147886644 function_size=712 markers=['%s'] xref_count=1
+- 確認済み: entry 1 format xref function_start=2147889536 function_size=360 markers=['%s'] xref_count=1
+- 確認済み: entry 1 format xref function_start=2147821176 function_size=168 markers=['%s'] xref_count=1
+- 確認済み: entry 1 format xref function_start=2147694324 function_size=840 markers=['%02d'] xref_count=1
+- 確認済み: entry 1 text cluster_count=570 interesting=32
+- 確認済み: entry 1 text region vaddr=2147553100..2147555147 keywords={'WORD': 5, 'QUEST': 22, 'DIARY': 3, 'CLOCK': 2, 'LOAD': 7, 'SAVE': 2, 'CARD': 1, 'MEM': 1} markers={'%s': 4, '%d': 18} xrefs=90
+- 確認済み: entry 1 text region vaddr=2147568836..2147570439 keywords={'KOTO': 1, 'MEM': 1} markers={'%s': 18, '%d': 16} xrefs=74
+- 確認済み: entry 1 text region vaddr=2147566476..2147567257 keywords={'KOTO': 1, 'LOAD': 2} markers={'%s': 2, '%d': 15} xrefs=46
+- 確認済み: entry 1 text region vaddr=2147551824..2147552935 keywords={'ANS': 2, 'PDA': 1, 'CARD': 16, 'MEM': 9} markers={'%s': 10, '%d': 10} xrefs=34
+- 確認済み: entry 1 text region vaddr=2147551232..2147551726 keywords={'DIARY': 2, 'PDA': 1, 'CLOCK': 2, 'LOAD': 1, 'SAVE': 1, 'MEM': 1} markers={'%d': 1} xrefs=30
+- 確認済み: entry 1 text region vaddr=2147567464..2147567660 keywords={} markers={} xrefs=26
+- 確認済み: entry 1 text region vaddr=2147559776..2147564192 keywords={} markers={'%d': 7} xrefs=19
+- 確認済み: entry 1 text region vaddr=2148013192..2148013376 keywords={} markers={'%s': 2} xrefs=18
+- 確認済み: entry 1 text region vaddr=2147556340..2147556932 keywords={'DIARY': 6} markers={'%d': 6} xrefs=14
+- 確認済み: entry 1 text region vaddr=2147934160..2147934191 keywords={} markers={} xrefs=13
+- 確認済み: entry 1 text region vaddr=2147986472..2147986557 keywords={} markers={} xrefs=13
+- 確認済み: entry 1 text region vaddr=2148015421..2148016165 keywords={'LOAD': 1} markers={'%s': 2, '%d': 3, '%02d': 1} xrefs=12
+- 確認済み: learning links WQ_regions=1 ANS_regions=1 WQ_functions=20 ANS_functions=10
+- 確認済み: learning links shared_functions=0 direct_links=5 common_callees=9
+- 確認済み: entry 1 PS-X EXE text_addr=2147551232 text_size=466944 pc0=2147786836
+- 確認済み: entry 1 keyword_hit_counts={'SAVE': 3, 'LOAD': 12, 'CARD': 17, 'MCRD': 1, 'MEM': 12, 'DIARY': 16, 'WORD': 5, 'KOTO': 2, 'QUEST': 22, 'ANS': 2, 'EVENT': 2, 'DAY': 3, 'TIME': 10, 'CLOCK': 4, 'PDA': 2, 'TALK': 2, 'IR': 13}
+- 確認済み: entry 1 keyword_xref_counts={'SAVE': 0, 'LOAD': 2, 'CARD': 0, 'MCRD': 0, 'MEM': 2, 'DIARY': 2, 'WORD': 0, 'KOTO': 0, 'QUEST': 0, 'ANS': 0, 'EVENT': 0, 'DAY': 0, 'TIME': 0, 'CLOCK': 1, 'PDA': 2, 'TALK': 0, 'IR': 0}
+- 確認済み: entry 1 関数候補数=1093
+- 確認済み: entry 1 xref keyword=PDA code=2147590620 function_start=2147589676 function_size=3104
+- 確認済み: entry 1 xref keyword=PDA code=2147590636 function_start=2147589676 function_size=3104
+- 確認済み: entry 1 xref keyword=DIARY code=2147591168 function_start=2147589676 function_size=3104
+- 確認済み: entry 1 xref keyword=CLOCK code=2147592084 function_start=2147589676 function_size=3104
+- 確認済み: entry 1 xref keyword=MEM code=2147592268 function_start=2147589676 function_size=3104
+- 確認済み: entry 1 xref keyword=MEM code=2147592468 function_start=2147589676 function_size=3104
+- 確認済み: entry 1 xref keyword=DIARY code=2147698560 function_start=2147698140 function_size=512
+- 確認済み: entry 1 xref keyword=LOAD code=2147769712 function_start=2147769692 function_size=96
+- 確認済み: entry 1 xref keyword=LOAD code=2147779088 function_start=2147779068 function_size=236
+- 確認済み: entry 1 関数候補数=1093 callsあり関数=999
+- 確認済み: entry 1 key function start=2147589676 keywords=['CLOCK', 'DIARY', 'MEM', 'PDA'] direct_calls=153 unique_callees=30 incoming=1
+- 確認済み: entry 1 key function start=2147698140 keywords=['DIARY'] direct_calls=20 unique_callees=11 incoming=0
+- 確認済み: entry 1 key function start=2147769692 keywords=['LOAD'] direct_calls=1 unique_callees=1 incoming=0
+- 確認済み: entry 1 key function start=2147779068 keywords=['LOAD'] direct_calls=4 unique_callees=4 incoming=0
+- 確認済み: entry 1 pointer keyword=WORD string_vaddr=2147554602 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=WORD string_vaddr=2147554630 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=WORD string_vaddr=2147554658 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=WORD string_vaddr=2147554686 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=WORD string_vaddr=2147555093 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=KOTO string_vaddr=2147567093 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=KOTO string_vaddr=2147569629 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553292 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553377 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553455 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553516 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553587 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553749 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553889 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147553943 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554001 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554121 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554169 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554251 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554280 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554336 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554393 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554443 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554496 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554553 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554609 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554719 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554814 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=QUEST string_vaddr=2147554906 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=ANS string_vaddr=2147552457 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=ANS string_vaddr=2147552473 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147551551 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147551560 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147554238 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147554266 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147554294 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556095 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556175 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556199 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556768 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556794 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556818 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556841 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556865 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147556882 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147558644 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=DIARY string_vaddr=2147564805 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=PDA string_vaddr=2147551512 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=PDA string_vaddr=2147552722 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CLOCK string_vaddr=2147551635 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CLOCK string_vaddr=2147551644 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CLOCK string_vaddr=2147553881 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CLOCK string_vaddr=2147553909 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147551691 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147553994 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147554018 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147554162 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147554190 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147554218 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147554899 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147554927 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147556066 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147566776 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2147567008 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=LOAD string_vaddr=2148015620 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=SAVE string_vaddr=2147551663 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=SAVE string_vaddr=2147554807 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=SAVE string_vaddr=2147554875 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552303 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552563 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552583 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552599 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552619 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552635 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552651 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552673 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552710 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552778 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552806 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552838 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552866 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552882 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552902 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147552922 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=CARD string_vaddr=2147553240 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147551672 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552486 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552498 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552560 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552580 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552596 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552616 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552632 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552648 pointer_count=1 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147552742 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147553237 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer keyword=MEM string_vaddr=2147569745 pointer_count=0 pointer_code_refs=0
+- 確認済み: entry 1 pointer table keywords=['MEM'] targets=6 code_refs=0 run_count=27
+- 確認済み: entry 1 pointer table keywords=['LOAD'] targets=1 code_refs=0 run_count=1
+- 確認済み: save/load flow key_functions=4 load_functions=2 sync_or_memory_functions=2
+- 確認済み: LOAD候補 非スタックload=11 非スタックstore=2
+- 確認済み: PDA/CLOCK/MEM/DIARY系候補 非スタックload=79 非スタックstore=14
+- 確認済み: save/load function start=2147589676 keywords=['CLOCK', 'DIARY', 'MEM', 'PDA'] size=3104 direct_calls=153 branches=175 non_stack_loads=74 non_stack_stores=6
+- 確認済み: save/load function start=2147698140 keywords=['DIARY'] size=512 direct_calls=20 branches=20 non_stack_loads=5 non_stack_stores=8
+- 確認済み: save/load function start=2147769692 keywords=['LOAD'] size=96 direct_calls=1 branches=1 non_stack_loads=3 non_stack_stores=0
+- 確認済み: save/load function start=2147779068 keywords=['LOAD'] size=236 direct_calls=4 branches=8 non_stack_loads=8 non_stack_stores=2
+- 確認済み: speech slot links format_s_functions=9 learning_functions=30 WQ_functions=20 ANS_functions=10
+- 確認済み: speech slot links shared_with_WQ=1 shared_with_ANS=1 shared_with_any_learning=2
+- 確認済み: speech slot links direct_links=1 common_callees=21
+
+## 5. 学習システムに関係しそうな一般的観察
+- 確認済み: 入力ファイルのサイズ、拡張子、部分ハッシュ、ISO9660候補を記録した。
+- 確認済み: ISO9660ディレクトリからファイル名、LBA、サイズを記録した。
+- 確認済み: `DOKODEMO.417` は先頭`CNA`の内部アーカイブ候補として、630件のエントリ表を持つ。
+- 確認済み: `DOKODEMO.417` 内部に文字列密度が高い複数エントリがある。
+- 確認済み: `DOKODEMO.417` 内部にPS-X EXE候補が1件ある。
+- 確認済み: entry 1内で`PDA`, `DIARY`, `CLOCK`, `MEM`, `LOAD`の一部がMIPSコードから参照される。
+- 確認済み: `PDA`, `DIARY`, `CLOCK`, `MEM`参照は同一の大きな関数候補に集中する。
+- 確認済み: `PDA/CLOCK/MEM/DIARY`関数候補は直接呼び出し153回、`LOAD`関数候補は直接呼び出し1回/4回。
+- 確認済み: `PDA/CLOCK/MEM/DIARY`系候補には非スタックload/storeがあり、`LOAD`候補2件にも非スタックloadと少数のstoreがある。
+- 確認済み: `WORD/QUEST/ANS`はentry 1内に構造ラベルとして存在する。個別ラベルへのポインタ表は今回確認できていないが、`WORD/QUEST`を含む領域と`ANS`を含む別領域はMIPSコードから参照される。
+- 確認済み: CNA entry 1は自然文らしい候補が最多。
+- 確認済み: `%s/%d/%c`などのフォーマット記号候補がentry 1に集中する。
+- 確認済み: entry 1内の`%s`は42件あり、そのうち18件がMIPSコードから参照される。
+- 確認済み: `%s`参照関数候補9件のうち、学習関連領域参照関数と2件が重なり、直接リンク1件、共通呼び先21件を持つ。
+- 確認済み: entry 1内の`WORD/QUEST`を含むテキスト領域はMIPSコードから90回参照される。
+- 確認済み: entry 1内の`ANS`を含む別テキスト領域はMIPSコードから34回参照される。
+- 確認済み: `WORD/QUEST`参照関数群と`ANS`参照関数群は共有関数0件、直接リンク5件、共通呼び先9件。
+- 確認済み: テキスト候補は集計情報として保存し、全文dumpは保存していない。
+- 確認済み: 画像・音声・動画は抽出していない。
+
+## 6. 不明点
+- 不明: `CNA`および`LPF`候補の正式な仕様名と各フィールドの意味。
+- 不明: 個別データ領域の正式なファイル形式。
+- 不明: 学習単語、カテゴリ、質問、日記、イベントの実データ構造。
+- 不明: `WORD/QUEST/ANS`の実処理関数、テーブル、状態遷移の場所。
+- 不明: `%s`等がユーザー学習語の差し込みに使われるかどうか。
+- 不明: 原作の発話テンプレート選択ロジックと学習語選択重み。
+- 不明: `WORD/QUEST`参照済み領域が学習処理本体か、表示ラベル/状態名/デバッグ名か。
+- 不明: `ANS`参照済み領域が回答保存処理本体か、表示ラベル/状態名か。
+- 不明: セーブデータまたはメモリカード構造の正確なフィールド配置。
+- 不明: `LOAD`候補2件が保存データ復元、内部リソースロード、または表示状態復元のどれに対応するか。
+
+## 7. 推測
+- 推測: 会話ゲームの言葉学習は、入力語、カテゴリ、使用条件、親密度やイベント状態などの抽象属性を分けると再設計しやすい。
+- 推測: 短い文字列候補が密集している領域が見つかった場合、辞書、ラベル、選択肢、UI文言のいずれかである可能性がある。
+- 推測: 長めの文字列候補が連続する領域が見つかった場合、会話テンプレートまたはシナリオ断片である可能性がある。
+- 推測: `DOKODEMO.417` のCNA候補エントリ表は、ゲーム本体がロードする内部リソース群を管理している可能性がある。
+- 推測: CNA内部の高文字列密度エントリは、会話、質問、日記、UIラベル、辞書風データのいずれかを含む可能性がある。
+- 推測: CNA内部のPS-X EXE候補は、メイン実行ファイルからロードされるサブプログラムまたはPocketStation連携処理に関係する可能性がある。ただし未確認。
+- 推測: entry 1の`PDA/CLOCK/MEM/DIARY`集中関数候補は、PocketStation相当の携帯状態、時計差分、メモリ状態、日記状態を同期する処理である可能性がある。
+- 推測: entry 1の`LOAD`関数候補は、保存データ、内部リソース、またはロード済み状態をランタイム用に復元する小さな処理である可能性がある。
+- 推測: PWA側のロード処理は、保存JSONの読み込み、schema検証、未回答学習状態の復元、学習語index再構築を小さな関数に分けるのが安全。
+- 推測: PWA側の`confidence`, `cooldown`, `usageCount`等は原作復元ではなく、公開機能を満たすための近似実装である。
+- 推測: コード参照される`%s`から、原作内部に何らかのスロット式表示/整形が存在する。ただしユーザー語差し込み専用とは断定しない。
+- 推測: `%s`参照関数と学習関連領域参照関数に重なりと呼び出し近接があるため、PWAで覚えた語をオリジナル発話スロットへ入れる設計は妥当。ただし原作テンプレートや重みは不明。
+- 推測: `WORD/QUEST`参照済み領域から、言葉学習と質問に関する状態名または表示名がentry 1内でまとまって扱われている可能性がある。
+- 推測: `WORD/QUEST`領域と`ANS`領域の主な参照元関数群が分かれるため、質問生成と回答適用は別責務として扱うのがPWAでは安全。
+- 推測: 両領域は直接リンクと共通呼び先を持つため、別責務だが連携する学習サブシステムとして扱うのがPWAでは妥当。
+
+## 8. ファンメイドPWAへ転用してよい抽象設計アイデア
+- `learnWord(input)`、`chooseLearningQuestion()`、`applyLearningAnswer()`、`finalizeLearnedWord()` を分ける。
+- `chooseSpeechSlot()`、`pickWordForSpeech()`、`renderSpeech()` を分ける。
+- ユーザー入力語は `surface` と `normalized` を最低限保存する。
+- 新しい言葉は、少なくとも1つの追加質問に回答されてから学習済みにする。
+- 覚えた言葉は、PWAオリジナル発話文の安全なスロットへ原則1語だけ入れる。
+- 保存・ロードは、JSON読み込み、schema検証、未回答学習状態復元、学習語index再構築に分ける。
+- import/exportはユーザー作成の学習データだけをJSON化する。
+- `category`, `confidence`, `cooldown`, `usageCount`, `preference` 等を使う場合は、原作仕様ではなくPWA側の近似フィールドとして扱う。
+- 実装時は `docs/research/PWA_MAIN_ALGORITHM_BLUEPRINT.md`、`docs/research/PWA_CORE_ALGORITHM_CONTRACT.md`、`docs/research/PWA_ALGORITHM_TRACEABILITY.md`、`docs/research/PWA_LEARNING_SPEAKING_STATE_MACHINE.md`、`docs/research/SAVE_LOAD_MEMORY_FLOW.md`、`docs/research/SPEECH_SLOT_MODEL.md` を優先し、未確認の原作仕様を追加しない。
+
+## 9. 転用してはいけない原作固有要素
+- 原作の会話文、辞書、固有名詞、キャラ設定、イベント、演出順序。
+- 抽出画像、抽出音声、抽出動画、抽出テキスト全文。
+- 原作データ内の具体的な台詞やシナリオ構造を再現できる量の文字列サンプル。
+- 原作固有のキャラクター口調や関係性をそのまま模倣する設計。
+
+## 10. 次に手作業で確認すべきこと
+- `dokodemo/` に対象の `.cue/.bin/.iso/.img` が置かれているか確認する。
+- 生成JSONの件数、長さ分布、オフセットだけを見て、文字列密集領域の有無を確認する。
+- 原文を読まずに、短い候補の密度や長さ分布から「辞書らしさ」「テンプレートらしさ」を判断する。
+- 必要なら個別オフセット周辺を少量だけ私的確認し、レポートには原文ではなく構造だけを残す。
