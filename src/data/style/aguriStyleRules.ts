@@ -59,7 +59,7 @@ export const aguriStyleRules: AguriStyleRules = {
   },
   bridgeStyle: {
     maxStyledLinesPerTurn: 3,
-    calmActs: ["greeting", "ask_new_word", "ask_category", "ask_emotion", "ask_situation", "confirm_meaning", "recall_word", "use_word_in_daily_talk"],
+    calmActs: ["greeting", "ask_category", "ask_emotion", "ask_situation", "confirm_meaning"],
     emphaticActs: ["praise_user", "misunderstanding_joke", "embarrassed_reaction", "happy_reaction"],
     avoidConsecutiveLaugh: true
   },
