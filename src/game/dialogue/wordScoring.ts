@@ -1,7 +1,7 @@
 import type { DialogueTemplate, WordFrame } from "../../types/domain";
 
 export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate, now = new Date()): number {
-  if (word.is_blocked || word.is_sensitive) return Number.NEGATIVE_INFINITY;
+  if (word.is_blocked || word.is_sensitive || word.forgotten_at) return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.category && word.category !== template.word_slot.category) return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.situation && !word.situation_tags.includes(template.word_slot.situation)) return Number.NEGATIVE_INFINITY;
 
@@ -14,8 +14,11 @@ export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate
     ? 0.8
     : 0;
   const confidenceBonus = word.confidence * 3;
+  const memoryBonus = word.memory_strength * 1.5;
+  const favoriteBonus = word.favorite_score * 1.2;
+  const ambiguityPenalty = word.ambiguity_score > 0.75 && template.speech_act !== "ask_correction" ? 0.9 : 0;
   const usePenalty = Math.min(word.use_count, 12) * 0.38;
-  return confidenceBonus + unusedPeriodBonus + situationMatchBonus + importantEmotionBonus - usePenalty - recentPenalty;
+  return confidenceBonus + memoryBonus + favoriteBonus + unusedPeriodBonus + situationMatchBonus + importantEmotionBonus - ambiguityPenalty - usePenalty - recentPenalty;
 }
 
 export function selectWordForTemplate(words: WordFrame[], template: DialogueTemplate, nowIso?: string): WordFrame | null {

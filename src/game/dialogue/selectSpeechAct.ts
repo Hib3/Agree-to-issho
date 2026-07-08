@@ -1,7 +1,7 @@
 import type { DialogueContext, SpeechAct } from "../../types/domain";
 
 export function selectSpeechAct(context: DialogueContext): SpeechAct {
-  const usableWords = context.words.filter((word) => !word.is_blocked && !word.is_sensitive);
+  const usableWords = context.words.filter((word) => !word.is_blocked && !word.is_sensitive && !word.forgotten_at);
   if (usableWords.length === 0) return "ask_new_word";
 
   const totalUseCount = usableWords.reduce((sum, word) => sum + word.use_count, 0);

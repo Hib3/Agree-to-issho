@@ -4,6 +4,7 @@ import { createWordFrame } from "../word/createWordFrame";
 import type { DialogueContext, DialogueTemplate, DialogueTurn, DiaryEntry, SpeechAct, WordFrame } from "../../types/domain";
 import type { DialogueEngine } from "./DialogueEngine";
 import { applyAguriStyle } from "./applyAguriStyle";
+import { chooseDriftMode, createDriftTemplate } from "./drift";
 import { renderTemplate } from "./renderTemplate";
 import { selectSpeechAct } from "./selectSpeechAct";
 import { selectWordForTemplate } from "./wordScoring";
@@ -14,11 +15,12 @@ export class TemplateDialogueEngine implements DialogueEngine {
     const speechAct = selectSpeechAct(context);
     const template = chooseTemplate(speechAct, context.words, turnIndex, context.now);
     const word = template.word_slot || template.text.includes("{word}") ? selectWordForTemplate(context.words, template, context.now) : null;
-    const renderedText = renderTemplate(template, word, context.words);
+    const finalTemplate = speechAct === "misunderstanding_joke" && word ? createDriftTemplate(word, chooseDriftMode(word, context)) : template;
+    const renderedText = renderTemplate(finalTemplate, word, context.words);
     return {
-      speech_act: speechAct,
-      text: applyAguriStyle({ template, renderedText, speechAct, word, turnIndex }),
-      expression: template.expression,
+      speech_act: finalTemplate.speech_act,
+      text: applyAguriStyle({ template: finalTemplate, renderedText, speechAct: finalTemplate.speech_act, word, turnIndex }),
+      expression: finalTemplate.expression,
       used_words: word ? [word] : []
     };
   }

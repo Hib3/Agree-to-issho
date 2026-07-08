@@ -4,7 +4,7 @@ import { createId, nowIso } from "../../utils/id";
 export function generateDiaryEntryFromContext(context: DialogueContext): DiaryEntry {
   const now = new Date(context.now);
   const date = now.toISOString().slice(0, 10);
-  const usable = context.words.filter((word) => !word.is_blocked && !word.is_sensitive);
+  const usable = context.words.filter((word) => !word.is_blocked && !word.is_sensitive && !word.forgotten_at);
   const words = [...usable]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.use_count - b.use_count)
     .slice(0, 3);

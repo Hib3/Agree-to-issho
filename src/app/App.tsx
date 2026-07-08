@@ -157,7 +157,15 @@ export function App() {
   async function persistDialogueTurn(nextTurn: DialogueTurn) {
     const now = nowIso();
     for (const used of nextTurn.used_words) {
-      await wordRepository.save({ ...used, use_count: used.use_count + 1, last_used_at: now, updated_at: now });
+      await wordRepository.save({
+        ...used,
+        use_count: used.use_count + 1,
+        memory_strength: Math.min(1, used.memory_strength + 0.02),
+        favorite_score: Math.min(1, used.favorite_score + 0.01),
+        last_used_at: now,
+        last_context_used: nextTurn.speech_act,
+        updated_at: now
+      });
     }
     await dialogueLogRepository.save({
       id: `log_${crypto.randomUUID()}`,

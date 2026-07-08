@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyCategory, applyEmotion, applySituation, createWordFrame } from "../game/word/createWordFrame";
+import { migrateWordFrame } from "../game/word/wordMemory";
 
 describe("WordFrame", () => {
   it("creates and enriches a user-taught word frame", () => {
@@ -13,6 +14,26 @@ describe("WordFrame", () => {
     expect(situated.emotion_tags).toContain("curious");
     expect(situated.situation_tags).toContain("daily_talk");
     expect(situated.confidence).toBeGreaterThan(0.8);
+    expect(situated.memory_strength).toBeGreaterThan(0.4);
+    expect(situated.favorite_score).toBeGreaterThan(0.2);
     expect(situated.taught_by_user).toBe(true);
+  });
+
+  it("migrates an old word frame with memory defaults", () => {
+    const migrated = migrateWordFrame({
+      id: "old_word",
+      surface: "古い言葉",
+      category: "unknown",
+      confidence: 0.3,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    });
+
+    expect(migrated.memory_strength).toBe(0.4);
+    expect(migrated.favorite_score).toBe(0.2);
+    expect(migrated.ambiguity_score).toBe(0.4);
+    expect(migrated.drift_level).toBe(1);
+    expect(migrated.review_count).toBe(0);
+    expect(migrated.correction_count).toBe(0);
   });
 });

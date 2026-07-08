@@ -14,12 +14,15 @@ describe("save import/export", () => {
     const exported = await exportSaveData();
     const preview = await previewImport(JSON.stringify(exported), "replace");
 
+    expect(exported.schema_version).toBe(2);
     expect(preview.valid).toBe(true);
     expect(preview.word_count).toBe(1);
 
     await clearGameStores(true);
     await importSaveData(preview);
-    expect(await wordRepository.findBySurface("あかり")).toBeTruthy();
+    const imported = await wordRepository.findBySurface("あかり");
+    expect(imported).toBeTruthy();
+    expect(imported?.memory_strength).toBeGreaterThan(0);
   });
 
   it("rejects broken JSON", async () => {

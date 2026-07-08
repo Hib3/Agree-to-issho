@@ -14,15 +14,17 @@ import {
   wordRepository
 } from "./repositories";
 import { checksumJson } from "./checksum";
+import { migrateWordFrame } from "../word/wordMemory";
 
 const APP_ID = "aguri-word-room";
 const LEGACY_APP_IDS = ["with-agree"];
 const APP_VERSION = "0.1.0";
+const SCHEMA_VERSION = 2;
 
 export async function exportSaveData(): Promise<ExportedSaveData> {
   const records = await getAllSaveRecords();
   const data: ExportedSaveData = {
-    schema_version: 1,
+    schema_version: SCHEMA_VERSION,
     app_id: APP_ID,
     exported_at: nowIso(),
     app_version: APP_VERSION,
@@ -43,7 +45,7 @@ export async function previewImport(raw: string, mode: "replace" | "merge"): Pro
   try {
     const data = JSON.parse(raw) as ExportedSaveData;
     const errors: string[] = [];
-    if (data.schema_version !== 1) errors.push("このセーブ形式はまだ読み込めません。");
+    if (data.schema_version !== 1 && data.schema_version !== SCHEMA_VERSION) errors.push("このセーブ形式はまだ読み込めません。");
     if (data.app_id !== APP_ID && !LEGACY_APP_IDS.includes(data.app_id)) errors.push("別のアプリの保存データです。");
     const expected = await checksumJson(data);
     if (expected !== data.checksum) errors.push("保存データの確認に失敗しました。");
@@ -59,7 +61,7 @@ export async function previewImport(raw: string, mode: "replace" | "merge"): Pro
       diary_count: Array.isArray(data.diary_entries) ? data.diary_entries.length : 0,
       conflict_surfaces,
       errors,
-      data: errors.length === 0 ? data : undefined
+      data: errors.length === 0 ? migrateSaveData(data) : undefined
     };
   } catch {
     return {
@@ -71,6 +73,14 @@ export async function previewImport(raw: string, mode: "replace" | "merge"): Pro
       errors: ["JSONを読み込めません。"]
     };
   }
+}
+
+function migrateSaveData(data: ExportedSaveData): ExportedSaveData {
+  return {
+    ...data,
+    schema_version: SCHEMA_VERSION,
+    words: Array.isArray(data.words) ? data.words.map((word) => migrateWordFrame(word)) : []
+  };
 }
 
 export async function importSaveData(preview: ImportPreview): Promise<void> {
@@ -107,8 +117,9 @@ function findSurfaceConflicts(current: WordFrame[], incoming: WordFrame[]): stri
 }
 
 async function saveMergedWord(incoming: WordFrame): Promise<void> {
-  const existing = await wordRepository.findBySurface(incoming.surface);
-  if (!existing || incoming.confidence >= existing.confidence) {
-    await wordRepository.save(incoming);
+  const migrated = migrateWordFrame(incoming);
+  const existing = await wordRepository.findBySurface(migrated.surface);
+  if (!existing || migrated.confidence >= existing.confidence) {
+    await wordRepository.save(migrated);
   }
 }

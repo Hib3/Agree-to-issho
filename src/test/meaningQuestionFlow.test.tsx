@@ -7,7 +7,7 @@ import { MeaningQuestionFlow } from "../screens/MeaningQuestionFlow";
 import { applyCategory, applyEmotion, applySituation, createWordFrame } from "../game/word/createWordFrame";
 import type { WordFrame } from "../types/domain";
 
-function renderFlow(step: "category" | "emotion" | "situation", word: WordFrame) {
+function renderFlow(step: "category" | "detail" | "emotion" | "situation", word: WordFrame) {
   const onStep = vi.fn();
   let currentWord = word;
   const onWordChange = vi.fn((next: WordFrame) => {
@@ -60,6 +60,20 @@ describe("MeaningQuestionFlow selection changes", () => {
     expect(onWordChange).toHaveBeenLastCalledWith(expect.objectContaining({ emotion_tags: ["happy"] }));
     await user.click(screen.getByTestId("choice-sad"));
     expect(onWordChange).toHaveBeenLastCalledWith(expect.objectContaining({ emotion_tags: ["sad"] }));
+  });
+
+  it("detail step changes by category and stores the answer", async () => {
+    const user = userEvent.setup();
+    const food = applyCategory(createWordFrame("カレー"), "food");
+    const { onWordChange, unmount } = renderFlow("detail", food);
+
+    expect(screen.getByText("それは、おいしそう？")).toBeTruthy();
+    await user.click(screen.getByTestId("choice-like"));
+    expect(onWordChange).toHaveBeenLastCalledWith(expect.objectContaining({ user_stance: "like", emotion_tags: ["happy"] }));
+
+    unmount();
+    renderFlow("detail", applyCategory(createWordFrame("公園"), "place"));
+    expect(screen.getByText("そこは、行ってみたい場所？")).toBeTruthy();
   });
 
   it("situation step allows changing selection before next", async () => {

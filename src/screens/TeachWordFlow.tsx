@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DialogueBox } from "../components/DialogueBox";
 import { TextInputPanel } from "../components/TextInputPanel";
-import { createWordFrame, normalizeSurface } from "../game/word/createWordFrame";
+import { createWordFrame } from "../game/word/createWordFrame";
+import { validateWordInput } from "../game/word/wordInputValidation";
 import type { WordFrame } from "../types/domain";
 import { MeaningQuestionFlow } from "./MeaningQuestionFlow";
 
@@ -11,7 +12,7 @@ type TeachWordFlowProps = {
   onSave: (word: WordFrame) => Promise<void>;
 };
 
-type Step = "input" | "category" | "emotion" | "situation" | "confirm";
+type Step = "input" | "category" | "detail" | "emotion" | "situation" | "confirm";
 
 export function TeachWordFlow({ words, onCancel, onSave }: TeachWordFlowProps) {
   const [step, setStep] = useState<Step>("input");
@@ -19,13 +20,13 @@ export function TeachWordFlow({ words, onCancel, onSave }: TeachWordFlowProps) {
   const [error, setError] = useState("");
 
   function handleInput(value: string) {
-    const surface = normalizeSurface(value);
-    const duplicate = words.find((item) => item.surface === surface);
-    if (duplicate) {
-      setError("同じ表記の言葉はすでに登録されています。");
+    const result = validateWordInput(value, words);
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
-    setWord(createWordFrame(surface));
+    setError("");
+    setWord(createWordFrame(result.surface));
     setStep("category");
   }
 

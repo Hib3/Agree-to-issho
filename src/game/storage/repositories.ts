@@ -1,4 +1,5 @@
 import { appDb, findWordBySurface } from "../../db/indexedDb";
+import { migrateWordFrame } from "../word/wordMemory";
 import { storeNames, type StoreName, type StoreRecordMap } from "../../db/schema";
 import type {
   AppProfile,
@@ -36,10 +37,19 @@ export const characterStateRepository = {
 };
 
 export const wordRepository = {
-  list: () => appDb.getAll("words"),
-  get: (id: string) => appDb.get("words", id),
-  findBySurface: findWordBySurface,
-  save: (word: WordFrame) => appDb.put("words", word),
+  async list() {
+    const words = await appDb.getAll("words");
+    return words.map((word) => migrateWordFrame(word));
+  },
+  async get(id: string) {
+    const word = await appDb.get("words", id);
+    return word ? migrateWordFrame(word) : undefined;
+  },
+  async findBySurface(surface: string) {
+    const word = await findWordBySurface(surface);
+    return word ? migrateWordFrame(word) : undefined;
+  },
+  save: (word: WordFrame) => appDb.put("words", migrateWordFrame(word)),
   remove: (id: string) => appDb.delete("words", id),
   clear: () => appDb.clear("words")
 };

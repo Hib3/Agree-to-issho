@@ -1,4 +1,6 @@
 import { FormEvent, useState } from "react";
+import { getCategoryLabel, getConfidenceLabel, getDriftLevelLabel, getEmotionLabel, getMemoryStrengthLabel, getSituationLabel } from "../game/word/labels";
+import { applyReview } from "../game/word/wordMemory";
 import type { WordFrame } from "../types/domain";
 
 type WordbookScreenProps = {
@@ -31,20 +33,34 @@ export function WordbookScreen({ words, onBack, onPatchWord }: WordbookScreenPro
 function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId: string, patch: Partial<WordFrame>) => void }) {
   const [notes, setNotes] = useState(word.notes);
   const [blocked, setBlocked] = useState(word.is_blocked);
+  const [sensitive, setSensitive] = useState(word.is_sensitive);
+  const [forgotten, setForgotten] = useState(Boolean(word.forgotten_at));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onPatchWord(word.id, { notes, is_blocked: blocked });
+    onPatchWord(word.id, {
+      notes,
+      is_blocked: blocked,
+      is_sensitive: sensitive,
+      forgotten_at: forgotten ? word.forgotten_at ?? new Date().toISOString() : undefined
+    });
+  }
+
+  function handleReview() {
+    onPatchWord(word.id, applyReview(word));
   }
 
   return (
     <article className="word-card">
       <h2>{word.surface}</h2>
       <dl>
-        <div><dt>カテゴリ</dt><dd>{word.category}</dd></div>
-        <div><dt>感情</dt><dd>{word.emotion_tags.join(", ") || "unknown"}</dd></div>
-        <div><dt>場面</dt><dd>{word.situation_tags.join(", ") || "unknown"}</dd></div>
-        <div><dt>わかった度</dt><dd>{Math.round(word.confidence * 100)}%</dd></div>
+        <div><dt>カテゴリ</dt><dd>{getCategoryLabel(word.category)}</dd></div>
+        <div><dt>感情</dt><dd>{word.emotion_tags.map(getEmotionLabel).join("、") || "未設定"}</dd></div>
+        <div><dt>場面</dt><dd>{word.situation_tags.map(getSituationLabel).join("、") || "未設定"}</dd></div>
+        <div><dt>わかった度</dt><dd>{getConfidenceLabel(word.confidence)}</dd></div>
+        <div><dt>記憶</dt><dd>{getMemoryStrengthLabel(word.memory_strength)}</dd></div>
+        <div><dt>ズレ</dt><dd>{getDriftLevelLabel(word.drift_level)}</dd></div>
+        <div><dt>復習</dt><dd>{word.review_count}回</dd></div>
         <div><dt>使用回数</dt><dd>{word.use_count}</dd></div>
       </dl>
       <form className="form-stack inline-edit" onSubmit={handleSubmit}>
@@ -56,6 +72,15 @@ function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId
           <input type="checkbox" checked={blocked} onChange={(event) => setBlocked(event.target.checked)} />
           通常会話に出さない
         </label>
+        <label className="check-row">
+          <input type="checkbox" checked={sensitive} onChange={(event) => setSensitive(event.target.checked)} />
+          慎重に扱う
+        </label>
+        <label className="check-row">
+          <input type="checkbox" checked={forgotten} onChange={(event) => setForgotten(event.target.checked)} />
+          普段の会話から外す
+        </label>
+        <button type="button" onClick={handleReview}>この言葉を復習した</button>
         <button type="submit">更新</button>
       </form>
     </article>

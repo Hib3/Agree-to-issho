@@ -68,6 +68,8 @@ export type SpeechAct =
   | "embarrassed_reaction"
   | "goodbye";
 
+export type DriftLevel = 0 | 1 | 2 | 3;
+
 export type AppProfile = {
   id: "local";
   player_name: string;
@@ -100,10 +102,20 @@ export type WordFrame = {
   affordances: string[];
   related_word_ids: Id[];
   confidence: number;
+  memory_strength: number;
+  favorite_score: number;
+  ambiguity_score: number;
+  drift_level: DriftLevel;
   taught_by_user: boolean;
   source_question_ids: string[];
   use_count: number;
+  review_count: number;
+  correction_count: number;
   last_used_at?: string;
+  last_reviewed_at?: string;
+  last_context_used?: string;
+  pronunciation_key?: string;
+  forgotten_at?: string;
   created_at: string;
   updated_at: string;
   is_sensitive: boolean;
@@ -219,7 +231,7 @@ export type PendingLearning = {
 };
 
 export type ExportedSaveData = {
-  schema_version: 1;
+  schema_version: 1 | 2;
   app_id: "aguri-word-room" | "with-agree";
   exported_at: string;
   app_version: string;
