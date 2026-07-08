@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DebugPanel } from "../components/debug/DebugPanel";
 import { DialogueBox } from "../components/DialogueBox";
+import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { dialogueTemplates } from "../data/templates/dialogueTemplates";
 import { TemplateDialogueEngine } from "../game/dialogue/TemplateDialogueEngine";
 import { deriveEventFlags } from "../game/events/eventRules";
@@ -214,6 +215,25 @@ export function App() {
     await refresh();
   }
 
+  async function handleSeedDebugWords() {
+    const debugWords = createDebugWordSeed(state.words);
+    for (const word of debugWords) {
+      await wordRepository.save(word);
+    }
+    const words = [...state.words, ...debugWords];
+    for (const flag of deriveEventFlags(words)) await eventFlagRepository.save(flag);
+    if (debugWords.length > 0) {
+      setTurn({
+        speech_act: "praise_user",
+        text: `デバッグ用の言葉を${debugWords.length}こ登録しましたっ。\n単語帳と会話で使い方を確認できますよォっ！`,
+        expression: "proud",
+        used_words: []
+      });
+    }
+    await refresh();
+    return debugWords.length;
+  }
+
   async function handleExport() {
     const data = await exportSaveData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -272,7 +292,13 @@ export function App() {
         />
       )}
       {screen === "manual" && <ManualScreen onBack={() => setScreen(hasStarted ? "main-room" : "title")} />}
-      <DebugPanel profile={state.profile} characterState={state.characterState} settings={state.settings} words={state.words} />
+      <DebugPanel
+        profile={state.profile}
+        characterState={state.characterState}
+        settings={state.settings}
+        words={state.words}
+        onSeedDebugWords={handleSeedDebugWords}
+      />
     </div>
   );
 }

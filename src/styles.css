@@ -595,6 +595,17 @@ dd {
   margin-top: 10px;
 }
 
+.debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.debug-actions button {
+  background: var(--color-choice);
+}
+
 .debug-panel pre {
   white-space: pre-wrap;
   overflow: auto;
