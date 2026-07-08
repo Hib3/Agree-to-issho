@@ -8,13 +8,14 @@ type TitleScreenProps = {
   onContinue: () => void;
   onManual: () => void;
   onSaveData: () => void;
+  onSeedSampleWords: () => Promise<number>;
 };
 
-export function TitleScreen({ hasStarted, wordCount, onStart, onContinue, onManual, onSaveData }: TitleScreenProps) {
+export function TitleScreen({ hasStarted, wordCount, onStart, onContinue, onManual, onSaveData, onSeedSampleWords }: TitleScreenProps) {
   const characterImage = `${import.meta.env.BASE_URL}${getFallbackCharacterImagePath()}`;
   const backgroundImage = `${import.meta.env.BASE_URL}assets/backgrounds/aguri_room_desk.webp`;
   const roomStyle = {
-    backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.12), rgba(57, 36, 22, 0.16)), url("${backgroundImage}")`
+    backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.04), rgba(57, 36, 22, 0.08)), url("${backgroundImage}")`
   } as CSSProperties;
 
   return (
@@ -32,6 +33,11 @@ export function TitleScreen({ hasStarted, wordCount, onStart, onContinue, onManu
         <aside className="title-memo">
           <strong>部屋のメモ</strong>
           {hasStarted ? <span>覚えた言葉 {wordCount}こ</span> : <span>まだ保存された部屋はありません</span>}
+          {hasStarted && wordCount === 0 && (
+            <button type="button" className="memo-button" onClick={onSeedSampleWords}>
+              おためし用単語を入れる
+            </button>
+          )}
         </aside>
 
         <section className="title-copy">

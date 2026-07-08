@@ -215,23 +215,23 @@ export function App() {
     await refresh();
   }
 
-  async function handleSeedDebugWords() {
-    const debugWords = createDebugWordSeed(state.words);
-    for (const word of debugWords) {
+  async function handleSeedSampleWords() {
+    const sampleWords = createDebugWordSeed(state.words);
+    for (const word of sampleWords) {
       await wordRepository.save(word);
     }
-    const words = [...state.words, ...debugWords];
+    const words = [...state.words, ...sampleWords];
     for (const flag of deriveEventFlags(words)) await eventFlagRepository.save(flag);
-    if (debugWords.length > 0) {
+    if (sampleWords.length > 0) {
       setTurn({
         speech_act: "praise_user",
-        text: `デバッグ用の言葉を${debugWords.length}こ登録しましたっ。\n単語帳と会話で使い方を確認できますよォっ！`,
+        text: `おためし用の言葉を${sampleWords.length}こ入れましたっ！\n単語帳と会話で、使い方を見られますよォっ！`,
         expression: "proud",
         used_words: []
       });
     }
     await refresh();
-    return debugWords.length;
+    return sampleWords.length;
   }
 
   async function handleExport() {
@@ -266,6 +266,7 @@ export function App() {
           onContinue={() => setScreen(hasStarted ? "main-room" : "first-start")}
           onManual={() => setScreen("manual")}
           onSaveData={() => setScreen("import-export")}
+          onSeedSampleWords={handleSeedSampleWords}
         />
       )}
       {screen === "first-start" && <FirstStartWizard onComplete={handleFirstStart} />}
@@ -277,6 +278,7 @@ export function App() {
           latestDiary={latestDiary}
           turn={turn}
           onAction={handleRoomAction}
+          onSeedSampleWords={handleSeedSampleWords}
         />
       )}
       {screen === "teach-word" && <TeachWordFlow words={state.words} onCancel={() => setScreen("main-room")} onSave={handleWordSaved} />}
@@ -293,11 +295,9 @@ export function App() {
       )}
       {screen === "manual" && <ManualScreen onBack={() => setScreen(hasStarted ? "main-room" : "title")} />}
       <DebugPanel
-        profile={state.profile}
-        characterState={state.characterState}
         settings={state.settings}
         words={state.words}
-        onSeedDebugWords={handleSeedDebugWords}
+        onSeedSampleWords={handleSeedSampleWords}
       />
     </div>
   );

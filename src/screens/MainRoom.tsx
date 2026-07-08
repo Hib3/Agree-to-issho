@@ -12,14 +12,15 @@ type MainRoomProps = {
   latestDiary?: DiaryEntry;
   turn: DialogueTurn;
   onAction: (action: RoomAction) => void;
+  onSeedSampleWords: () => Promise<number>;
 };
 
-export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction }: MainRoomProps) {
+export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords }: MainRoomProps) {
   const name = characterState?.character_name ?? "アグリちゃん";
   const playerName = profile?.player_name ?? "あなた";
   const backgroundImage = `${import.meta.env.BASE_URL}assets/backgrounds/aguri_room_desk.webp`;
   const roomStyle = {
-    backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.08), rgba(47, 33, 23, 0.13)), url("${backgroundImage}")`
+    backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.03), rgba(47, 33, 23, 0.08)), url("${backgroundImage}")`
   } as CSSProperties;
 
   return (
@@ -35,6 +36,14 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
           <CharacterStage name={name} expression={turn.expression} wordCount={words.length} />
           <DialogueBox speaker={name} text={turn.text} variant="bubble" />
         </div>
+
+        {words.length === 0 && (
+          <section className="sample-word-note" aria-label="おためし用単語">
+            <strong>まず会話を試したい時</strong>
+            <span>おためし用の言葉を入れると、会話と日記の動きをすぐ見られます。</span>
+            <button type="button" onClick={onSeedSampleWords}>おためし単語を100こ入れる</button>
+          </section>
+        )}
 
         <div className="primary-actions" aria-label="メイン操作">
           <button className="primary" type="button" onClick={() => onAction("speak")}>話す</button>

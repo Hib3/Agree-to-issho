@@ -28,12 +28,27 @@ npm run zip:review
 - CharacterStage / DialogueBox / ChoiceButtons / TextInputPanel
 - TeachWordFlow / WordCategorySelector / MeaningQuestionFlow
 - WordbookScreen / DiaryScreen / SettingsScreen / ImportExportScreen
-- StorageStatusPanel / ManualScreen / DebugPanel
+- StorageStatusPanel / ManualScreen / おためし準備パネル
 - 保存先: この端末の中のIndexedDB
 - JSON backup/import: `app_id=aguri-word-room`, checksum, preview, backup, replace/merge
 - Service Worker + Web App Manifest
 - Approved standing art: `public/assets/characters/main/fullbody/approved/aguri_normal.png`
 - Original room background: `public/assets/backgrounds/aguri_room_desk.webp`
+
+## UI Direction
+
+- 画面は「アグリちゃんの小さな机の部屋」を基準にします。
+- 木の机、ノート、付箋、やわらかい紙色を中心にし、紫はアクセントに留めます。
+- MainRoomは、背景、立ち絵、会話吹き出し、主ボタンを一体の部屋シーンとして扱います。
+- `話す` と `言葉を教える` を主導線にし、単語帳、日記、保存、説明、タイトルは付箋風の補助操作にします。
+- 会話欄は日本語の折返しと行間を優先し、`onNext` がない時は `▼` を表示しません。
+
+## Sample Words
+
+- 単語が0この時は、部屋画面とタイトルのメモに `おためし単語を100こ入れる` ボタンを表示します。
+- おためし単語は汎用的な日常語だけで、既存IPの辞書や固有語は含みません。
+- 追加された単語はこの端末の保存領域に入り、会話、単語帳、日記の動作確認に使えます。
+- 設定で補助パネルを表示している場合も、同じおためし単語投入ボタンを使えます。
 
 ## Research Boundary
 

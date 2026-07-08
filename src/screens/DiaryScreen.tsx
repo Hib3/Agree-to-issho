@@ -1,4 +1,5 @@
 import type { DiaryEntry } from "../types/domain";
+import { sanitizeGameText } from "../utils/sanitizeGameText";
 
 type DiaryScreenProps = {
   entries: DiaryEntry[];
@@ -25,7 +26,7 @@ export function DiaryScreen({ entries, onGenerate, onBack }: DiaryScreenProps) {
             <article className="panel" key={entry.id}>
               <p className="eyebrow">{entry.entry_date}</p>
               <h2>{entry.title}</h2>
-              <p>{entry.body}</p>
+              <p>{sanitizeGameText(entry.body)}</p>
             </article>
           ))}
         </div>

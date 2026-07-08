@@ -37,7 +37,7 @@ export function SettingsScreen({ settings, onChange, onBack }: SettingsScreenPro
             checked={Boolean(settings?.debug_panel)}
             onChange={(event) => onChange({ debug_panel: event.target.checked })}
           />
-          DebugPanelを表示
+          おためし準備を表示
         </label>
       </section>
       <StorageStatusPanel />

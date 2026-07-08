@@ -1,30 +1,32 @@
-import type { AppProfile, CharacterState, GameSettings, WordFrame } from "../../types/domain";
+import { useState } from "react";
+import type { GameSettings, WordFrame } from "../../types/domain";
 
 type DebugPanelProps = {
-  profile: AppProfile | null;
-  characterState: CharacterState | null;
   settings: GameSettings | null;
   words: WordFrame[];
-  onSeedDebugWords: () => Promise<number>;
+  onSeedSampleWords: () => Promise<number>;
 };
 
-export function DebugPanel({ profile, characterState, settings, words, onSeedDebugWords }: DebugPanelProps) {
+export function DebugPanel({ settings, words, onSeedSampleWords }: DebugPanelProps) {
+  const [message, setMessage] = useState("");
   if (!settings?.debug_panel) return null;
 
-  async function handleSeedDebugWords() {
-    const savedCount = await onSeedDebugWords();
-    window.alert(savedCount > 0 ? `デバッグ用の言葉を${savedCount}こ登録しました。` : "追加できるデバッグ用の言葉はありません。");
+  async function handleSeedSampleWords() {
+    const savedCount = await onSeedSampleWords();
+    setMessage(savedCount > 0 ? `おためし用の言葉を${savedCount}こ入れました。` : "追加できるおためし用の言葉はありません。");
   }
 
   return (
-    <details className="panel debug-panel">
-      <summary>DebugPanel</summary>
+    <details className="panel debug-panel sample-panel">
+      <summary>おためし準備</summary>
+      <p>会話や日記の動きを確認するための、汎用的な日常語を入れます。</p>
       <div className="debug-actions">
-        <button type="button" onClick={handleSeedDebugWords}>
-          デバッグ用100語を登録
+        <button type="button" onClick={handleSeedSampleWords}>
+          おためし単語を100こ入れる
         </button>
       </div>
-      <pre>{JSON.stringify({ profile, characterState, wordCount: words.length }, null, 2)}</pre>
+      <p className="muted">今の言葉: {words.length}こ</p>
+      {message && <p className="sample-status">{message}</p>}
     </details>
   );
 }

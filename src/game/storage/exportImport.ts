@@ -43,11 +43,11 @@ export async function previewImport(raw: string, mode: "replace" | "merge"): Pro
   try {
     const data = JSON.parse(raw) as ExportedSaveData;
     const errors: string[] = [];
-    if (data.schema_version !== 1) errors.push("未対応のschema_versionです。");
-    if (data.app_id !== APP_ID && !LEGACY_APP_IDS.includes(data.app_id)) errors.push("app_idが一致しません。");
+    if (data.schema_version !== 1) errors.push("このセーブ形式はまだ読み込めません。");
+    if (data.app_id !== APP_ID && !LEGACY_APP_IDS.includes(data.app_id)) errors.push("別のアプリの保存データです。");
     const expected = await checksumJson(data);
-    if (expected !== data.checksum) errors.push("checksumが一致しません。");
-    if (!Array.isArray(data.words)) errors.push("wordsが配列ではありません。");
+    if (expected !== data.checksum) errors.push("保存データの確認に失敗しました。");
+    if (!Array.isArray(data.words)) errors.push("言葉の一覧を読み込めません。");
 
     const currentWords = await wordRepository.list();
     const conflict_surfaces = findSurfaceConflicts(currentWords, Array.isArray(data.words) ? data.words : []);
@@ -74,7 +74,7 @@ export async function previewImport(raw: string, mode: "replace" | "merge"): Pro
 }
 
 export async function importSaveData(preview: ImportPreview): Promise<void> {
-  if (!preview.valid || !preview.data) throw new Error("無効なimport previewです。");
+  if (!preview.valid || !preview.data) throw new Error("読み込み前の確認に失敗しました。");
   const backup: ImportBackup = {
     id: createId("backup"),
     created_at: nowIso(),

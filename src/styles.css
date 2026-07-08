@@ -180,11 +180,11 @@ h2 {
   overflow: hidden;
   border-radius: 24px;
   background-size: cover;
-  background-position: center bottom;
+  background-position: center top;
   box-shadow: var(--shadow-paper);
   padding: 18px;
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto;
+  grid-template-rows: auto minmax(250px, 1fr) auto auto auto;
   gap: 10px;
 }
 
@@ -250,6 +250,14 @@ h2 {
   transform: rotate(-1.5deg);
 }
 
+.memo-button {
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 0 10px;
+  background: rgba(255, 241, 207, 0.95);
+  font-size: 0.82rem;
+}
+
 .title-copy {
   position: relative;
   z-index: 2;
@@ -287,7 +295,7 @@ h2 {
   overflow: hidden;
   border-radius: 24px;
   background-size: cover;
-  background-position: center bottom;
+  background-position: center top;
   box-shadow: var(--shadow-paper);
 }
 
@@ -466,6 +474,35 @@ h2 {
   background: rgba(255, 243, 215, 0.94);
 }
 
+.sample-word-note {
+  position: relative;
+  z-index: 7;
+  display: grid;
+  gap: 6px;
+  margin: -2px 12px 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(140, 101, 69, 0.36);
+  border-radius: 14px 14px 18px 12px;
+  background: rgba(255, 248, 232, 0.94);
+  box-shadow: var(--shadow-soft);
+}
+
+.sample-word-note strong {
+  font-size: 0.92rem;
+}
+
+.sample-word-note span {
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.sample-word-note button {
+  justify-self: start;
+  min-height: 36px;
+  background: var(--color-choice);
+}
+
 .form-stack {
   display: flex;
   flex-direction: column;
@@ -514,13 +551,11 @@ h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
-  pointer-events: auto;
 }
 
 .option-grid button {
   min-height: 48px;
   background: var(--color-choice);
-  pointer-events: auto;
   font-weight: 800;
 }
 
@@ -606,9 +641,9 @@ dd {
   background: var(--color-choice);
 }
 
-.debug-panel pre {
-  white-space: pre-wrap;
-  overflow: auto;
+.sample-status {
+  color: var(--color-accent);
+  font-weight: 800;
 }
 
 @media (max-width: 640px) {
@@ -619,16 +654,21 @@ dd {
   .title-room {
     min-height: calc(100vh - 16px);
     padding: 12px;
-    background-position: center bottom;
+    background-position: 32% top;
+    grid-template-rows: auto minmax(250px, 0.8fr) auto auto auto;
+  }
+
+  .aguri-room {
+    background-position: 38% top;
   }
 
   .title-character {
-    min-height: 318px;
+    min-height: 250px;
   }
 
   .title-character img {
     max-width: 84%;
-    max-height: min(43vh, 345px);
+    max-height: min(36vh, 300px);
   }
 
   .title-memo {
