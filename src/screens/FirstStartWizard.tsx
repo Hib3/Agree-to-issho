@@ -19,13 +19,13 @@ export function FirstStartWizard({ onComplete }: FirstStartWizardProps) {
     <main className="screen narrow-screen">
       <form className="panel form-stack" onSubmit={handleSubmit}>
         <h1>最初の設定</h1>
-        <label>
+        <label htmlFor="player-name">
           プレイヤー名
-          <input value={playerName} maxLength={24} onChange={(event) => setPlayerName(event.target.value)} />
+          <input id="player-name" value={playerName} maxLength={24} onChange={(event) => setPlayerName(event.target.value)} />
         </label>
-        <label>
+        <label htmlFor="character-name">
           キャラクター名
-          <input value={characterName} maxLength={24} onChange={(event) => setCharacterName(event.target.value)} />
+          <input id="character-name" value={characterName} maxLength={24} onChange={(event) => setCharacterName(event.target.value)} />
         </label>
         <button className="primary" type="submit" disabled={!playerName.trim()}>部屋へ入る</button>
       </form>
