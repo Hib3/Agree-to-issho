@@ -1,11 +1,13 @@
-const CACHE_NAME = "with-aguri-mvp-v4";
+const CACHE_NAME = "with-aguri-mvp-v5";
 const scopeUrl = new URL(self.registration.scope);
 const BASE_PATH = scopeUrl.pathname.endsWith("/") ? scopeUrl.pathname : `${scopeUrl.pathname}/`;
 const APP_SHELL = [
   "./",
   "index.html",
   "manifest.webmanifest",
-  "assets/characters/main/fullbody/approved/aguri_normal.png"
+  "assets/characters/main/fullbody/approved/aguri_normal.png",
+  "assets/backgrounds/aguri_room_desk.webp",
+  "assets/backgrounds/aguri_room_desk.png"
 ].map((path) => new URL(path, self.registration.scope).toString());
 
 self.addEventListener("install", (event) => {

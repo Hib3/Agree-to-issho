@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +23,19 @@ function renderFlow(step: "category" | "emotion" | "situation", word: WordFrame)
     />
   );
   return { ...utils, onWordChange, getCurrentWord: () => currentWord };
+}
+
+function StatefulFlow({ step, initialWord }: { step: "emotion" | "situation"; initialWord: WordFrame }) {
+  const [word, setWord] = useState(initialWord);
+  return (
+    <MeaningQuestionFlow
+      step={step}
+      word={word}
+      onStep={vi.fn()}
+      onWordChange={setWord}
+      onComplete={vi.fn()}
+    />
+  );
 }
 
 describe("MeaningQuestionFlow selection changes", () => {
@@ -57,6 +71,28 @@ describe("MeaningQuestionFlow selection changes", () => {
     expect(onWordChange).toHaveBeenLastCalledWith(expect.objectContaining({ situation_tags: ["room"] }));
     await user.click(screen.getByTestId("choice-diary"));
     expect(onWordChange).toHaveBeenLastCalledWith(expect.objectContaining({ situation_tags: ["diary"] }));
+  });
+
+  it("emotion step visually switches from 好き to 大事 and keeps navigation clickable", async () => {
+    const user = userEvent.setup();
+    render(<StatefulFlow step="emotion" initialWord={applyEmotion(createWordFrame("カレー"), "happy", "like")} />);
+
+    await user.click(screen.getByTestId("choice-proud"));
+    expect(screen.getByTestId("choice-happy").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("choice-proud").getAttribute("aria-pressed")).toBe("true");
+    await user.click(screen.getByRole("button", { name: "戻る" }));
+    await user.click(screen.getByRole("button", { name: "次へ" }));
+  });
+
+  it("situation step visually switches from 日常 to 部屋 and keeps navigation clickable", async () => {
+    const user = userEvent.setup();
+    render(<StatefulFlow step="situation" initialWord={applySituation(createWordFrame("カレー"), "daily_talk")} />);
+
+    await user.click(screen.getByTestId("choice-room"));
+    expect(screen.getByTestId("choice-daily_talk").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("choice-room").getAttribute("aria-pressed")).toBe("true");
+    await user.click(screen.getByRole("button", { name: "戻る" }));
+    await user.click(screen.getByRole("button", { name: "次へ" }));
   });
 
   it("option grid buttons are not disabled by default", () => {

@@ -1,4 +1,5 @@
 import { getFallbackCharacterImagePath } from "../data/initial/assetManifest";
+import type { CSSProperties } from "react";
 
 type TitleScreenProps = {
   hasStarted: boolean;
@@ -11,20 +12,18 @@ type TitleScreenProps = {
 
 export function TitleScreen({ hasStarted, wordCount, onStart, onContinue, onManual, onSaveData }: TitleScreenProps) {
   const characterImage = `${import.meta.env.BASE_URL}${getFallbackCharacterImagePath()}`;
+  const backgroundImage = `${import.meta.env.BASE_URL}assets/backgrounds/aguri_room_desk.webp`;
+  const roomStyle = {
+    backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.12), rgba(57, 36, 22, 0.16)), url("${backgroundImage}")`
+  } as CSSProperties;
 
   return (
     <main className="screen title-screen">
-      <section className="title-room-scene">
-        <div className="title-room-decor" aria-hidden="true">
-          <div className="title-window" />
-          <div className="title-desk" />
-          <div className="title-memo-paper" />
-        </div>
-
-        <div className="title-plate">
+      <section className="title-room" style={roomStyle}>
+        <header className="title-plate">
           <h1>With Aguri</h1>
           <p>言葉を教える小さな部屋</p>
-        </div>
+        </header>
 
         <div className="title-character">
           <img src={characterImage} alt="アグリちゃん" />
@@ -35,10 +34,10 @@ export function TitleScreen({ hasStarted, wordCount, onStart, onContinue, onManu
           {hasStarted ? <span>覚えた言葉 {wordCount}こ</span> : <span>まだ保存された部屋はありません</span>}
         </aside>
 
-        <div className="title-copy">
+        <section className="title-copy">
           <p>アグリちゃんは、あなたが教えた言葉だけを少しずつ覚えます。</p>
           <p>保存はこの端末の中だけ。ネットがなくても遊べます。</p>
-        </div>
+        </section>
 
         <div className="title-actions">
           <button className="primary" type="button" disabled={!hasStarted} onClick={onContinue}>つづきから</button>

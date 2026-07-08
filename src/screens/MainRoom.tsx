@@ -1,5 +1,6 @@
 import { CharacterStage } from "../components/character/CharacterStage";
 import { DialogueBox } from "../components/DialogueBox";
+import type { CSSProperties } from "react";
 import type { AppProfile, CharacterState, DiaryEntry, DialogueTurn, WordFrame } from "../types/domain";
 
 type RoomAction = "speak" | "teach" | "wordbook" | "diary" | "settings" | "import-export" | "manual" | "title";
@@ -16,22 +17,26 @@ type MainRoomProps = {
 export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction }: MainRoomProps) {
   const name = characterState?.character_name ?? "アグリちゃん";
   const playerName = profile?.player_name ?? "あなた";
+  const backgroundImage = `${import.meta.env.BASE_URL}assets/backgrounds/aguri_room_desk.webp`;
+  const roomStyle = {
+    backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.08), rgba(47, 33, 23, 0.13)), url("${backgroundImage}")`
+  } as CSSProperties;
 
   return (
     <main className="screen main-room-screen">
-      <section className="room-scene">
-        <div className="room-ui-top">
-          <span>{playerName}の部屋</span>
-          <span>覚えた言葉 {words.length}こ</span>
+      <section className="aguri-room" style={roomStyle}>
+        <header className="room-header">
+          <strong>{playerName}の部屋</strong>
+          <span>言葉 {words.length}こ</span>
           <button type="button" onClick={() => onAction("settings")}>設定</button>
-        </div>
+        </header>
 
-        <div className="room-stage-wrap">
+        <div className="room-stage">
           <CharacterStage name={name} expression={turn.expression} wordCount={words.length} />
           <DialogueBox speaker={name} text={turn.text} variant="bubble" />
         </div>
 
-        <div className="main-command-panel" aria-label="メイン操作">
+        <div className="primary-actions" aria-label="メイン操作">
           <button className="primary" type="button" onClick={() => onAction("speak")}>話す</button>
           <button className="primary teach" type="button" onClick={() => onAction("teach")}>言葉を教える</button>
         </div>
@@ -44,7 +49,7 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
         </section>
       )}
 
-      <nav className="sub-command-strip" aria-label="サブメニュー">
+      <nav className="sub-actions" aria-label="サブメニュー">
         <button type="button" onClick={() => onAction("wordbook")}>単語帳</button>
         <button type="button" onClick={() => onAction("diary")}>日記</button>
         <button type="button" onClick={() => onAction("import-export")}>保存</button>

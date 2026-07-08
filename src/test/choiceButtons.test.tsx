@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +7,38 @@ import { ChoiceButtons } from "../components/ChoiceButtons";
 
 describe("ChoiceButtons", () => {
   afterEach(() => cleanup());
+
+  function StatefulChoiceButtons() {
+    const [value, setValue] = useState<"food" | "place">("food");
+    return (
+      <ChoiceButtons
+        value={value}
+        options={[
+          { value: "food", label: "食べ物" },
+          { value: "place", label: "場所" }
+        ]}
+        onChoose={setValue}
+      />
+    );
+  }
+
+  it("switches aria-pressed from A to B in a stateful parent", async () => {
+    const user = userEvent.setup();
+    render(<StatefulChoiceButtons />);
+
+    const food = screen.getByTestId("choice-food");
+    const place = screen.getByTestId("choice-place");
+    expect(food.getAttribute("aria-pressed")).toBe("true");
+    expect(place.getAttribute("aria-pressed")).toBe("false");
+
+    await user.click(place);
+    expect(food.getAttribute("aria-pressed")).toBe("false");
+    expect(place.getAttribute("aria-pressed")).toBe("true");
+
+    await user.click(food);
+    expect(food.getAttribute("aria-pressed")).toBe("true");
+    expect(place.getAttribute("aria-pressed")).toBe("false");
+  });
 
   it("calls onChoose every time and keeps unselected options enabled", async () => {
     const user = userEvent.setup();

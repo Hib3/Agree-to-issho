@@ -12,16 +12,6 @@ export function CharacterStage({ name, expression, wordCount }: CharacterStagePr
   const fallbackImage = `${import.meta.env.BASE_URL}${getFallbackCharacterImagePath()}`;
   return (
     <section className={`character-stage mood-${expression}`} aria-label={`${name}の部屋`}>
-      <div className="room-background" aria-hidden="true">
-        <div className="room-window" />
-        <div className="room-curtain curtain-left" />
-        <div className="room-curtain curtain-right" />
-        <div className="room-shelf" />
-        <div className="room-stereo" />
-        <div className="room-calendar" />
-        <div className="room-low-table" />
-        <div className="room-cushion" />
-      </div>
       <div className="character-stand">
         <img
           src={characterImage}
