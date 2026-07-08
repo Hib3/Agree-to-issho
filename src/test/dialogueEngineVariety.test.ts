@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { TemplateDialogueEngine } from "../game/dialogue/TemplateDialogueEngine";
+import { applyCategory, applyEmotion, applySituation, createWordFrame } from "../game/word/createWordFrame";
 import type { DialogueContext, WordFrame } from "../types/domain";
 
 describe("TemplateDialogueEngine variety", () => {
@@ -59,5 +60,25 @@ describe("TemplateDialogueEngine variety", () => {
     expect(turn.text).not.toContain("出してはいけない語");
     expect(turn.text).not.toContain("通常会話では避ける語");
     expect(turn.used_words.every((word) => !word.is_blocked && !word.is_sensitive)).toBe(true);
+  });
+
+  it("does not show the missing-word fallback when a specific template cannot use the available word", () => {
+    const engine = new TemplateDialogueEngine();
+    const objectWord = applySituation(
+      applyEmotion(applyCategory(createWordFrame("ノート"), "object"), "curious", "neutral"),
+      "daily_talk"
+    );
+
+    const turn = engine.next({
+      profile: null,
+      character_state: null,
+      settings: null,
+      words: [{ ...objectWord, confidence: 0.95, use_count: 2 }],
+      now: new Date(Date.UTC(2026, 6, 8, 12, 0, 0)).toISOString()
+    });
+
+    expect(turn.text).not.toContain("うまく言葉を選べませんでした");
+    expect(turn.used_words).toHaveLength(1);
+    expect(turn.used_words[0].surface).toBe("ノート");
   });
 });

@@ -1,7 +1,7 @@
 import type { DialogueTemplate, WordFrame } from "../../types/domain";
 
 export function renderTemplate(template: DialogueTemplate, word: WordFrame | null, words: WordFrame[] = []): string {
-  if (!word && template.text.includes("{word}")) return "今はまだ、うまく言葉を選べませんでした。";
+  if (!word && template.text.includes("{word}")) return "この言葉、もう一回だけ教えてほしいです。";
   if (!word) return template.text;
 
   const relatedWord = findRelatedWord(word, words);

@@ -12,7 +12,7 @@ export class TemplateDialogueEngine implements DialogueEngine {
   next(context: DialogueContext): DialogueTurn {
     const turnIndex = context.words.reduce((sum, item) => sum + item.use_count, 0);
     const speechAct = selectSpeechAct(context);
-    const template = chooseTemplate(speechAct, context.words, turnIndex);
+    const template = chooseTemplate(speechAct, context.words, turnIndex, context.now);
     const word = template.word_slot || template.text.includes("{word}") ? selectWordForTemplate(context.words, template, context.now) : null;
     const renderedText = renderTemplate(template, word, context.words);
     return {
@@ -43,12 +43,13 @@ export class TemplateDialogueEngine implements DialogueEngine {
   }
 }
 
-function chooseTemplate(speechAct: SpeechAct, words: WordFrame[], turnIndex: number): DialogueTemplate {
+function chooseTemplate(speechAct: SpeechAct, words: WordFrame[], turnIndex: number, now: string): DialogueTemplate {
   const candidates = dialogueTemplates.filter((template) => template.speech_act === speechAct);
   if (candidates.length === 0) return dialogueTemplates[0];
   const usable = candidates.filter((template) => {
-    if (!template.word_slot?.category) return true;
-    return words.some((word) => !word.is_blocked && !word.is_sensitive && word.category === template.word_slot?.category);
+    const needsWord = Boolean(template.word_slot) || template.text.includes("{word}");
+    if (!needsWord) return true;
+    return Boolean(selectWordForTemplate(words, template, now));
   });
   const pool = usable.length > 0 ? usable : candidates;
   return pool[turnIndex % pool.length];
