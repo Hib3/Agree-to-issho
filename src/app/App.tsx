@@ -229,14 +229,14 @@ export function App() {
     await refresh();
   }
 
-  async function handleDriftFeedback(mode: "correct" | "keep") {
+  async function handleDriftFeedback(mode: "correct" | "keep", note = "") {
     const target = turn.used_words[0];
     if (!target) return;
     const saved = await wordRepository.get(target.id);
     if (!saved) return;
     const now = nowIso();
     const nextWord = mode === "correct"
-      ? applyCorrectionToWord(saved)
+      ? applyCorrectionToWord(saved, note)
       : {
           ...saved,
           favorite_score: Math.min(1, saved.favorite_score + 0.03),
@@ -331,7 +331,15 @@ export function App() {
       )}
       {screen === "teach-word" && <TeachWordFlow words={state.words} onCancel={() => setScreen("main-room")} onSave={handleWordSaved} />}
       {screen === "wordbook" && <WordbookScreen words={state.words} onBack={() => setScreen("main-room")} onPatchWord={handlePatchWord} />}
-      {screen === "diary" && <DiaryScreen entries={state.diaryEntries} onGenerate={handleGenerateDiary} onBack={() => setScreen("main-room")} />}
+      {screen === "diary" && (
+        <DiaryScreen
+          entries={state.diaryEntries}
+          words={state.words}
+          onGenerate={handleGenerateDiary}
+          onOpenWordbook={() => setScreen("wordbook")}
+          onBack={() => setScreen("main-room")}
+        />
+      )}
       {screen === "settings" && <SettingsScreen settings={state.settings} onChange={handleSettingsChange} onBack={() => setScreen("main-room")} />}
       {screen === "import-export" && (
         <ImportExportScreen

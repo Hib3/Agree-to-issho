@@ -27,10 +27,12 @@ describe("drift and recall safety", () => {
 
   it("correction feedback raises confidence and lowers ambiguity", () => {
     const word = { ...applyCategory(createWordFrame("カレー"), "food"), confidence: 0.4, ambiguity_score: 0.8 };
-    const corrected = applyCorrectionToWord(word);
+    const corrected = applyCorrectionToWord(word, "食べ物として使う");
 
     expect(corrected.correction_count).toBe(word.correction_count + 1);
     expect(corrected.confidence).toBeGreaterThan(word.confidence);
     expect(corrected.ambiguity_score).toBeLessThan(word.ambiguity_score);
+    expect(corrected.notes).toContain("食べ物として使う");
+    expect(corrected.source_question_ids).toContain("drift_correction_note");
   });
 });

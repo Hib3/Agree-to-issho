@@ -1,6 +1,6 @@
 import { CharacterStage } from "../components/character/CharacterStage";
 import { DialogueBox } from "../components/DialogueBox";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { AppProfile, CharacterState, DiaryEntry, DialogueTurn, WordFrame } from "../types/domain";
 
 type RoomAction = "speak" | "teach" | "wordbook" | "diary" | "settings" | "import-export" | "manual" | "title";
@@ -13,10 +13,11 @@ type MainRoomProps = {
   turn: DialogueTurn;
   onAction: (action: RoomAction) => void;
   onSeedSampleWords: () => Promise<number>;
-  onDriftFeedback: (mode: "correct" | "keep") => void;
+  onDriftFeedback: (mode: "correct" | "keep", note?: string) => void;
 };
 
 export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords, onDriftFeedback }: MainRoomProps) {
+  const [correctionNote, setCorrectionNote] = useState("");
   const name = characterState?.character_name ?? "アグリちゃん";
   const playerName = profile?.player_name ?? "あなた";
   const reviewTargetCount = words.filter((word) => !word.is_blocked && !word.is_sensitive && !word.forgotten_at && (word.confidence < 0.58 || word.ambiguity_score > 0.72 || word.category === "unknown")).length;
@@ -25,6 +26,10 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
   const roomStyle = {
     backgroundImage: `linear-gradient(180deg, rgba(255, 250, 242, 0.03), rgba(47, 33, 23, 0.08)), url("${backgroundImage}")`
   } as CSSProperties;
+
+  useEffect(() => {
+    setCorrectionNote("");
+  }, [turn.text]);
 
   return (
     <main className="screen main-room-screen">
@@ -58,7 +63,16 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
 
         {canGiveDriftFeedback && (
           <div className="drift-actions" aria-label="言葉の直し方">
-            <button type="button" onClick={() => onDriftFeedback("correct")}>直す</button>
+            <label>
+              直す時のメモ
+              <input
+                value={correctionNote}
+                maxLength={60}
+                placeholder="例: 食べ物として使う"
+                onChange={(event) => setCorrectionNote(event.target.value)}
+              />
+            </label>
+            <button type="button" onClick={() => onDriftFeedback("correct", correctionNote)}>直す</button>
             <button type="button" onClick={() => onDriftFeedback("keep")}>そのままでいい</button>
           </div>
         )}

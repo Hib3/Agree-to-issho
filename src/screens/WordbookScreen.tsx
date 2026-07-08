@@ -1,8 +1,9 @@
 import { FormEvent, useState } from "react";
 import { getCategoryLabel, getConfidenceLabel, getDriftLevelLabel, getEmotionLabel, getMemoryStrengthLabel, getSituationLabel } from "../game/word/labels";
+import { applyDetailedReview, reviewCategoryOptions, reviewEmotionOptions, reviewSituationOptions } from "../game/word/review";
 import { getShiritoriCandidates } from "../game/word/shiritori";
 import { applyReview } from "../game/word/wordMemory";
-import type { WordFrame } from "../types/domain";
+import type { EmotionTag, SituationTag, WordCategory, WordFrame } from "../types/domain";
 
 type WordbookScreenProps = {
   words: WordFrame[];
@@ -45,6 +46,10 @@ export function WordbookScreen({ words, onBack, onPatchWord }: WordbookScreenPro
 
 function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId: string, patch: Partial<WordFrame>) => void }) {
   const [notes, setNotes] = useState(word.notes);
+  const [reading, setReading] = useState(word.reading);
+  const [category, setCategory] = useState<WordCategory>(word.category);
+  const [emotion, setEmotion] = useState<EmotionTag>(word.emotion_tags[0] ?? "neutral");
+  const [situation, setSituation] = useState<SituationTag>(word.situation_tags[0] ?? "daily_talk");
   const [blocked, setBlocked] = useState(word.is_blocked);
   const [sensitive, setSensitive] = useState(word.is_sensitive);
   const [forgotten, setForgotten] = useState(Boolean(word.forgotten_at));
@@ -53,6 +58,7 @@ function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId
     event.preventDefault();
     onPatchWord(word.id, {
       notes,
+      reading,
       is_blocked: blocked,
       is_sensitive: sensitive,
       forgotten_at: forgotten ? word.forgotten_at ?? new Date().toISOString() : undefined
@@ -61,6 +67,10 @@ function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId
 
   function handleReview() {
     onPatchWord(word.id, applyReview(word));
+  }
+
+  function handleDetailedReview() {
+    onPatchWord(word.id, applyDetailedReview(word, { category, emotion, situation, reading, notes }));
   }
 
   return (
@@ -78,6 +88,30 @@ function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId
       </dl>
       <form className="form-stack inline-edit" onSubmit={handleSubmit}>
         <label>
+          読み
+          <input value={reading} maxLength={24} onChange={(event) => setReading(event.target.value)} />
+        </label>
+        <div className="review-edit-grid">
+          <label>
+            種類
+            <select value={category} onChange={(event) => setCategory(event.target.value as WordCategory)}>
+              {reviewCategoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>
+            気持ち
+            <select value={emotion} onChange={(event) => setEmotion(event.target.value as EmotionTag)}>
+              {reviewEmotionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>
+            場面
+            <select value={situation} onChange={(event) => setSituation(event.target.value as SituationTag)}>
+              {reviewSituationOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <label>
           メモ
           <input value={notes} maxLength={120} onChange={(event) => setNotes(event.target.value)} />
         </label>
@@ -93,6 +127,7 @@ function WordCard({ word, onPatchWord }: { word: WordFrame; onPatchWord: (wordId
           <input type="checkbox" checked={forgotten} onChange={(event) => setForgotten(event.target.checked)} />
           普段の会話から外す
         </label>
+        <button type="button" onClick={handleDetailedReview}>選んだ内容で復習する</button>
         <button type="button" onClick={handleReview}>この言葉を復習した</button>
         <button type="submit">更新</button>
       </form>

@@ -38,6 +38,14 @@ export function createDriftTemplate(word: WordFrame, mode: DriftMode): DialogueT
   };
 }
 
-export function applyCorrectionToWord(word: WordFrame): WordFrame {
-  return applyCorrectionFeedback(word);
+export function applyCorrectionToWord(word: WordFrame, correctionNote = ""): WordFrame {
+  const corrected = applyCorrectionFeedback(word);
+  const note = correctionNote.trim();
+  if (!note) return corrected;
+  const notes = [corrected.notes, `修正メモ: ${note}`].filter(Boolean).join("\n");
+  return {
+    ...corrected,
+    notes,
+    source_question_ids: Array.from(new Set([...corrected.source_question_ids, "drift_correction_note"]))
+  };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { applyDetailedReview } from "../game/word/review";
 import { applyCategory, applyEmotion, applySituation, createWordFrame } from "../game/word/createWordFrame";
 import { migrateWordFrame } from "../game/word/wordMemory";
 
@@ -35,5 +36,24 @@ describe("WordFrame", () => {
     expect(migrated.drift_level).toBe(1);
     expect(migrated.review_count).toBe(0);
     expect(migrated.correction_count).toBe(0);
+  });
+
+  it("applies detailed review fields and strengthens memory", () => {
+    const word = createWordFrame("カレー");
+    const reviewed = applyDetailedReview(word, {
+      category: "food",
+      emotion: "happy",
+      situation: "daily_talk",
+      reading: "かれー",
+      notes: "夕飯の話題"
+    });
+
+    expect(reviewed.category).toBe("food");
+    expect(reviewed.emotion_tags).toEqual(["happy"]);
+    expect(reviewed.situation_tags).toEqual(["daily_talk"]);
+    expect(reviewed.reading).toBe("かれー");
+    expect(reviewed.notes).toBe("夕飯の話題");
+    expect(reviewed.review_count).toBe(1);
+    expect(reviewed.memory_strength).toBeGreaterThan(word.memory_strength);
   });
 });
