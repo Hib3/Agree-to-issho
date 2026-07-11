@@ -2,7 +2,7 @@
 
 https://hib3.github.io/Agree-to-issho/
 
-React + TypeScript + Viteで作る、完全オフライン対応のファンメイド会話ゲームMVPです。メインキャラクターはユーザー提供画像のオリジナル人間少女キャラクター「アグリちゃん」です。
+React + TypeScript + Viteで作る、完全オフライン対応のファンメイド会話ゲームです。メインキャラクターはユーザー提供画像のオリジナル人間少女キャラクター「アグリちゃん」です。
 
 既存IPのキャラクター、名称、ロゴ、画像、音声、台詞、辞書、イベント、固有設定は含めません。使うのは「ユーザーが言葉を教え、キャラクターが意味を質問で覚え、会話や日記へ再利用する」という抽象システムだけです。
 
@@ -62,6 +62,24 @@ npm run zip:review
 - 日記は、今日の会話ログ、使った言葉、ズレ、修正、復習の情報を優先して生成し、出てきた言葉をチップで表示します。
 - 10語以上ある時、単語帳に読みがつながる `しりとり候補` を軽く表示します。
 - これらは原作仕様の断定ではなく、このPWA用の抽象的な学習会話モデルです。
+
+## Conversation System v2
+
+- 通常会話は `opening → awaiting_answer → reaction → closing → completed` の短いセッションとして、この端末の中へ保存します。
+- 質問は好き嫌い、意味の再確認、場面、関連語を扱い、選択回答または60文字以内の短いメモをWordFrameへ反映します。
+- 回答待ちの途中で再読み込みしても、保存済みConversationSessionとDialogueLogから質問へ戻ります。
+- 状態、テンプレート、単語は注入可能な乱数による重み付き抽選です。直近のspeech act、意味キー、テンプレート、単語、カテゴリにはcooldownをかけます。
+- アグリちゃんの口調層は、完成済み本文の単語、否定、疑問を保ったまま、導入または語尾を一部だけ調整します。
+- 自動発話は90〜180秒の範囲で待ち、回答待ち、別画面、非表示タブ、保存処理中には実行しません。
+- `last_user_interaction_at` と `last_character_speech_at` を分離し、留守判定はユーザー操作を基準にします。
+- 日記は当日の実会話、回答、復習、修正、関連語を優先し、原則1日1件です。
+
+## Save Compatibility
+
+- IndexedDBはversion 3です。`conversation_sessions` storeを追加しています。
+- JSON save schemaはversion 3です。会話ログと会話セッションを含みます。
+- schema 1 / 2は読み込み時に不足フィールドを補完します。
+- merge時はDialogueLogとConversationSessionをIDで重複保存しません。
 
 ## Research Boundary
 

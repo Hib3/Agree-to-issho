@@ -1,19 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DebugPanel } from "../components/debug/DebugPanel";
 import { DialogueBox } from "../components/DialogueBox";
 import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { dialogueTemplates } from "../data/templates/dialogueTemplates";
 import { TemplateDialogueEngine } from "../game/dialogue/TemplateDialogueEngine";
+import { answerConversation, closeConversation, completeConversation, createConversationSession, createPlayerAnswerLog } from "../game/dialogue/conversationSession";
+import { getAutoTalkDelay, shouldScheduleAutoTalk } from "../game/dialogue/autoTalk";
+import { systemRandom } from "../game/dialogue/random";
 import { applyCorrectionToWord } from "../game/dialogue/drift";
 import { deriveEventFlags } from "../game/events/eventRules";
 import { exportSaveData, importSaveData, previewImport } from "../game/storage/exportImport";
 import {
   characterStateRepository,
+  conversationSessionRepository,
   diaryEntryRepository,
   dialogueLogRepository,
   eventFlagRepository,
   profileRepository,
   settingsRepository,
+  wordRelationRepository,
   wordRepository
 } from "../game/storage/repositories";
 import { nowIso } from "../utils/id";
@@ -29,6 +34,7 @@ import { WordbookScreen } from "../screens/WordbookScreen";
 import type {
   AppProfile,
   CharacterState,
+  ConversationSession,
   DiaryEntry,
   DialogueLog,
   DialogueTurn,
@@ -47,6 +53,7 @@ type AppState = {
   dialogueLogs: DialogueLog[];
   diaryEntries: DiaryEntry[];
   eventFlags: EventFlag[];
+  conversationSessions: ConversationSession[];
 };
 
 const engine = new TemplateDialogueEngine();
@@ -66,6 +73,7 @@ const initialState: AppState = {
   dialogueLogs: [],
   diaryEntries: [],
   eventFlags: []
+  ,conversationSessions: []
 };
 
 export function App() {
@@ -74,9 +82,13 @@ export function App() {
   const [turn, setTurn] = useState<DialogueTurn>(initialTurn);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
+  const [visibilityTick, setVisibilityTick] = useState(0);
+  const [autoTalkDueAt, setAutoTalkDueAt] = useState<string | null>(null);
+  const busyRef = useRef(false);
 
   async function refresh() {
-    const [profile, characterState, settings, words, dialogueLogs, diaryEntries, eventFlags] = await Promise.all([
+    const [profile, characterState, settings, words, dialogueLogs, diaryEntries, eventFlags, conversationSessions] = await Promise.all([
       profileRepository.get(),
       characterStateRepository.get(),
       settingsRepository.get(),
@@ -84,6 +96,7 @@ export function App() {
       dialogueLogRepository.list(),
       diaryEntryRepository.list(),
       eventFlagRepository.list()
+      ,conversationSessionRepository.list()
     ]);
 
     setState({
@@ -94,6 +107,7 @@ export function App() {
       dialogueLogs: (dialogueLogs as DialogueLog[]).sort((a, b) => a.created_at.localeCompare(b.created_at)),
       diaryEntries: diaryEntries.sort((a, b) => a.entry_date.localeCompare(b.entry_date)),
       eventFlags: eventFlags as EventFlag[]
+      ,conversationSessions: (conversationSessions as ConversationSession[]).sort((a, b) => a.started_at.localeCompare(b.started_at))
     });
   }
 
@@ -105,6 +119,10 @@ export function App() {
 
   const hasStarted = Boolean(state.profile && state.characterState && state.settings);
   const latestDiary = useMemo(() => state.diaryEntries[state.diaryEntries.length - 1], [state.diaryEntries]);
+  const activeSession = useMemo(
+    () => [...state.conversationSessions].reverse().find((session) => session.phase !== "completed") ?? null,
+    [state.conversationSessions]
+  );
 
   async function handleFirstStart(playerName: string, characterName: string) {
     const now = nowIso();
@@ -116,6 +134,8 @@ export function App() {
       affection: 0,
       energy: 100,
       last_interaction_at: now,
+      last_user_interaction_at: now,
+      last_character_speech_at: now,
       updated_at: now
     });
     await settingsRepository.save({
@@ -138,7 +158,7 @@ export function App() {
   }
 
   async function handleRoomAction(action: string) {
-    if (action === "speak") return handleSpeak();
+    if (action === "speak") return activeSession ? handleContinueConversation() : handleSpeak();
     if (action === "teach") return setScreen("teach-word");
     if (action === "wordbook") return setScreen("wordbook");
     if (action === "diary") return setScreen("diary");
@@ -148,31 +168,95 @@ export function App() {
     if (action === "title") return setScreen("title");
   }
 
-  async function handleSpeak() {
-    const nextTurn = engine.next({
-      profile: state.profile,
-      character_state: state.characterState,
-      settings: state.settings,
-      words: state.words,
-      dialogue_logs: state.dialogueLogs,
-      diary_entries: state.diaryEntries,
-      now: nowIso()
+  useEffect(() => {
+    if (screen !== "main-room" || !activeSession) return;
+    const latestLog = [...state.dialogueLogs].reverse().find((log) => log.session_id === activeSession.id && log.role === "character");
+    if (!latestLog) return;
+    const usedWords = activeSession.topic_word_ids.map((id) => state.words.find((word) => word.id === id)).filter(Boolean) as WordFrame[];
+    setTurn({
+      speech_act: latestLog.speech_act ?? "use_word_in_daily_talk",
+      text: latestLog.text,
+      expression: state.characterState?.expression ?? "talk_normal",
+      emotion_code: latestLog.emotion_code,
+      motion_hint: latestLog.motion_hint,
+      used_words: usedWords,
+      template_id: latestLog.template_id,
+      semantic_key: latestLog.semantic_key,
+      session_id: activeSession.id,
+      requires_answer: activeSession.phase === "awaiting_answer",
+      ...(activeSession.phase === "awaiting_answer" && activeSession.question_kind !== "none" ? {
+        answer_schema: {
+          kind: activeSession.question_kind ?? "single_choice",
+          ...(activeSession.answer_options ? { options: activeSession.answer_options } : {}),
+          ...(activeSession.question_kind === "free_text" ? { placeholder: "60文字まで", max_length: 60 } : {})
+        }
+      } : {})
     });
-    await persistDialogueTurn(nextTurn);
-    setTurn(nextTurn);
-    await refresh();
+  }, [screen, activeSession?.id, activeSession?.phase]);
+
+  async function handleSpeak(isUserAction = true) {
+    if (busyRef.current || activeSession) return;
+    busyRef.current = true;
+    setIsBusy(true);
+    try {
+      const now = nowIso();
+      const nextTurn = engine.next({
+        profile: state.profile,
+        character_state: state.characterState,
+        settings: state.settings,
+        words: state.words,
+        dialogue_logs: state.dialogueLogs,
+        diary_entries: state.diaryEntries,
+        conversation_sessions: state.conversationSessions,
+        conversation_session: activeSession,
+        now
+      });
+      const log = await persistDialogueTurn(nextTurn, isUserAction);
+      if (nextTurn.requires_answer) {
+        await conversationSessionRepository.save({
+          ...createConversationSession(nextTurn, now),
+          prompt_log_id: log.id
+        });
+      }
+      setTurn(nextTurn);
+      await refresh();
+    } finally {
+      busyRef.current = false;
+      setIsBusy(false);
+    }
   }
 
   useEffect(() => {
-    if (screen !== "main-room" || !hasStarted || state.settings?.auto_talk === false) return;
-    const delayMs = state.settings?.reduce_motion ? 60000 : 42000;
-    const timer = window.setTimeout(() => {
-      void handleSpeak();
-    }, delayMs);
-    return () => window.clearTimeout(timer);
-  }, [screen, hasStarted, state.settings?.auto_talk, state.settings?.reduce_motion, turn.text, state.words.length, state.dialogueLogs.length]);
+    const onVisibility = () => setVisibilityTick((value) => value + 1);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
-  async function persistDialogueTurn(nextTurn: DialogueTurn) {
+  useEffect(() => {
+    if (!hasStarted || !shouldScheduleAutoTalk({
+      screen,
+      enabled: state.settings?.auto_talk !== false,
+      hidden: document.hidden,
+      busy: isBusy,
+      session: activeSession,
+      lastUserInteractionAt: state.characterState?.last_user_interaction_at,
+      now: Date.now()
+    })) {
+      setAutoTalkDueAt(null);
+      return;
+    }
+    const delayMs = getAutoTalkDelay(systemRandom);
+    setAutoTalkDueAt(new Date(Date.now() + delayMs).toISOString());
+    const timer = window.setTimeout(() => {
+      if (!document.hidden && !busyRef.current) void handleSpeak(false);
+    }, delayMs);
+    return () => {
+      window.clearTimeout(timer);
+      setAutoTalkDueAt(null);
+    };
+  }, [screen, hasStarted, state.settings?.auto_talk, activeSession?.id, activeSession?.phase, isBusy, turn.text, state.words.length, state.dialogueLogs.length, visibilityTick]);
+
+  async function persistDialogueTurn(nextTurn: DialogueTurn, isUserAction = false) {
     const now = nowIso();
     for (const used of nextTurn.used_words) {
       await wordRepository.save({
@@ -185,22 +269,83 @@ export function App() {
         updated_at: now
       });
     }
-    await dialogueLogRepository.save({
+    const log: DialogueLog = {
       id: `log_${crypto.randomUUID()}`,
+      session_id: nextTurn.session_id ?? `session_${crypto.randomUUID()}`,
+      role: "character",
       speech_act: nextTurn.speech_act,
+      ...(nextTurn.template_id ? { template_id: nextTurn.template_id } : {}),
+      ...(nextTurn.semantic_key ? { semantic_key: nextTurn.semantic_key } : {}),
       text: nextTurn.text,
       used_word_ids: nextTurn.used_words.map((word) => word.id),
       emotion_code: nextTurn.emotion_code,
       motion_hint: nextTurn.motion_hint,
       created_at: now
-    });
+    };
+    await dialogueLogRepository.save(log);
     if (state.characterState) {
       await characterStateRepository.save({
         ...state.characterState,
         expression: nextTurn.expression,
-        last_interaction_at: now,
+        ...(isUserAction ? { last_interaction_at: now, last_user_interaction_at: now } : {}),
+        last_character_speech_at: now,
+        energy: Math.max(0, state.characterState.energy - (isUserAction ? 1 : 0.5)),
         updated_at: now
       });
+    }
+    return log;
+  }
+
+  async function handleConversationAnswer(value: string, freeText = "") {
+    if (!activeSession || activeSession.phase !== "awaiting_answer" || busyRef.current) return;
+    busyRef.current = true;
+    setIsBusy(true);
+    try {
+      const now = nowIso();
+      const result = answerConversation(activeSession, value, state.words, now, freeText);
+      await dialogueLogRepository.save(createPlayerAnswerLog(activeSession, value, freeText, now));
+      for (const word of result.updated_words) await wordRepository.save(word);
+      if (result.relation) await wordRelationRepository.save(result.relation);
+      await conversationSessionRepository.save(result.session);
+      await persistDialogueTurn(result.turn, false);
+      if (state.characterState) {
+        await characterStateRepository.save({
+          ...state.characterState,
+          affection: Math.min(100, state.characterState.affection + 1),
+          energy: Math.max(0, state.characterState.energy - 1),
+          last_interaction_at: now,
+          last_user_interaction_at: now,
+          updated_at: now
+        });
+      }
+      setTurn(result.turn);
+      await refresh();
+    } finally {
+      busyRef.current = false;
+      setIsBusy(false);
+    }
+  }
+
+  async function handleContinueConversation() {
+    if (!activeSession || activeSession.phase === "awaiting_answer" || busyRef.current) return;
+    busyRef.current = true;
+    setIsBusy(true);
+    try {
+      const now = nowIso();
+      if (activeSession.phase === "closing") {
+        await conversationSessionRepository.save(completeConversation(activeSession, now));
+        await refresh();
+        return;
+      }
+      const word = state.words.find((item) => item.id === activeSession.topic_word_ids[0]);
+      const result = closeConversation(activeSession, word, now);
+      await conversationSessionRepository.save(result.session);
+      await persistDialogueTurn(result.turn, true);
+      setTurn(result.turn);
+      await refresh();
+    } finally {
+      busyRef.current = false;
+      setIsBusy(false);
     }
   }
 
@@ -208,12 +353,30 @@ export function App() {
     await wordRepository.save(word);
     const words = [...state.words.filter((item) => item.id !== word.id), word];
     for (const flag of deriveEventFlags(words)) await eventFlagRepository.save(flag);
-    setTurn({
+    const learnedTurn: DialogueTurn = {
       speech_act: "confirm_meaning",
       text: `「${word.surface}」っ！\n覚えまァっしたっ！\nまだふわふわしてるからっ、ときどき聞き直しますねェっ！`,
       expression: "proud",
+      emotion_code: "proud",
+      motion_hint: "sparkle",
+      template_id: "learning_saved",
+      semantic_key: "learning.word.saved",
+      session_id: `session_${crypto.randomUUID()}`,
       used_words: []
-    });
+    };
+    await persistDialogueTurn(learnedTurn, true);
+    if (state.characterState) {
+      const now = nowIso();
+      await characterStateRepository.save({
+        ...state.characterState,
+        affection: Math.min(100, state.characterState.affection + 1),
+        energy: Math.max(0, state.characterState.energy - 1),
+        last_user_interaction_at: now,
+        last_interaction_at: now,
+        updated_at: now
+      });
+    }
+    setTurn(learnedTurn);
     await refresh();
     setScreen("main-room");
   }
@@ -226,6 +389,8 @@ export function App() {
   }
 
   async function handleGenerateDiary() {
+    const today = nowIso().slice(0, 10);
+    if (state.diaryEntries.some((entry) => entry.entry_date === today)) return;
     const entry = await engine.generateDiaryEntry({
       profile: state.profile,
       character_state: state.characterState,
@@ -233,6 +398,7 @@ export function App() {
       words: state.words,
       dialogue_logs: state.dialogueLogs,
       diary_entries: state.diaryEntries,
+      conversation_sessions: state.conversationSessions,
       now: nowIso()
     });
     await diaryEntryRepository.save(entry);
@@ -253,7 +419,7 @@ export function App() {
           updated_at: now
         };
     await wordRepository.save({ ...nextWord, updated_at: now });
-    setTurn({
+    const feedbackTurn: DialogueTurn = {
       speech_act: "praise_user",
       text: mode === "correct"
         ? `「${saved.surface}」っ、直してくれてありがとォっ！\n前よりちゃんと覚え直しまァっすっ！`
@@ -261,8 +427,13 @@ export function App() {
       expression: "proud",
       emotion_code: "proud",
       motion_hint: "sparkle",
+      template_id: mode === "correct" ? "correction_accepted" : "drift_kept",
+      semantic_key: mode === "correct" ? "review.correction.accepted" : "drift.user.accepted",
+      session_id: turn.session_id ?? `session_${crypto.randomUUID()}`,
       used_words: []
-    });
+    };
+    await persistDialogueTurn(feedbackTurn, true);
+    setTurn(feedbackTurn);
     await refresh();
   }
 
@@ -337,6 +508,9 @@ export function App() {
           onAction={handleRoomAction}
           onSeedSampleWords={handleSeedSampleWords}
           onDriftFeedback={handleDriftFeedback}
+          activeSession={activeSession}
+          isBusy={isBusy}
+          onAnswer={handleConversationAnswer}
         />
       )}
       {screen === "teach-word" && <TeachWordFlow words={state.words} onCancel={() => setScreen("main-room")} onSave={handleWordSaved} />}
@@ -364,6 +538,11 @@ export function App() {
         settings={state.settings}
         words={state.words}
         onSeedSampleWords={handleSeedSampleWords}
+        debugInfo={engine.lastDebug}
+        session={activeSession}
+        characterState={state.characterState}
+        autoTalkEnabled={screen === "main-room" && state.settings?.auto_talk !== false && !activeSession && !document.hidden}
+        autoTalkDueAt={autoTalkDueAt}
       />
     </div>
   );

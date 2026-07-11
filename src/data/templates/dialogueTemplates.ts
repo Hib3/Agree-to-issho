@@ -16,20 +16,215 @@ export const dialogueTemplates: DialogueTemplate[] = [
     expression: "thinking"
   },
   {
+    id: "preference_check_direct",
+    speech_act: "ask_emotion",
+    semantic_key: "review.preference.direct",
+    text: "「{word}」は、好きな方ですか？ 今の気持ちで教えてください。",
+    intent: "daily_question",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "preference",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "like", label: "好き", value: "like" },
+        { id: "neutral", label: "ふつう", value: "neutral" },
+        { id: "dislike", label: "苦手", value: "dislike" },
+        { id: "unknown", label: "わからない", value: "unknown" }
+      ]
+    }
+  },
+  {
+    id: "preference_check_memory",
+    speech_act: "ask_emotion",
+    semantic_key: "review.preference.memory",
+    text: "前に聞いた「{word}」、今も {stance} という覚え方でよさそうですか？",
+    intent: "memory_recall",
+    word_slot: {},
+    expression: "talk_normal",
+    cooldown_group: "preference",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "like", label: "好き", value: "like" },
+        { id: "neutral", label: "ふつう", value: "neutral" },
+        { id: "dislike", label: "苦手", value: "dislike" },
+        { id: "later", label: "あとで", value: "unknown" }
+      ]
+    }
+  },
+  {
+    id: "preference_check_feeling",
+    speech_act: "ask_emotion",
+    semantic_key: "review.preference.feeling",
+    text: "「{word}」を聞くと、どんな気持ちに近いですか？",
+    intent: "daily_question",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "preference",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "like", label: "うれしい", value: "like" },
+        { id: "neutral", label: "おだやか", value: "neutral" },
+        { id: "dislike", label: "ちょっと苦手", value: "dislike" },
+        { id: "unknown", label: "まだ不明", value: "unknown" }
+      ]
+    }
+  },
+  {
+    id: "situation_check_choice",
+    speech_act: "ask_situation",
+    semantic_key: "review.situation.choice",
+    text: "「{word}」は、どんな場面で思い出しやすい言葉ですか？",
+    intent: "daily_question",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "situation",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "room", label: "部屋で", value: "room" },
+        { id: "daily", label: "普段の会話", value: "daily_talk" },
+        { id: "memory", label: "思い出す時", value: "memory" },
+        { id: "other", label: "別の場面", value: "free_text" }
+      ]
+    }
+  },
+  {
+    id: "situation_check_free",
+    speech_act: "ask_situation",
+    semantic_key: "review.situation.free",
+    text: "「{word}」を使う時のこと、短いメモで教えてもらえますか？",
+    intent: "daily_question",
+    word_slot: {},
+    expression: "talk_normal",
+    cooldown_group: "situation",
+    answer_schema: { kind: "free_text", placeholder: "60文字までの場面メモ", max_length: 60 }
+  },
+  {
+    id: "situation_check_confirm",
+    speech_act: "ask_situation",
+    semantic_key: "review.situation.confirm",
+    text: "「{word}」は {situation} の言葉として残しています。このままで合っていますか？",
+    intent: "correction",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "situation",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "yes", label: "合っている", value: "confirm" },
+        { id: "no", label: "違う", value: "correct" },
+        { id: "later", label: "あとで", value: "later" }
+      ]
+    }
+  },
+  {
+    id: "relation_check_pair",
+    speech_act: "ask_relation",
+    semantic_key: "relation.word_pair.confirm",
+    text: "「{word}」と「{relatedWord}」は、つながりのある言葉ですか？",
+    intent: "daily_question",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "relation",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "related", label: "関係ある", value: "related" },
+        { id: "unrelated", label: "関係ない", value: "unrelated" },
+        { id: "unknown", label: "わからない", value: "unknown" }
+      ]
+    }
+  },
+  {
+    id: "relation_check_memory",
+    speech_act: "ask_relation",
+    semantic_key: "relation.memory.pair",
+    text: "ノートでは「{word}」の近くに「{relatedWord}」があります。この並び方は合っていますか？",
+    intent: "memory_recall",
+    word_slot: {},
+    expression: "talk_normal",
+    cooldown_group: "relation",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "related", label: "関係ある", value: "related" },
+        { id: "unrelated", label: "関係ない", value: "unrelated" },
+        { id: "unknown", label: "まだ不明", value: "unknown" }
+      ]
+    }
+  },
+  {
+    id: "relation_check_usage",
+    speech_act: "ask_relation",
+    semantic_key: "relation.usage.pair",
+    text: "「{word}」を話す時に「{relatedWord}」も一緒に出てきそうですか？",
+    intent: "daily_question",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "relation",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "related", label: "一緒に出る", value: "related" },
+        { id: "unrelated", label: "別々", value: "unrelated" },
+        { id: "unknown", label: "わからない", value: "unknown" }
+      ]
+    }
+  },
+  {
     id: "ask_correction_low_confidence",
     speech_act: "ask_correction",
+    semantic_key: "review.category.confirm",
     text: "「{word}」は {category} として覚えてるけど、{situation} に出しても合っていますか？",
     intent: "correction",
     word_slot: {},
-    expression: "confused"
+    expression: "confused",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "confirm", label: "合っている", value: "confirm" },
+        { id: "correct", label: "違う", value: "correct" },
+        { id: "later", label: "あとで", value: "later" }
+      ]
+    }
   },
   {
     id: "ask_correction_emotion",
     speech_act: "ask_correction",
+    semantic_key: "review.emotion.confirm",
     text: "「{word}」は {emotion} で覚えています。もし違ったら、あとで直してください。",
     intent: "correction",
     word_slot: {},
-    expression: "thinking"
+    expression: "thinking",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "confirm", label: "合っている", value: "confirm" },
+        { id: "correct", label: "違う", value: "correct" },
+        { id: "later", label: "あとで", value: "later" }
+      ]
+    }
+  },
+  {
+    id: "ask_correction_usage",
+    speech_act: "ask_correction",
+    semantic_key: "review.usage.confirm",
+    text: "「{word}」は {useHint} と覚えています。この手がかりで合っていますか？",
+    intent: "correction",
+    word_slot: {},
+    expression: "thinking",
+    cooldown_group: "review",
+    answer_schema: {
+      kind: "single_choice",
+      options: [
+        { id: "confirm", label: "合っている", value: "confirm" },
+        { id: "correct", label: "違う", value: "correct" },
+        { id: "later", label: "あとで", value: "later" }
+      ]
+    }
   },
   {
     id: "recall_word_any",

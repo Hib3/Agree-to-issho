@@ -3,7 +3,9 @@ import { createId, nowIso } from "../../utils/id";
 import {
   characterStateRepository,
   clearGameStores,
+  conversationSessionRepository,
   diaryEntryRepository,
+  dialogueLogRepository,
   dialogueSummaryRepository,
   eventFlagRepository,
   getAllSaveRecords,
@@ -19,7 +21,7 @@ import { migrateWordFrame } from "../word/wordMemory";
 const APP_ID = "aguri-word-room";
 const LEGACY_APP_IDS = ["with-agree"];
 const APP_VERSION = "0.1.0";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export async function exportSaveData(): Promise<ExportedSaveData> {
   const records = await getAllSaveRecords();
@@ -32,6 +34,8 @@ export async function exportSaveData(): Promise<ExportedSaveData> {
     character_state: records.character_state,
     words: records.words,
     word_relations: records.word_relations,
+    dialogue_logs: records.dialogue_logs,
+    conversation_sessions: records.conversation_sessions,
     diary_entries: records.diary_entries,
     dialogue_summaries: records.dialogue_summaries,
     event_flags: records.event_flags,
@@ -45,7 +49,7 @@ export async function previewImport(raw: string, mode: "replace" | "merge"): Pro
   try {
     const data = JSON.parse(raw) as ExportedSaveData;
     const errors: string[] = [];
-    if (data.schema_version !== 1 && data.schema_version !== SCHEMA_VERSION) errors.push("このセーブ形式はまだ読み込めません。");
+    if (data.schema_version !== 1 && data.schema_version !== 2 && data.schema_version !== SCHEMA_VERSION) errors.push("このセーブ形式はまだ読み込めません。");
     if (data.app_id !== APP_ID && !LEGACY_APP_IDS.includes(data.app_id)) errors.push("別のアプリの保存データです。");
     const expected = await checksumJson(data);
     if (expected !== data.checksum) errors.push("保存データの確認に失敗しました。");
@@ -79,7 +83,13 @@ function migrateSaveData(data: ExportedSaveData): ExportedSaveData {
   return {
     ...data,
     schema_version: SCHEMA_VERSION,
-    words: Array.isArray(data.words) ? data.words.map((word) => migrateWordFrame(word)) : []
+    words: Array.isArray(data.words) ? data.words.map((word) => migrateWordFrame(word)) : [],
+    word_relations: Array.isArray(data.word_relations) ? data.word_relations : [],
+    dialogue_logs: Array.isArray(data.dialogue_logs) ? data.dialogue_logs : [],
+    conversation_sessions: Array.isArray(data.conversation_sessions) ? data.conversation_sessions : [],
+    diary_entries: Array.isArray(data.diary_entries) ? data.diary_entries : [],
+    dialogue_summaries: Array.isArray(data.dialogue_summaries) ? data.dialogue_summaries : [],
+    event_flags: Array.isArray(data.event_flags) ? data.event_flags : []
   };
 }
 
@@ -106,6 +116,14 @@ export async function importSaveData(preview: ImportPreview): Promise<void> {
     await saveMergedWord(word);
   }
   for (const relation of data.word_relations) await wordRelationRepository.save(relation);
+  for (const log of data.dialogue_logs) {
+    if (preview.mode === "merge" && await dialogueLogRepository.get(log.id)) continue;
+    await dialogueLogRepository.save(log);
+  }
+  for (const session of data.conversation_sessions) {
+    if (preview.mode === "merge" && await conversationSessionRepository.get(session.id)) continue;
+    await conversationSessionRepository.save(session);
+  }
   for (const entry of data.diary_entries) await diaryEntryRepository.save(entry);
   for (const summary of data.dialogue_summaries) await dialogueSummaryRepository.save(summary);
   for (const flag of data.event_flags) await eventFlagRepository.save(flag);

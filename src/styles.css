@@ -93,6 +93,11 @@ button.primary {
   font-weight: 900;
 }
 
+button.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #9b78aa, #7b5a8e);
+  color: #fffaf2;
+}
+
 h1,
 h2,
 p {
@@ -504,6 +509,29 @@ h2 {
   background: linear-gradient(180deg, #986fa8, #7b5a8e);
 }
 
+.conversation-answer-panel {
+  position: relative;
+  z-index: 7;
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  background: rgba(255, 250, 242, 0.94);
+  border-top: 1px solid rgba(59, 45, 37, 0.18);
+}
+
+.conversation-free-text {
+  display: grid;
+  gap: 5px;
+  color: var(--color-muted);
+  font-weight: 800;
+}
+
+.conversation-answer-actions {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 8px;
+}
+
 .sub-actions {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -759,6 +787,23 @@ dd {
 
 .debug-actions button {
   background: var(--color-choice);
+}
+
+.debug-details {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.debug-details div {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+}
+
+.debug-details dd {
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .sample-status {

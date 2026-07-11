@@ -2,6 +2,7 @@ import type {
   AppProfile,
   AssetManifestItem,
   CharacterState,
+  ConversationSession,
   DialogueLog,
   DialogueSummary,
   DiaryEntry,
@@ -13,7 +14,7 @@ import type {
 } from "../types/domain";
 
 export const DB_NAME = "with-agree-db";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export type StoreName =
   | "profile"
@@ -21,6 +22,7 @@ export type StoreName =
   | "words"
   | "word_relations"
   | "dialogue_logs"
+  | "conversation_sessions"
   | "dialogue_summaries"
   | "event_flags"
   | "diary_entries"
@@ -34,6 +36,7 @@ export type StoreRecordMap = {
   words: WordFrame;
   word_relations: WordRelation;
   dialogue_logs: DialogueLog;
+  conversation_sessions: ConversationSession;
   dialogue_summaries: DialogueSummary;
   event_flags: EventFlag;
   diary_entries: DiaryEntry;
@@ -48,6 +51,7 @@ export const storeNames: StoreName[] = [
   "words",
   "word_relations",
   "dialogue_logs",
+  "conversation_sessions",
   "dialogue_summaries",
   "event_flags",
   "diary_entries",

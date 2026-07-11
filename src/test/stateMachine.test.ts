@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { chooseNextState, stateToSpeechAct } from "../game/dialogue/stateMachine";
+import { SeededRandomSource } from "../game/dialogue/random";
 import type { DialogueContext } from "../types/domain";
 
 function context(partial: Partial<DialogueContext>): DialogueContext {
@@ -32,5 +33,10 @@ describe("dialogue state machine", () => {
 
   it("maps review prompt to an existing correction speech act", () => {
     expect(stateToSpeechAct("review_prompt")).toBe("ask_correction");
+  });
+
+  it("returns the same selection for the same seed and context", () => {
+    const input = context({ words: createDebugWordSeed(), dialogue_logs: [] });
+    expect(chooseNextState(input, new SeededRandomSource(99))).toBe(chooseNextState(input, new SeededRandomSource(99)));
   });
 });

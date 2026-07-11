@@ -1,7 +1,8 @@
 import { CharacterStage } from "../components/character/CharacterStage";
 import { DialogueBox } from "../components/DialogueBox";
+import { ChoiceButtons } from "../components/ChoiceButtons";
 import { useEffect, useState, type CSSProperties } from "react";
-import type { AppProfile, CharacterState, DiaryEntry, DialogueTurn, WordFrame } from "../types/domain";
+import type { AppProfile, CharacterState, ConversationSession, DiaryEntry, DialogueTurn, WordFrame } from "../types/domain";
 
 type RoomAction = "speak" | "teach" | "wordbook" | "diary" | "settings" | "import-export" | "manual" | "title";
 
@@ -14,10 +15,15 @@ type MainRoomProps = {
   onAction: (action: RoomAction) => void;
   onSeedSampleWords: () => Promise<number>;
   onDriftFeedback: (mode: "correct" | "keep", note?: string) => void;
+  activeSession: ConversationSession | null;
+  isBusy: boolean;
+  onAnswer: (value: string, freeText?: string) => void;
 };
 
-export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords, onDriftFeedback }: MainRoomProps) {
+export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords, onDriftFeedback, activeSession, isBusy, onAnswer }: MainRoomProps) {
   const [correctionNote, setCorrectionNote] = useState("");
+  const [selectedAnswer, setSelectedAnswer] = useState("");
+  const [answerText, setAnswerText] = useState("");
   const name = characterState?.character_name ?? "アグリちゃん";
   const playerName = profile?.player_name ?? "あなた";
   const reviewTargetCount = words.filter((word) => !word.is_blocked && !word.is_sensitive && !word.forgotten_at && (word.confidence < 0.58 || word.ambiguity_score > 0.72 || word.category === "unknown")).length;
@@ -29,7 +35,22 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
 
   useEffect(() => {
     setCorrectionNote("");
+    setSelectedAnswer("");
+    setAnswerText("");
   }, [turn.text]);
+
+  const awaitingAnswer = activeSession?.phase === "awaiting_answer" && turn.requires_answer;
+  const showFreeText = turn.answer_schema?.kind === "free_text" || selectedAnswer === "free_text";
+  const answerOptions = turn.answer_schema?.options ?? [];
+
+  function submitAnswer() {
+    if (showFreeText) {
+      if (!answerText.trim()) return;
+      onAnswer(selectedAnswer || "free_text", answerText);
+      return;
+    }
+    if (selectedAnswer) onAnswer(selectedAnswer);
+  }
 
   return (
     <main className="screen main-room-screen">
@@ -77,10 +98,49 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
           </div>
         )}
 
-        <div className="primary-actions" aria-label="メイン操作">
-          <button className="primary" type="button" onClick={() => onAction("speak")}>話す</button>
-          <button className="primary teach" type="button" onClick={() => onAction("teach")}>言葉を教える</button>
-        </div>
+        {awaitingAnswer && (
+          <section className="conversation-answer-panel" aria-label="アグリちゃんの質問に答える">
+            {answerOptions.length > 0 && (
+              <ChoiceButtons
+                options={answerOptions.map((option) => ({ value: option.value, label: option.label }))}
+                value={selectedAnswer}
+                disabled={isBusy}
+                ariaLabel="回答の選択肢"
+                onChoose={setSelectedAnswer}
+              />
+            )}
+            {showFreeText && (
+              <label className="conversation-free-text">
+                短いメモ
+                <input
+                  value={answerText}
+                  maxLength={turn.answer_schema?.max_length ?? 60}
+                  placeholder={turn.answer_schema?.placeholder ?? "60文字まで"}
+                  disabled={isBusy}
+                  onChange={(event) => setAnswerText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.nativeEvent.isComposing) submitAnswer();
+                  }}
+                />
+              </label>
+            )}
+            <div className="conversation-answer-actions">
+              <button className="primary" type="button" disabled={isBusy || (showFreeText ? !answerText.trim() : !selectedAnswer)} onClick={submitAnswer}>
+                答える
+              </button>
+              <button type="button" disabled={isBusy} onClick={() => onAnswer("later")}>あとで</button>
+            </div>
+          </section>
+        )}
+
+        {!awaitingAnswer && (
+          <div className="primary-actions" aria-label="メイン操作">
+            <button className="primary" type="button" disabled={isBusy} onClick={() => onAction("speak")}>
+              {activeSession ? "会話を続ける" : "話す"}
+            </button>
+            <button className="primary teach" type="button" disabled={isBusy || Boolean(activeSession)} onClick={() => onAction("teach")}>言葉を教える</button>
+          </div>
+        )}
       </section>
 
       {latestDiary && (

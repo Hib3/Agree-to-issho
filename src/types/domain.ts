@@ -95,6 +95,9 @@ export type CharacterState = {
   affection: number;
   energy: number;
   last_interaction_at?: string;
+  last_user_interaction_at?: string;
+  last_character_speech_at?: string;
+  idle_motion?: MotionHint;
   updated_at: string;
 };
 
@@ -145,12 +148,51 @@ export type WordRelation = {
 
 export type DialogueLog = {
   id: Id;
-  speech_act: SpeechAct;
+  session_id?: Id;
+  role?: DialogueRole;
+  speech_act?: SpeechAct;
+  template_id?: string;
+  semantic_key?: string;
   text: string;
   used_word_ids: Id[];
+  reply_to_log_id?: Id;
+  player_action?: string;
+  selected_option_id?: string;
   emotion_code?: EmotionCode;
   motion_hint?: MotionHint;
   created_at: string;
+};
+
+export type DialogueRole = "character" | "player" | "system";
+
+export type DialogueAnswerOption = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+export type ConversationPhase =
+  | "opening"
+  | "awaiting_answer"
+  | "reaction"
+  | "follow_up"
+  | "closing"
+  | "completed";
+
+export type ConversationSession = {
+  id: Id;
+  intent: string;
+  phase: ConversationPhase;
+  topic_word_ids: Id[];
+  prompt_log_id?: Id;
+  question_kind?: "yes_no" | "single_choice" | "free_text" | "none";
+  answer_options?: DialogueAnswerOption[];
+  remaining_turns: number;
+  answer_value?: string;
+  answer_text?: string;
+  started_at: string;
+  updated_at: string;
+  completed_at?: string;
 };
 
 export type DialogueSummary = {
@@ -166,6 +208,8 @@ export type DiaryEntry = {
   title: string;
   body: string;
   used_word_ids: Id[];
+  source_log_ids?: Id[];
+  source_session_ids?: Id[];
   mood: EmotionTag;
   created_at: string;
 };
@@ -207,12 +251,16 @@ export type DialogueTemplate = {
   id: string;
   speech_act: SpeechAct;
   text: string;
+  semantic_key?: string;
   intent?: "greeting" | "learning_prompt" | "memory_recall" | "daily_question" | "correction" | "praise" | "lonely" | "diary";
   word_slot?: {
     category?: WordCategory;
     situation?: SituationTag;
   };
   expression: CharacterExpression;
+  motion_hint?: MotionHint;
+  cooldown_group?: string;
+  answer_schema?: DialogueTurn["answer_schema"];
 };
 
 export type DialogueTurn = {
@@ -222,6 +270,17 @@ export type DialogueTurn = {
   emotion_code?: EmotionCode;
   motion_hint?: MotionHint;
   used_words: WordFrame[];
+  template_id?: string;
+  semantic_key?: string;
+  session_id?: string;
+  requires_answer?: boolean;
+  answer_schema?: {
+    kind: "yes_no" | "single_choice" | "free_text";
+    options?: DialogueAnswerOption[];
+    placeholder?: string;
+    max_length?: number;
+  };
+  relaxed_constraints?: string[];
 };
 
 export type DialogueContext = {
@@ -231,6 +290,8 @@ export type DialogueContext = {
   settings: GameSettings | null;
   dialogue_logs?: DialogueLog[];
   diary_entries?: DiaryEntry[];
+  conversation_session?: ConversationSession | null;
+  conversation_sessions?: ConversationSession[];
   now: string;
 };
 
@@ -249,7 +310,7 @@ export type PendingLearning = {
 };
 
 export type ExportedSaveData = {
-  schema_version: 1 | 2;
+  schema_version: 1 | 2 | 3;
   app_id: "aguri-word-room" | "with-agree";
   exported_at: string;
   app_version: string;
@@ -257,6 +318,8 @@ export type ExportedSaveData = {
   character_state: CharacterState | null;
   words: WordFrame[];
   word_relations: WordRelation[];
+  dialogue_logs: DialogueLog[];
+  conversation_sessions: ConversationSession[];
   diary_entries: DiaryEntry[];
   dialogue_summaries: DialogueSummary[];
   event_flags: EventFlag[];
