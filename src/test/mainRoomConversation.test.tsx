@@ -1,11 +1,40 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MainRoom } from "../screens/MainRoom";
 import { applyCategory, createWordFrame } from "../game/word/createWordFrame";
 
 describe("MainRoom conversation answers", () => {
+  afterEach(cleanup);
+
+  it("shows a continue button while a non-question conversation is active", () => {
+    const word = applyCategory(createWordFrame("台所"), "place");
+    render(
+      <MainRoom
+        profile={{ id: "local", player_name: "テスト", created_at: "2026-01-01", updated_at: "2026-01-01" }}
+        characterState={{ id: "main", character_name: "アグリちゃん", expression: "talk_smile", affection: 1, energy: 90, updated_at: "2026-01-01" }}
+        words={[word]}
+        turn={{
+          speech_act: "praise_user",
+          text: "覚え方を少し強くしておきます。",
+          expression: "talk_smile",
+          used_words: [word],
+          session_id: "session_reaction"
+        }}
+        activeSession={{ id: "session_reaction", intent: "review", phase: "reaction", topic_word_ids: [word.id], remaining_turns: 1, started_at: "2026-01-01", updated_at: "2026-01-01" }}
+        isBusy={false}
+        onAction={vi.fn()}
+        onSeedSampleWords={vi.fn(async () => 0)}
+        onDriftFeedback={vi.fn()}
+        onAnswer={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "会話を続ける" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "言葉を教える" }).hasAttribute("disabled")).toBe(true);
+  });
+
   it("allows changing an answer and hides the normal talk action while waiting", async () => {
     const user = userEvent.setup();
     const onAnswer = vi.fn();

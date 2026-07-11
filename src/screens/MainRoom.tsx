@@ -144,7 +144,7 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
           </section>
         )}
 
-        {!awaitingAnswer && !activeSession && (
+        {!awaitingAnswer && (
           <div className="primary-actions" aria-label="メイン操作">
             <button className="primary" type="button" disabled={isBusy} onClick={() => onAction("speak")}>
               {activeSession ? "会話を続ける" : "話す"}
