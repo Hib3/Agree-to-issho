@@ -21,5 +21,5 @@ export function sanitizeGameText(text: string): string {
     .filter((line) => !blockedPatterns.some((pattern) => pattern.test(line)))
     .join("\n")
     .trim();
-  return sanitized || "まァっ、この話っ！ もう一回、落ち着いて選び直しますねェっ！";
+  return sanitized || "なんかっ、うまく言葉にできませんでした。もう一回、落ち着いて選び直しますねェっ！";
 }

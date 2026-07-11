@@ -3,6 +3,7 @@ import { systemRandom, weightedPick, type RandomSource } from "./random";
 
 export function scoreWordForTemplate(word: WordFrame, template: DialogueTemplate, now = new Date(), recentLogs: DialogueLog[] = [], words: WordFrame[] = []): number {
   if (word.is_blocked || word.is_sensitive || word.forgotten_at) return Number.NEGATIVE_INFINITY;
+  if (template.speech_act === "ask_emotion" && word.category !== "food" && word.user_stance !== "unknown") return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.category && word.category !== template.word_slot.category) return Number.NEGATIVE_INFINITY;
   if (template.word_slot?.situation && !word.situation_tags.includes(template.word_slot.situation)) return Number.NEGATIVE_INFINITY;
 
@@ -56,8 +57,9 @@ export function selectWordForTemplate(
   const categoryCooldown = recentCategories.length === 2 && recentCategories.every((category) => category === recentCategories[0])
     ? recentCategories[0]
     : null;
-  const strict = scored.filter((item) => !recentIds.has(item.word.id) && item.word.category !== categoryCooldown);
-  const pool = strict.length > 0 ? strict : scored;
+  const withoutRecentWords = scored.filter((item) => !recentIds.has(item.word.id));
+  const strict = withoutRecentWords.filter((item) => item.word.category !== categoryCooldown);
+  const pool = strict.length > 0 ? strict : withoutRecentWords.length > 0 ? withoutRecentWords : scored;
   const minimum = Math.min(...pool.map((item) => item.score));
   return weightedPick(
     pool.map((item) => ({

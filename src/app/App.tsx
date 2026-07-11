@@ -60,7 +60,7 @@ const engine = new TemplateDialogueEngine();
 
 const initialTurn: DialogueTurn = {
   speech_act: "greeting",
-  text: "はァっいっ！\nおかえりなさいでございまァっすっ！\n今日はどんな言葉を連れてきたのかなァっ！",
+  text: "おかえりなさいでございまァっすっ！\nアグリっ！\n今日はどんな言葉を連れてきたのかなァっ！",
   expression: "talk_smile",
   used_words: []
 };
@@ -150,7 +150,7 @@ export function App() {
     await refresh();
     setTurn({
       speech_act: "greeting",
-      text: `はァっいっ！\n${characterName}でございまァっすっ！\nあなたの言葉っ！めっちゃ覚えていきますよォっ！`,
+      text: `${characterName}でございまァっすっ！\nアグリっ！\nあなたの言葉をめっちゃ覚えていくよォっ！`,
       expression: "talk_smile",
       used_words: []
     });
@@ -355,7 +355,7 @@ export function App() {
     for (const flag of deriveEventFlags(words)) await eventFlagRepository.save(flag);
     const learnedTurn: DialogueTurn = {
       speech_act: "confirm_meaning",
-      text: `「${word.surface}」っ！\n覚えまァっしたっ！\nまだふわふわしてるからっ、ときどき聞き直しますねェっ！`,
+      text: `「${word.surface}」っ！\nノートに覚えておきまァっすっ！\nまだふわふわしてるからっ、ときどき聞き直しますねェっ！`,
       expression: "proud",
       emotion_code: "proud",
       motion_hint: "sparkle",
@@ -422,7 +422,7 @@ export function App() {
     const feedbackTurn: DialogueTurn = {
       speech_act: "praise_user",
       text: mode === "correct"
-        ? `「${saved.surface}」っ、直してくれてありがとォっ！\n前よりちゃんと覚え直しまァっすっ！`
+        ? `「${saved.surface}」っ、直してくれてありがとうございまァっすっ！\n前よりちゃんと覚え直しまァっすっ！`
         : `「${saved.surface}」っ、このままでもいいんですねェっ！\nじゃあ、ちょっと不思議な感じもノートに残しますっ！`,
       expression: "proud",
       emotion_code: "proud",

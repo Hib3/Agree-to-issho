@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { TemplateDialogueEngine } from "../game/dialogue/TemplateDialogueEngine";
+import { SeededRandomSource } from "../game/dialogue/random";
 import { applyCategory, applyEmotion, applySituation, createWordFrame } from "../game/word/createWordFrame";
 import type { DialogueContext, WordFrame } from "../types/domain";
 
 describe("TemplateDialogueEngine variety", () => {
   it("uses different learned words and parameters across repeated conversations", () => {
-    const engine = new TemplateDialogueEngine();
+    const engine = new TemplateDialogueEngine(new SeededRandomSource(4386));
     let words = createDebugWordSeed();
     const texts = new Set<string>();
     const usedWordIds = new Set<string>();
@@ -42,7 +43,7 @@ describe("TemplateDialogueEngine variety", () => {
   });
 
   it("does not use blocked or sensitive words in normal conversation", () => {
-    const engine = new TemplateDialogueEngine();
+    const engine = new TemplateDialogueEngine(new SeededRandomSource(17));
     const words = createDebugWordSeed().map((word, index): WordFrame => {
       if (index === 0) return { ...word, surface: "出してはいけない語", is_blocked: true, confidence: 1, use_count: 0 };
       if (index === 1) return { ...word, surface: "通常会話では避ける語", is_sensitive: true, confidence: 1, use_count: 0 };
@@ -63,7 +64,7 @@ describe("TemplateDialogueEngine variety", () => {
   });
 
   it("does not show the missing-word fallback when a specific template cannot use the available word", () => {
-    const engine = new TemplateDialogueEngine();
+    const engine = new TemplateDialogueEngine(new SeededRandomSource(23));
     const objectWord = applySituation(
       applyEmotion(applyCategory(createWordFrame("ノート"), "object"), "curious", "neutral"),
       "daily_talk"
@@ -80,5 +81,18 @@ describe("TemplateDialogueEngine variety", () => {
     expect(turn.text).not.toContain("うまく言葉を選べませんでした");
     expect(turn.used_words).toHaveLength(1);
     expect(turn.used_words[0].surface).toBe("ノート");
+  });
+
+  it("uses food or an unknown stance for preference questions", () => {
+    const engine = new TemplateDialogueEngine(new SeededRandomSource(99));
+    const words = createDebugWordSeed();
+    let preferenceTurns = 0;
+    for (let index = 0; index < 80; index += 1) {
+      const turn = engine.next({ profile: null, character_state: null, settings: null, words, now: new Date(Date.UTC(2026, 6, 8, 12, index)).toISOString() });
+      if (turn.speech_act !== "ask_emotion") continue;
+      preferenceTurns += 1;
+      expect(turn.used_words[0]?.category === "food" || turn.used_words[0]?.user_stance === "unknown").toBe(true);
+    }
+    expect(preferenceTurns).toBeGreaterThan(0);
   });
 });

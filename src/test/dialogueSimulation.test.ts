@@ -29,7 +29,8 @@ describe("500 turn conversation simulation", () => {
         relaxedTurns += 1;
       }
       for (const word of turn.used_words) {
-        expect(logs.slice(-3).flatMap((log) => log.used_word_ids)).not.toContain(word.id);
+        const recentWordIds = logs.slice(-3).flatMap((log) => log.used_word_ids);
+        expect(recentWordIds).not.toContain(word.id);
         usedIds.add(word.id);
       }
       const recentActs = logs.slice(-2).map((log) => log.speech_act);

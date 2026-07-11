@@ -54,7 +54,7 @@ function buildDiaryBody(words: NonNullable<DialogueContext["words"]>, flags: { d
   const answerNote = flags.playerAnswered ? "質問に答えてもらえたので、言葉の意味をひとつ確かめられました。" : "";
   const relationNote = flags.relationConfirmed ? "二つの言葉のつながりも、ひとつ確認できました。" : "";
   const tail = third
-    ? `まだ全部は言えないけど、「${third.surface}」までつながると、部屋のメモがにぎやかになりまァっすっ。`
+    ? `まだ全部は言えないけど、「${third.surface}」までつながると、部屋のメモがにぎやかだよなァっ！`
     : "まだ全部は言えないけど、少しずつ私の中で形になっています。";
 
   if (variant === 1) return `ノートを見返すと、今日は${surfaces}が残っていました。最初の「${first.surface}」は${firstFeeling}で、${firstSituation}の言葉です。${answerNote}${relationNote}${learningNote}${tail}`;

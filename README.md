@@ -74,6 +74,12 @@ npm run zip:review
 - `last_user_interaction_at` と `last_character_speech_at` を分離し、留守判定はユーザー操作を基準にします。
 - 日記は当日の実会話、回答、復習、修正、関連語を優先し、原則1日1件です。
 
+## Aguri Voice
+
+- アグリちゃんの口調は、ユーザー提供のstyle-onlyルールから、共感、賞賛、驚き、不確実、丁寧、オチの条件だけを抽象化して実装します。
+- 口調処理は完成した本文を上書きせず、短い前置き、丁寧語の崩し、語尾、限定的な笑いを発話目的に応じて適用します。
+- 元投稿やコメント本文、収集JSONはアプリへ同梱せず、Git管理もしません。
+
 ## Save Compatibility
 
 - IndexedDBはversion 3です。`conversation_sessions` storeを追加しています。

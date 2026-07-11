@@ -1,3 +1,4 @@
+import { aguriStyleRules, type AguriStyleCondition } from "../../data/style/aguriStyleRules";
 import type { DialogueTemplate, SpeechAct, WordFrame } from "../../types/domain";
 
 type StyleInput = {
@@ -6,37 +7,115 @@ type StyleInput = {
   speechAct: SpeechAct;
   word: WordFrame | null;
   turnIndex: number;
-  recentStyleIds?: string[];
+  recentTexts?: string[];
 };
 
-const leads = [
-  { id: "lead_maa", text: "まァっ、" },
-  { id: "lead_ano", text: "あのォっ、" },
-  { id: "lead_ne", text: "ねェっ、" }
-] as const;
-
-export function applyAguriStyle({ renderedText, speechAct, turnIndex, recentStyleIds = [] }: StyleInput): string {
+export function applyAguriStyle({ renderedText, speechAct, turnIndex, recentTexts = [] }: StyleInput): string {
   const base = normalize(renderedText);
-  if (!base) return "まだうまく言えないから、少し考えておきます。";
-  if (isCarefulAct(speechAct)) return base;
+  if (!base) return "まだうまく言えないからっ、少し考えておきまァっすっ！";
 
-  const canDecorate = turnIndex % 3 !== 1;
-  if (!canDecorate) return softenEnding(base, turnIndex);
-  const available = leads.filter((item) => !recentStyleIds.slice(-2).includes(item.id));
-  const lead = available[turnIndex % Math.max(1, available.length)] ?? leads[0];
-  return `${lead.text}${softenEnding(base, turnIndex)}`;
+  const condition = selectCondition(speechAct, base);
+  let lines = splitClauses(base);
+  lines = applyCondition(lines, condition, turnIndex);
+
+  if (shouldLaugh(condition, turnIndex, recentTexts)) {
+    const counts = aguriStyleRules.laugh.allowedCounts;
+    const count = counts[turnIndex % Math.min(2, counts.length)] ?? 4;
+    lines.push(`${aguriStyleRules.laugh.token.repeat(count)}っ！`);
+  }
+
+  return lines.map(cleanLine).filter(Boolean).join("\n");
 }
 
-function isCarefulAct(speechAct: SpeechAct) {
-  return speechAct === "ask_correction" || speechAct === "confirm_meaning" || speechAct === "ask_category";
+function selectCondition(speechAct: SpeechAct, text: string): AguriStyleCondition | "statement" {
+  if (speechAct === "goodbye") return "closing_thanks";
+  if (speechAct === "lonely_reaction" || (speechAct === "praise_user" && /苦手|無理|違って|大丈夫|さみし|つら/.test(text))) return "empathy";
+  if (speechAct === "misunderstanding_joke" || speechAct === "embarrassed_reaction") return "comic_release";
+  if (speechAct === "happy_reaction" || speechAct === "praise_user") return "praise";
+  if (speechAct === "greeting") return "greeting_daily";
+  if (speechAct === "ask_relation" && /それとも|どちら|二つ|2つ/.test(text)) return "choice_or_branch";
+  if (speechAct === "ask_category" || speechAct === "ask_emotion" || speechAct === "ask_situation" || speechAct === "ask_relation" || speechAct === "ask_correction" || speechAct === "confirm_meaning" || /[？?]$/.test(text)) {
+    return "self_softening";
+  }
+  if (speechAct === "ask_new_word") return "self_softening";
+  return "statement";
+}
+
+function applyCondition(lines: string[], condition: AguriStyleCondition | "statement", turnIndex: number): string[] {
+  if (lines.length === 0) return lines;
+  switch (condition) {
+    case "greeting_daily":
+      return turnIndex % 2 === 0
+        ? ["アグリっ！", ...replaceLast(lines, applyPoliteEnding)]
+        : replaceLast(lines, applyPoliteEnding);
+    case "praise":
+      return /めっちゃ/.test(lines.join(""))
+        ? replaceLast(lines, applyWarmEnding)
+        : ["めっちゃうれしいなァっ！", ...lines];
+    case "empathy":
+      return /そうなんだよなァっ|わかるよォっ/.test(lines.join(""))
+        ? lines
+        : [turnIndex % 2 === 0 ? "そうなんだよなァっ。" : "めっちゃわかるよォっ。", ...lines];
+    case "surprise":
+      return ["えェっ！？", ...lines];
+    case "choice_or_branch":
+      return turnIndex % 3 === 0 ? [...lines, "それもまた選択だねっ！"] : applySoftener(lines, turnIndex);
+    case "self_softening":
+      return turnIndex % 3 === 1 ? replaceLast(lines, applyPoliteEnding) : applySoftener(lines, turnIndex);
+    case "comic_release":
+      return applySoftener(lines, turnIndex);
+    case "closing_thanks":
+      return /ありがと/.test(lines.join("")) ? replaceLast(lines, applyPoliteEnding) : [...lines, "ありがとなァっ！"];
+    default:
+      return turnIndex % 2 === 0 ? replaceLast(lines, applyWarmEnding) : applySoftener(lines, turnIndex);
+  }
+}
+
+function applySoftener(lines: string[], turnIndex: number) {
+  const openers = aguriStyleRules.openers.softener;
+  const opener = openers[turnIndex % openers.length] ?? "まァっ";
+  if (lines[0].startsWith(opener) || hasStrongStyle(lines[0])) return lines;
+  return [`${opener}、${lines[0]}`, ...lines.slice(1)];
+}
+
+function applyPoliteEnding(line: string) {
+  if (/[？?]$/.test(line)) return line.replace(/\?$/, "？");
+  return line
+    .replace(/ます。$/, "まァっすっ！")
+    .replace(/です。$/, "ですねェっ！")
+    .replace(/ね。$/, "ねェっ！")
+    .replace(/よ。$/, "よォっ！");
+}
+
+function applyWarmEnding(line: string) {
+  if (/[？?]$/.test(line)) return line.replace(/\?$/, "？");
+  const polite = applyPoliteEnding(line);
+  if (polite !== line || hasStrongStyle(line)) return polite;
+  return line;
+}
+
+function replaceLast(lines: string[], transform: (line: string) => string) {
+  return [...lines.slice(0, -1), transform(lines[lines.length - 1])];
+}
+
+function shouldLaugh(condition: AguriStyleCondition | "statement", turnIndex: number, recentTexts: string[]) {
+  if (condition !== "comic_release") return false;
+  if (recentTexts.slice(-2).some((text) => text.includes(aguriStyleRules.laugh.token))) return false;
+  return turnIndex % aguriStyleRules.laugh.maxEveryTurns === 0;
+}
+
+function splitClauses(text: string) {
+  return (text.match(/[^。！？\n]+[。！？]?/g) ?? [text]).map((line) => line.trim()).filter(Boolean);
 }
 
 function normalize(text: string) {
-  return text.replace(/\s+/g, " ").trim();
+  return text.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
 }
 
-function softenEnding(text: string, turnIndex: number) {
-  if (/[？?]$/.test(text)) return text.replace(/\?$/, "？");
-  if (turnIndex % 4 === 0 && /。$/.test(text)) return text.replace(/。$/, "ですよォっ！");
-  return text;
+function cleanLine(line: string) {
+  return line.replace(/\s+/g, " ").trim();
+}
+
+function hasStrongStyle(text: string) {
+  return /(?:なァっ|よォっ|ねェっ|まァっすっ|めっちゃ|ぎゃぎゃ)/.test(text);
 }

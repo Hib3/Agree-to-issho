@@ -55,7 +55,7 @@ export class TemplateDialogueEngine implements DialogueEngine {
       speechAct: finalTemplate.speech_act,
       word,
       turnIndex,
-      recentStyleIds: characterLogs.slice(-3).map((log) => log.semantic_key ?? "")
+      recentTexts: characterLogs.slice(-3).map((log) => log.text)
     });
     const relaxed = [...state.relaxed, ...selection.relaxed];
     if (characterLogs.slice(-8).some((log) => log.template_id === finalTemplate.id) && !relaxed.includes("template_id_cooldown")) {
@@ -161,6 +161,7 @@ function needsWord(template: DialogueTemplate) {
 
 function isWordEligible(word: WordFrame, template: DialogueTemplate) {
   if (word.is_blocked || word.is_sensitive || word.forgotten_at) return false;
+  if (template.speech_act === "ask_emotion" && word.category !== "food" && word.user_stance !== "unknown") return false;
   if (template.word_slot?.category && word.category !== template.word_slot.category) return false;
   if (template.word_slot?.situation && !word.situation_tags.includes(template.word_slot.situation)) return false;
   return true;
@@ -185,7 +186,7 @@ function avoidExactRepeat(text: string, logs: DialogueLog[]) {
 export function createSemanticSignature(text: string) {
   return text
     .normalize("NFKC")
-    .replace(/^(?:まァっ|あのォっ|ねェっ)[、,]?/u, "")
+    .replace(/^(?:まァっ|なんかっ|あのっそのっ)[、,]?/u, "")
     .replace(/[\s、。！？!?「」『』]/g, "")
     .trim();
 }

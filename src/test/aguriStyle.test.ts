@@ -59,4 +59,35 @@ describe("Aguri style layer", () => {
     expect(styled.some((text) => !/[ァ-ヴ]っ/.test(text))).toBe(true);
     expect(styled[0]).not.toBe(styled[1]);
   });
+
+  it("uses praise markers only for positive reactions", () => {
+    const template = dialogueTemplates.find((item) => item.speech_act === "praise_user")!;
+    const text = applyAguriStyle({ template, renderedText: "教えてくれてありがとう。覚えておきます。", speechAct: "praise_user", word: null, turnIndex: 2 });
+    expect(text).toContain("めっちゃ");
+    expect(text).toContain("教えてくれてありがとう");
+    expect(text).toContain("覚えておきます");
+  });
+
+  it("uses the signature laugh only after comic release and not consecutively", () => {
+    const template = dialogueTemplates.find((item) => item.speech_act === "misunderstanding_joke")!;
+    const first = applyAguriStyle({ template, renderedText: "ちょっと変な使い方になりました。", speechAct: "misunderstanding_joke", word: null, turnIndex: 10, recentTexts: [] });
+    const second = applyAguriStyle({ template, renderedText: "また少しズレました。", speechAct: "misunderstanding_joke", word: null, turnIndex: 15, recentTexts: [first] });
+    expect(first).toMatch(/(?:ぎゃ){4,6}っ！/);
+    expect(second).not.toContain("ぎゃぎゃ");
+  });
+
+  it("keeps short clauses on separate lines without dropping content", () => {
+    const template = dialogueTemplates[0];
+    const text = applyAguriStyle({ template, renderedText: "今日はノートを見ました。言葉を一つ思い出しました。あとでまた話します。", speechAct: "recall_word", word: null, turnIndex: 0 });
+    expect(text.split("\n").length).toBeGreaterThanOrEqual(3);
+    expect(text).toContain("今日はノートを見ました");
+    expect(text).toContain("あとでまた話し");
+  });
+
+  it("does not mistake a learned feeling word for an empathy reaction", () => {
+    const template = dialogueTemplates.find((item) => item.id === "relation_check_pair")!;
+    const text = applyAguriStyle({ template, renderedText: "「さみしい」と「うれしい」は関係がありますか？", speechAct: "ask_relation", word: null, turnIndex: 1 });
+    expect(text).not.toContain("わかるよォっ");
+    expect(text).toContain("さみしい");
+  });
 });
