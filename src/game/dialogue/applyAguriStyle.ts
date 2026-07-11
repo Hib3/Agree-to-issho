@@ -17,6 +17,7 @@ export function applyAguriStyle({ renderedText, speechAct, turnIndex, recentText
   const condition = selectCondition(speechAct, base);
   let lines = splitClauses(base);
   lines = applyCondition(lines, condition, turnIndex);
+  lines = applyHighTensionRhythm(lines);
 
   if (shouldLaugh(condition, turnIndex, recentTexts)) {
     const counts = aguriStyleRules.laugh.allowedCounts;
@@ -45,12 +46,10 @@ function applyCondition(lines: string[], condition: AguriStyleCondition | "state
   if (lines.length === 0) return lines;
   switch (condition) {
     case "greeting_daily":
-      return turnIndex % 2 === 0
-        ? ["アグリっ！", ...replaceLast(lines, applyPoliteEnding)]
-        : replaceLast(lines, applyPoliteEnding);
+      return ["アグリっ！", ...lines];
     case "praise":
       return /めっちゃ/.test(lines.join(""))
-        ? replaceLast(lines, applyWarmEnding)
+        ? lines
         : ["めっちゃうれしいなァっ！", ...lines];
     case "empathy":
       return /そうなんだよなァっ|わかるよォっ/.test(lines.join(""))
@@ -61,13 +60,13 @@ function applyCondition(lines: string[], condition: AguriStyleCondition | "state
     case "choice_or_branch":
       return turnIndex % 3 === 0 ? [...lines, "それもまた選択だねっ！"] : applySoftener(lines, turnIndex);
     case "self_softening":
-      return turnIndex % 3 === 1 ? replaceLast(lines, applyPoliteEnding) : applySoftener(lines, turnIndex);
+      return applySoftener(lines, turnIndex);
     case "comic_release":
       return applySoftener(lines, turnIndex);
     case "closing_thanks":
-      return /ありがと/.test(lines.join("")) ? replaceLast(lines, applyPoliteEnding) : [...lines, "ありがとなァっ！"];
+      return /ありがと/.test(lines.join("")) ? lines : [...lines, "ありがとなァっ！"];
     default:
-      return turnIndex % 2 === 0 ? replaceLast(lines, applyWarmEnding) : applySoftener(lines, turnIndex);
+      return applySoftener(lines, turnIndex);
   }
 }
 
@@ -78,24 +77,21 @@ function applySoftener(lines: string[], turnIndex: number) {
   return [`${opener}、${lines[0]}`, ...lines.slice(1)];
 }
 
-function applyPoliteEnding(line: string) {
-  if (/[？?]$/.test(line)) return line.replace(/\?$/, "？");
-  return line
-    .replace(/ます。$/, "まァっすっ！")
-    .replace(/です。$/, "ですねェっ！")
-    .replace(/ね。$/, "ねェっ！")
-    .replace(/よ。$/, "よォっ！");
-}
-
-function applyWarmEnding(line: string) {
-  if (/[？?]$/.test(line)) return line.replace(/\?$/, "？");
-  const polite = applyPoliteEnding(line);
-  if (polite !== line || hasStrongStyle(line)) return polite;
-  return line;
-}
-
-function replaceLast(lines: string[], transform: (line: string) => string) {
-  return [...lines.slice(0, -1), transform(lines[lines.length - 1])];
+function applyHighTensionRhythm(lines: string[]) {
+  return lines.map((line) => {
+    if (/[っッ][！!?]$/.test(line) || /っ！？$/.test(line)) return line;
+    if (/[ァ-ヴぁ-ん]っ。$/.test(line)) return line.replace(/。$/, "！");
+    if (/[？?]$/.test(line)) return line.replace(/[？?]$/, "っ！？");
+    return line
+      .replace(/ください。$/, "くださいよォっ！")
+      .replace(/ました。$/, "まァっしたっ！")
+      .replace(/ます。$/, "まァっすっ！")
+      .replace(/です。$/, "ですねェっ！")
+      .replace(/だね。$/, "だよなァっ！")
+      .replace(/ね。$/, "ねェっ！")
+      .replace(/よ。$/, "よォっ！")
+      .replace(/。$/, "っ！");
+  });
 }
 
 function shouldLaugh(condition: AguriStyleCondition | "statement", turnIndex: number, recentTexts: string[]) {

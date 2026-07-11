@@ -1,4 +1,4 @@
-const CACHE_NAME = "with-aguri-voice-v7";
+const CACHE_NAME = "with-aguri-high-energy-v8";
 const scopeUrl = new URL(self.registration.scope);
 const BASE_PATH = scopeUrl.pathname.endsWith("/") ? scopeUrl.pathname : `${scopeUrl.pathname}/`;
 const APP_SHELL = [

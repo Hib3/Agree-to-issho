@@ -50,14 +50,14 @@ describe("Aguri style layer", () => {
     expect(text).toContain("カレー");
     expect(text).toContain("お茶");
     expect(text).toContain("関係ない");
-    expect(text.endsWith("？")).toBe(true);
+    expect(text.endsWith("！？")).toBe(true);
   });
 
-  it("does not force a strong catchphrase onto every utterance", () => {
+  it("keeps the baseline high-energy while varying the opener", () => {
     const template = dialogueTemplates[0];
     const styled = [0, 1, 2, 3].map((turnIndex) => applyAguriStyle({ template, renderedText: "今日はノートを見ます。", speechAct: "recall_word", word: null, turnIndex }));
-    expect(styled.some((text) => !/[ァ-ヴ]っ/.test(text))).toBe(true);
-    expect(styled[0]).not.toBe(styled[1]);
+    expect(styled.every((text) => /っ！/.test(text))).toBe(true);
+    expect(new Set(styled).size).toBeGreaterThanOrEqual(3);
   });
 
   it("uses praise markers only for positive reactions", () => {
@@ -65,7 +65,7 @@ describe("Aguri style layer", () => {
     const text = applyAguriStyle({ template, renderedText: "教えてくれてありがとう。覚えておきます。", speechAct: "praise_user", word: null, turnIndex: 2 });
     expect(text).toContain("めっちゃ");
     expect(text).toContain("教えてくれてありがとう");
-    expect(text).toContain("覚えておきます");
+    expect(text).toContain("覚えておき");
   });
 
   it("uses the signature laugh only after comic release and not consecutively", () => {
@@ -80,8 +80,9 @@ describe("Aguri style layer", () => {
     const template = dialogueTemplates[0];
     const text = applyAguriStyle({ template, renderedText: "今日はノートを見ました。言葉を一つ思い出しました。あとでまた話します。", speechAct: "recall_word", word: null, turnIndex: 0 });
     expect(text.split("\n").length).toBeGreaterThanOrEqual(3);
-    expect(text).toContain("今日はノートを見ました");
+    expect(text).toContain("今日はノートを見");
     expect(text).toContain("あとでまた話し");
+    expect(text.split("\n").every((line) => /(?:っ！|っ！？)$/.test(line))).toBe(true);
   });
 
   it("does not mistake a learned feeling word for an empathy reaction", () => {
