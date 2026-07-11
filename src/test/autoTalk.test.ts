@@ -5,12 +5,19 @@ import { SeededRandomSource } from "../game/dialogue/random";
 describe("auto talk guard", () => {
   const base = { screen: "main-room" as const, enabled: true, hidden: false, busy: false, session: null, now: Date.now() };
 
-  it("uses a reproducible 90 to 180 second delay", () => {
+  it("uses a reproducible 45 to 90 second delay", () => {
     const first = getAutoTalkDelay(new SeededRandomSource(42));
     const second = getAutoTalkDelay(new SeededRandomSource(42));
     expect(first).toBe(second);
-    expect(first).toBeGreaterThanOrEqual(90000);
-    expect(first).toBeLessThanOrEqual(180000);
+    expect(first).toBeGreaterThanOrEqual(45000);
+    expect(first).toBeLessThanOrEqual(90000);
+  });
+
+  it("schedules the idle timer immediately instead of waiting for another state change", () => {
+    expect(shouldScheduleAutoTalk({
+      ...base,
+      lastUserInteractionAt: new Date(base.now).toISOString()
+    })).toBe(true);
   });
 
   it("does not schedule while hidden, busy, or awaiting an answer", () => {

@@ -15,17 +15,52 @@ export type ConversationAnswerResult = {
 };
 
 export function createConversationSession(turn: DialogueTurn, now: string): ConversationSession {
+  const queuedTurns = turn.continuation ?? [];
+  const topicWordIds = Array.from(new Set([
+    ...turn.used_words.map((word) => word.id),
+    ...queuedTurns.flatMap((queued) => queued.used_word_ids)
+  ]));
   return {
     id: turn.session_id ?? `session_${crypto.randomUUID()}`,
     intent: turn.semantic_key ?? "daily.conversation",
-    phase: turn.requires_answer ? "awaiting_answer" : "closing",
-    topic_word_ids: turn.used_words.map((word) => word.id),
+    phase: turn.requires_answer ? "awaiting_answer" : queuedTurns.length > 0 ? "follow_up" : "closing",
+    topic_word_ids: topicWordIds,
     question_kind: turn.answer_schema?.kind ?? "none",
     ...(turn.answer_schema?.options ? { answer_options: turn.answer_schema.options } : {}),
-    remaining_turns: turn.requires_answer ? 2 : 1,
+    ...(queuedTurns.length > 0 ? { queued_turns: queuedTurns } : {}),
+    remaining_turns: turn.requires_answer ? 2 : Math.max(1, queuedTurns.length),
     started_at: now,
     updated_at: now
   };
+}
+
+export function advanceConversation(session: ConversationSession, words: WordFrame[], now: string) {
+  const [queued, ...remaining] = session.queued_turns ?? [];
+  if (!queued) return null;
+  const nextPhase = queued.requires_answer ? "awaiting_answer" : remaining.length > 0 ? "follow_up" : "closing";
+  const nextSession: ConversationSession = {
+    ...session,
+    phase: nextPhase,
+    question_kind: queued.answer_schema?.kind ?? "none",
+    ...(queued.answer_schema?.options ? { answer_options: queued.answer_schema.options } : {}),
+    queued_turns: remaining,
+    remaining_turns: remaining.length + (queued.requires_answer ? 1 : 0),
+    updated_at: now
+  };
+  const turn: DialogueTurn = {
+    speech_act: queued.speech_act,
+    text: queued.text,
+    expression: queued.expression,
+    emotion_code: queued.emotion_code,
+    motion_hint: queued.motion_hint,
+    used_words: queued.used_word_ids.map((id) => words.find((word) => word.id === id)).filter(Boolean) as WordFrame[],
+    template_id: queued.template_id,
+    semantic_key: queued.semantic_key,
+    session_id: session.id,
+    requires_answer: Boolean(queued.requires_answer),
+    ...(queued.answer_schema ? { answer_schema: queued.answer_schema } : {})
+  };
+  return { session: nextSession, turn };
 }
 
 export function answerConversation(
@@ -40,7 +75,37 @@ export function answerConversation(
   const related = words.find((word) => word.id === session.topic_word_ids[1]);
   const updatedWords: WordFrame[] = [];
   let relation: WordRelation | undefined;
-  if (target) {
+  if (session.intent.startsWith("composition.") && target) {
+    const topicWords = session.topic_word_ids
+      .map((id) => words.find((word) => word.id === id))
+      .filter(Boolean) as WordFrame[];
+    for (const word of topicWords) {
+      const otherIds = topicWords.filter((item) => item.id !== word.id).map((item) => item.id);
+      updatedWords.push({
+        ...word,
+        related_word_ids: answer === "confirm"
+          ? Array.from(new Set([...word.related_word_ids, ...otherIds]))
+          : word.related_word_ids.filter((id) => !otherIds.includes(id)),
+        review_count: word.review_count + 1,
+        correction_count: word.correction_count + (answer === "correct" ? 1 : 0),
+        ambiguity_score: clamp01(word.ambiguity_score - (answer === "confirm" || answer === "correct" ? 0.05 : 0)),
+        confidence: clamp01(word.confidence + (answer === "confirm" ? 0.05 : 0.02)),
+        source_question_ids: Array.from(new Set([...word.source_question_ids, answer === "confirm" ? "composition_relation_confirmed" : "composition_relation_corrected"])),
+        last_reviewed_at: now,
+        updated_at: now
+      });
+    }
+    if (answer === "confirm" && topicWords[1]) {
+      relation = {
+        id: `relation_${target.id}_${topicWords[1].id}`,
+        from_word_id: target.id,
+        to_word_id: topicWords[1].id,
+        relation_type: "user_linked",
+        confidence: 0.9,
+        created_at: now
+      };
+    }
+  } else if (target) {
     const update = updateWordFromAnswer(target, session.intent, answer, freeText, now);
     updatedWords.push(update);
     if (session.intent.startsWith("relation.") && answer === "related" && related) {
@@ -57,6 +122,7 @@ export function answerConversation(
   }
 
   const text = reactionText(target?.surface ?? "その言葉", answer, session.intent);
+  const compositionAnswer = session.intent.startsWith("composition.");
   return {
     session: {
       ...session,
@@ -67,11 +133,11 @@ export function answerConversation(
       updated_at: now
     },
     turn: {
-      speech_act: answer === "correct" ? "ask_correction" : "praise_user",
+      speech_act: answer === "correct" && !compositionAnswer ? "ask_correction" : "praise_user",
       text,
-      expression: answer === "correct" ? "thinking" : "talk_smile",
-      emotion_code: answer === "correct" ? "inquisitive" : "heart_warming",
-      motion_hint: answer === "correct" ? "sway" : "bounce",
+      expression: answer === "correct" && !compositionAnswer ? "thinking" : "talk_smile",
+      emotion_code: answer === "correct" && !compositionAnswer ? "inquisitive" : "heart_warming",
+      motion_hint: answer === "correct" && !compositionAnswer ? "sway" : "bounce",
       used_words: target ? [updatedWords[0] ?? target] : [],
       template_id: `reaction_${answer}`,
       semantic_key: `${session.intent}.reaction`,
@@ -162,6 +228,10 @@ function updateWordFromAnswer(word: WordFrame, intent: string, answer: string, f
 }
 
 function reactionText(surface: string, answer: string, intent: string) {
+  if (intent.startsWith("composition.")) {
+    if (answer === "confirm") return `やっぱり「${surface}」から始まるつながりで合ってたんですね。ノートの線を濃くしておきますっ！`;
+    if (answer === "correct") return `まァっ、そこがずれてたんですね！「${surface}」たちは、いったん別々の線に戻して覚え直しますっ！`;
+  }
   if (answer === "later" || answer === "unknown") return `「${surface}」は、まだ決めなくて大丈夫です。ノートには空きを残しておきますね。`;
   if (answer === "correct") return `なるほど、「${surface}」の覚え方は違っていたんですね。単語帳で直せるようにしておきます。`;
   if (answer === "confirm") return `よかった。「${surface}」は今の覚え方を少し強くしておきますね。`;

@@ -190,9 +190,23 @@ export type ConversationSession = {
   remaining_turns: number;
   answer_value?: string;
   answer_text?: string;
+  queued_turns?: QueuedDialogueTurn[];
   started_at: string;
   updated_at: string;
   completed_at?: string;
+};
+
+export type QueuedDialogueTurn = {
+  speech_act: SpeechAct;
+  text: string;
+  expression: CharacterExpression;
+  emotion_code?: EmotionCode;
+  motion_hint?: MotionHint;
+  used_word_ids: Id[];
+  template_id?: string;
+  semantic_key?: string;
+  requires_answer?: boolean;
+  answer_schema?: DialogueTurn["answer_schema"];
 };
 
 export type DialogueSummary = {
@@ -280,6 +294,7 @@ export type DialogueTurn = {
     placeholder?: string;
     max_length?: number;
   };
+  continuation?: QueuedDialogueTurn[];
   relaxed_constraints?: string[];
 };
 

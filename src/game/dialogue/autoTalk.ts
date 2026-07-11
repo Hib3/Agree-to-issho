@@ -14,10 +14,9 @@ type AutoTalkContext = {
 export function shouldScheduleAutoTalk(context: AutoTalkContext) {
   if (context.screen !== "main-room" || !context.enabled || context.hidden || context.busy) return false;
   if (context.session && context.session.phase !== "completed") return false;
-  if (!context.lastUserInteractionAt) return true;
-  return context.now - new Date(context.lastUserInteractionAt).getTime() >= 30000;
+  return true;
 }
 
 export function getAutoTalkDelay(random: RandomSource) {
-  return 90000 + Math.floor(random.next() * 90001);
+  return 45000 + Math.floor(random.next() * 45001);
 }

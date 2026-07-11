@@ -4,7 +4,7 @@ import { DialogueBox } from "../components/DialogueBox";
 import { createDebugWordSeed } from "../data/debug/debugWordSeed";
 import { dialogueTemplates } from "../data/templates/dialogueTemplates";
 import { TemplateDialogueEngine } from "../game/dialogue/TemplateDialogueEngine";
-import { answerConversation, closeConversation, completeConversation, createConversationSession, createPlayerAnswerLog } from "../game/dialogue/conversationSession";
+import { advanceConversation, answerConversation, closeConversation, completeConversation, createConversationSession, createPlayerAnswerLog } from "../game/dialogue/conversationSession";
 import { getAutoTalkDelay, shouldScheduleAutoTalk } from "../game/dialogue/autoTalk";
 import { systemRandom } from "../game/dialogue/random";
 import { applyCorrectionToWord } from "../game/dialogue/drift";
@@ -212,7 +212,7 @@ export function App() {
         now
       });
       const log = await persistDialogueTurn(nextTurn, isUserAction);
-      if (nextTurn.requires_answer) {
+      if (nextTurn.requires_answer || nextTurn.continuation?.length) {
         await conversationSessionRepository.save({
           ...createConversationSession(nextTurn, now),
           prompt_log_id: log.id
@@ -332,6 +332,16 @@ export function App() {
     setIsBusy(true);
     try {
       const now = nowIso();
+      if (activeSession.phase === "follow_up") {
+        const next = advanceConversation(activeSession, state.words, now);
+        if (next) {
+          await conversationSessionRepository.save(next.session);
+          await persistDialogueTurn(next.turn, true);
+          setTurn(next.turn);
+          await refresh();
+          return;
+        }
+      }
       if (activeSession.phase === "closing") {
         await conversationSessionRepository.save(completeConversation(activeSession, now));
         await refresh();
@@ -406,24 +416,60 @@ export function App() {
   }
 
   async function handleDriftFeedback(mode: "correct" | "keep", note = "") {
-    const target = turn.used_words[0];
-    if (!target) return;
-    const saved = await wordRepository.get(target.id);
+    const usedIds = Array.from(new Set(turn.used_words.map((word) => word.id)));
+    if (usedIds.length === 0) return;
+    const savedWords = (await Promise.all(usedIds.map((id) => wordRepository.get(id))))
+      .filter((word): word is WordFrame => Boolean(word));
+    const saved = savedWords[0];
     if (!saved) return;
     const now = nowIso();
-    const nextWord = mode === "correct"
-      ? applyCorrectionToWord(saved, note)
-      : {
-          ...saved,
-          favorite_score: Math.min(1, saved.favorite_score + 0.03),
-          updated_at: now
-        };
-    await wordRepository.save({ ...nextWord, updated_at: now });
+    for (const word of savedWords) {
+      const otherIds = usedIds.filter((id) => id !== word.id);
+      const nextWord = mode === "correct"
+        ? {
+            ...(word.id === saved.id ? applyCorrectionToWord(word, note) : word),
+            related_word_ids: word.related_word_ids.filter((id) => !otherIds.includes(id)),
+            review_count: word.review_count + 1,
+            source_question_ids: Array.from(new Set([...word.source_question_ids, "composition_relation_corrected"])),
+            updated_at: now
+          }
+        : {
+            ...word,
+            related_word_ids: Array.from(new Set([...word.related_word_ids, ...otherIds])),
+            favorite_score: Math.min(1, word.favorite_score + 0.03),
+            ambiguity_score: Math.max(0, word.ambiguity_score - 0.03),
+            source_question_ids: Array.from(new Set([...word.source_question_ids, "composition_relation_kept"])),
+            updated_at: now
+          };
+      await wordRepository.save(nextWord);
+    }
+    if (mode === "keep") {
+      for (let fromIndex = 0; fromIndex < savedWords.length; fromIndex += 1) {
+        for (let toIndex = fromIndex + 1; toIndex < savedWords.length; toIndex += 1) {
+          await wordRelationRepository.save({
+            id: `relation_${savedWords[fromIndex].id}_${savedWords[toIndex].id}`,
+            from_word_id: savedWords[fromIndex].id,
+            to_word_id: savedWords[toIndex].id,
+            relation_type: "user_linked",
+            confidence: 0.9,
+            created_at: now
+          });
+        }
+      }
+    } else {
+      const relations = await wordRelationRepository.list();
+      for (const relation of relations) {
+        if (usedIds.includes(relation.from_word_id) && usedIds.includes(relation.to_word_id)) {
+          await wordRelationRepository.remove(relation.id);
+        }
+      }
+    }
+    const surfaces = savedWords.map((word) => `「${word.surface}」`).join("と");
     const feedbackTurn: DialogueTurn = {
       speech_act: "praise_user",
       text: mode === "correct"
-        ? `「${saved.surface}」っ、直してくれてありがとうございまァっすっ！\n前よりちゃんと覚え直しまァっすっ！`
-        : `「${saved.surface}」っ、このままでもいいんですねェっ！\nじゃあ、ちょっと不思議な感じもノートに残しますっ！`,
+        ? `${surfaces}のつながりっ、直してくれてありがとうございまァっすっ！\nこの組み合わせは混ぜないように覚え直しまァっすっ！`
+        : `${surfaces}っ、このつながりでいいんですねェっ！\nじゃあ、アグリのノートに一緒に残しますっ！`,
       expression: "proud",
       emotion_code: "proud",
       motion_hint: "sparkle",
@@ -511,6 +557,8 @@ export function App() {
           activeSession={activeSession}
           isBusy={isBusy}
           onAnswer={handleConversationAnswer}
+          onAdvance={handleContinueConversation}
+          textSpeed={state.settings?.text_speed ?? "normal"}
         />
       )}
       {screen === "teach-word" && <TeachWordFlow words={state.words} onCancel={() => setScreen("main-room")} onSave={handleWordSaved} />}

@@ -18,9 +18,11 @@ type MainRoomProps = {
   activeSession: ConversationSession | null;
   isBusy: boolean;
   onAnswer: (value: string, freeText?: string) => void;
+  onAdvance?: () => void;
+  textSpeed?: "slow" | "normal" | "fast";
 };
 
-export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords, onDriftFeedback, activeSession, isBusy, onAnswer }: MainRoomProps) {
+export function MainRoom({ profile, characterState, words, latestDiary, turn, onAction, onSeedSampleWords, onDriftFeedback, activeSession, isBusy, onAnswer, onAdvance = () => undefined, textSpeed = "normal" }: MainRoomProps) {
   const [correctionNote, setCorrectionNote] = useState("");
   const [selectedAnswer, setSelectedAnswer] = useState("");
   const [answerText, setAnswerText] = useState("");
@@ -40,6 +42,7 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
   }, [turn.text]);
 
   const awaitingAnswer = activeSession?.phase === "awaiting_answer" && turn.requires_answer;
+  const canAdvance = Boolean(activeSession && !awaitingAnswer && activeSession.phase !== "completed");
   const showFreeText = turn.answer_schema?.kind === "free_text" || selectedAnswer === "free_text";
   const answerOptions = turn.answer_schema?.options ?? [];
 
@@ -63,7 +66,15 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
 
         <div className="room-stage">
           <CharacterStage name={name} expression={turn.expression} motionHint={turn.motion_hint} wordCount={words.length} />
-          <DialogueBox speaker={name} text={turn.text} variant="bubble" emotionCode={turn.emotion_code} />
+          <DialogueBox
+            speaker={name}
+            text={turn.text}
+            variant="bubble"
+            emotionCode={turn.emotion_code}
+            animateText
+            textSpeed={textSpeed}
+            {...(canAdvance ? { onNext: onAdvance } : {})}
+          />
         </div>
 
         {words.length === 0 && (
@@ -133,7 +144,7 @@ export function MainRoom({ profile, characterState, words, latestDiary, turn, on
           </section>
         )}
 
-        {!awaitingAnswer && (
+        {!awaitingAnswer && !activeSession && (
           <div className="primary-actions" aria-label="メイン操作">
             <button className="primary" type="button" disabled={isBusy} onClick={() => onAction("speak")}>
               {activeSession ? "会話を続ける" : "話す"}

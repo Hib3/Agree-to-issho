@@ -35,4 +35,6 @@ dist/
 *.local
 *.zip
 review-*.zip
+.playwright-cli/
+output/
 agreeable_bridge4386_expanded_rules_only.json

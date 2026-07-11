@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyCategory, createWordFrame } from "../game/word/createWordFrame";
 import {
+  advanceConversation,
   answerConversation,
   closeConversation,
   completeConversation,
@@ -13,6 +14,69 @@ import type { DialogueTurn } from "../types/domain";
 
 describe("Conversation System v2", () => {
   beforeEach(async () => clearGameStores(true));
+
+  it("keeps an autonomous learned-word story as a paged session", async () => {
+    const now = "2026-07-11T09:00:00.000Z";
+    const first = applyCategory(createWordFrame("公園"), "place");
+    const second = applyCategory(createWordFrame("散歩"), "action");
+    const opening: DialogueTurn = {
+      speech_act: "use_word_in_daily_talk",
+      text: "最初のページ",
+      expression: "talk_smile",
+      used_words: [first, second],
+      semantic_key: "composition.grounded.test",
+      continuation: [{
+        speech_act: "ask_relation",
+        text: "このつながりで合っていますか？",
+        expression: "thinking",
+        used_word_ids: [first.id, second.id],
+        requires_answer: true,
+        answer_schema: {
+          kind: "single_choice",
+          options: [
+            { id: "confirm", label: "合ってる", value: "confirm" },
+            { id: "correct", label: "違う", value: "correct" }
+          ]
+        }
+      }]
+    };
+    const session = createConversationSession(opening, now);
+    await conversationSessionRepository.save(session);
+    const restored = await conversationSessionRepository.get(session.id);
+    const advanced = restored ? advanceConversation(restored, [first, second], now) : null;
+
+    expect(session.phase).toBe("follow_up");
+    expect(restored?.queued_turns).toHaveLength(1);
+    expect(advanced?.session.phase).toBe("awaiting_answer");
+    expect(advanced?.turn.text).toBe("このつながりで合っていますか？");
+    expect(advanced?.turn.used_words).toHaveLength(2);
+  });
+
+  it("learns or separates every word in a composed relation from the player's answer", () => {
+    const now = "2026-07-11T09:00:00.000Z";
+    const first = applyCategory(createWordFrame("公園"), "place");
+    const second = applyCategory(createWordFrame("散歩"), "action");
+    const session = {
+      id: "composition_session",
+      intent: "composition.grounded.outing",
+      phase: "awaiting_answer" as const,
+      topic_word_ids: [first.id, second.id],
+      question_kind: "single_choice" as const,
+      remaining_turns: 1,
+      started_at: now,
+      updated_at: now
+    };
+
+    const confirmed = answerConversation(session, "confirm", [first, second], now);
+    expect(confirmed.updated_words).toHaveLength(2);
+    expect(confirmed.updated_words[0].related_word_ids).toContain(second.id);
+    expect(confirmed.updated_words[1].related_word_ids).toContain(first.id);
+
+    const corrected = answerConversation(session, "correct", confirmed.updated_words, now);
+    expect(corrected.updated_words[0].related_word_ids).not.toContain(second.id);
+    expect(corrected.updated_words[1].related_word_ids).not.toContain(first.id);
+    expect(corrected.turn.speech_act).toBe("praise_user");
+  });
 
   it("persists an awaiting answer, learns from the answer, then completes", async () => {
     const now = "2026-07-11T09:00:00.000Z";

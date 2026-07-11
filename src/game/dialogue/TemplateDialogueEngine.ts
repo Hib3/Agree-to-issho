@@ -8,6 +8,7 @@ import { chooseDriftMode, createDriftTemplate } from "./drift";
 import { getEmotionCode, getMotionHint } from "./emotionMapping";
 import { systemRandom, weightedPick, type RandomSource } from "./random";
 import { renderTemplate } from "./renderTemplate";
+import { composeLearnedScene } from "./semanticComposition";
 import { chooseNextStateWithDebug, stateToSpeechAct, type StateSelection } from "./stateMachine";
 import { getWordScoreDebug, selectWordForTemplate } from "./wordScoring";
 
@@ -36,29 +37,65 @@ export class TemplateDialogueEngine implements DialogueEngine {
     const word = needsWord(template)
       ? selectWordForTemplate(context.words, template, context.now, characterLogs, this.random)
       : null;
+    const driftMode = speechAct === "misunderstanding_joke" && word ? chooseDriftMode(word, context) : null;
     const finalTemplate = speechAct === "misunderstanding_joke" && word
-      ? { ...createDriftTemplate(word, chooseDriftMode(word, context)), semantic_key: "drift.word.misuse", cooldown_group: "drift" }
+      ? { ...createDriftTemplate(word, driftMode!), semantic_key: "drift.word.misuse", cooldown_group: "drift" }
       : template;
-    const renderedText = renderTemplate(finalTemplate, word, context.words);
-    const emotionCode = getEmotionCode(finalTemplate.speech_act, finalTemplate.expression);
-    const semanticKey = finalTemplate.semantic_key ?? semanticKeyFor(finalTemplate);
+    const composition = word && (
+      speechAct === "use_word_in_daily_talk"
+        ? composeLearnedScene(word, context.words, characterLogs, false, this.random)
+        : speechAct === "misunderstanding_joke" && (driftMode === "mild_drift" || driftMode === "playful_misuse")
+          ? composeLearnedScene(word, context.words, characterLogs, true, this.random)
+          : null
+    );
+    const effectiveTemplate = composition
+      ? { ...finalTemplate, id: composition.templateId, text: composition.text, semantic_key: composition.semanticKey }
+      : finalTemplate;
+    const renderedText = composition?.text ?? renderTemplate(effectiveTemplate, word, context.words);
+    const emotionCode = getEmotionCode(effectiveTemplate.speech_act, effectiveTemplate.expression);
+    const semanticKey = effectiveTemplate.semantic_key ?? semanticKeyFor(effectiveTemplate);
     const sessionId = `session_${crypto.randomUUID()}`;
-    const usedWords = word ? [word] : [];
-    if (speechAct === "ask_relation" && word) {
+    const usedWords = composition?.words ?? (word ? [word] : []);
+    if (!composition && speechAct === "ask_relation" && word) {
       const recentWordIds = new Set(characterLogs.slice(-3).flatMap((log) => log.used_word_ids));
       const related = context.words.find((item) => item.id !== word.id && !recentWordIds.has(item.id) && !item.is_blocked && !item.is_sensitive && (word.related_word_ids.includes(item.id) || item.category === word.category));
       if (related) usedWords.push(related);
     }
     const styledText = applyAguriStyle({
-      template: finalTemplate,
+      template: effectiveTemplate,
       renderedText,
-      speechAct: finalTemplate.speech_act,
+      speechAct: effectiveTemplate.speech_act,
       word,
       turnIndex,
       recentTexts: characterLogs.slice(-3).map((log) => log.text)
     });
+    const continuation = composition ? [{
+      speech_act: composition.drifted ? "misunderstanding_joke" as const : "ask_relation" as const,
+      text: applyAguriStyle({
+        template: effectiveTemplate,
+        renderedText: composition.followUpText,
+        speechAct: composition.drifted ? "misunderstanding_joke" : "ask_relation",
+        word,
+        turnIndex: turnIndex + 1,
+        recentTexts: [...characterLogs.slice(-2).map((log) => log.text), styledText]
+      }),
+      expression: "thinking" as const,
+      emotion_code: "inquisitive" as const,
+      motion_hint: "sway" as const,
+      used_word_ids: composition.words.map((item) => item.id),
+      template_id: `${composition.templateId}_check`,
+      semantic_key: `${composition.semanticKey}.check`,
+      requires_answer: true,
+      answer_schema: {
+        kind: "single_choice" as const,
+        options: [
+          { id: "confirm", label: "そのつながりで合ってる", value: "confirm" },
+          { id: "correct", label: "ちょっと違う", value: "correct" }
+        ]
+      }
+    }] : undefined;
     const relaxed = [...state.relaxed, ...selection.relaxed];
-    if (characterLogs.slice(-8).some((log) => log.template_id === finalTemplate.id) && !relaxed.includes("template_id_cooldown")) {
+    if (characterLogs.slice(-8).some((log) => log.template_id === effectiveTemplate.id) && !relaxed.includes("template_id_cooldown")) {
       relaxed.push("template_id_cooldown");
     }
     if (characterLogs.slice(-5).some((log) => log.semantic_key === semanticKey) && !relaxed.includes("semantic_key_cooldown")) {
@@ -69,12 +106,12 @@ export class TemplateDialogueEngine implements DialogueEngine {
     const recentCategories = characterLogs.slice(-2).map((log) => context.words.find((item) => log.used_word_ids.includes(item.id))?.category).filter(Boolean);
     if (word && recentCategories.length === 2 && recentCategories.every((category) => category === word.category)) relaxed.push("word_category_cooldown");
 
-    const wordCandidates = getWordScoreDebug(context.words, finalTemplate, context.now, characterLogs);
+    const wordCandidates = getWordScoreDebug(context.words, effectiveTemplate, context.now, characterLogs);
     const selectedWordDebug = word ? wordCandidates.find((item) => item.word_id === word.id) : undefined;
 
     this.lastDebug = {
       state,
-      selected_template_id: finalTemplate.id,
+      selected_template_id: effectiveTemplate.id,
       semantic_key: semanticKey,
       excluded_templates: selection.excluded,
       word_candidates: wordCandidates,
@@ -83,17 +120,18 @@ export class TemplateDialogueEngine implements DialogueEngine {
     };
 
     return {
-      speech_act: finalTemplate.speech_act,
+      speech_act: effectiveTemplate.speech_act,
       text: avoidExactRepeat(styledText, characterLogs),
-      expression: finalTemplate.expression,
+      expression: effectiveTemplate.expression,
       emotion_code: emotionCode,
-      motion_hint: finalTemplate.motion_hint ?? getMotionHint(emotionCode),
+      motion_hint: effectiveTemplate.motion_hint ?? getMotionHint(emotionCode),
       used_words: usedWords,
-      template_id: finalTemplate.id,
+      template_id: effectiveTemplate.id,
       semantic_key: semanticKey,
       session_id: sessionId,
-      requires_answer: Boolean(finalTemplate.answer_schema),
-      ...(finalTemplate.answer_schema ? { answer_schema: finalTemplate.answer_schema } : {}),
+      requires_answer: Boolean(effectiveTemplate.answer_schema),
+      ...(effectiveTemplate.answer_schema ? { answer_schema: effectiveTemplate.answer_schema } : {}),
+      ...(continuation ? { continuation } : {}),
       ...(relaxed.length ? { relaxed_constraints: relaxed } : {})
     };
   }
