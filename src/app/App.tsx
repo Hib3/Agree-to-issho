@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useGameStore } from "./providers";
 import { TitleScreen } from "../features/onboarding/TitleScreen";
 import { FirstStartWizard } from "../features/onboarding/FirstStartWizard";
@@ -14,17 +14,10 @@ import { ManualScreen } from "../features/settings/ManualScreen";
 export function App() {
   const store = useGameStore();
   const initialize = store.initialize;
-  const [updateReady, setUpdateReady] = useState(false);
 
   useEffect(() => {
     void initialize();
   }, [initialize]);
-
-  useEffect(() => {
-    const notify = () => setUpdateReady(true);
-    window.addEventListener("aguri-update-ready", notify);
-    return () => window.removeEventListener("aguri-update-ready", notify);
-  }, []);
 
   if (store.loading) return <main className="loading-screen">部屋を開いています…</main>;
   if (store.error) return <main className="error-screen"><h1>部屋を開けませんでした</h1><p>{store.error}</p><button type="button" onClick={() => location.reload()}>もう一度</button></main>;
@@ -35,7 +28,6 @@ export function App() {
 
   return (
     <div className={rootClass}>
-      {updateReady ? <aside className="update-notice" role="status"><span>新しい部屋を使えます</span><button type="button" onClick={() => location.reload()}>更新</button></aside> : null}
       {screen === "title" ? (
         <TitleScreen
           hasSave={Boolean(store.player)}

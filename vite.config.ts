@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "prompt",
+      registerType: "autoUpdate",
       includeAssets: ["assets/characters/main/fullbody/approved/aguri_normal.png"],
       manifest: {
         name: "アグリといっしょ",
