@@ -6,6 +6,7 @@ import type { ConceptRelation } from "../model/relation";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { resolveSlots } from "./slotResolver";
 import { scoreCandidate, type ScoredCandidate } from "./scorer";
+import type { IntentBias } from "./intentPolicy";
 
 export function buildCandidates(input: {
   templates: DialogueTemplate[];
@@ -15,6 +16,7 @@ export function buildCandidates(input: {
   character: CharacterState;
   locationId: string;
   random: RandomSource;
+  intentBias?: IntentBias;
 }) {
   const candidates: ScoredCandidate[] = [];
   for (const template of input.templates) {
@@ -22,7 +24,7 @@ export function buildCandidates(input: {
     const slots = resolveSlots(template, input.concepts, input.recentSessions, input.random);
     if (!slots) continue;
     candidates.push(
-      scoreCandidate(template, slots, input.locationId, input.relations, input.recentSessions, input.character)
+      scoreCandidate(template, slots, input.locationId, input.relations, input.recentSessions, input.character, input.intentBias)
     );
   }
   return candidates.sort((a, b) => b.score - a.score || a.template.id.localeCompare(b.template.id));

@@ -52,6 +52,18 @@ export function applyResponse(
     .slice(0, 2)
     .map(displayConcept);
   const pair = names.length >= 2 ? `「${names[0]}」と「${names[1]}」` : names[0] ? `「${names[0]}」` : "今の話";
+  const updatedConcepts = concepts.map((concept) => {
+    if (!involvedIds.includes(concept.id) || choice.effect === "later") return concept;
+    const understandingGain = choice.effect === "affirm" ? 0.08 : choice.effect === "deny" ? 0.05 : 0.03;
+    const ambiguityDrop = choice.effect === "deny" ? 0.14 : choice.effect === "affirm" ? 0.08 : 0.03;
+    return {
+      ...concept,
+      understanding: Math.min(1, concept.understanding + understandingGain),
+      ambiguity: Math.max(0, concept.ambiguity - ambiguityDrop),
+      reviewCount: concept.reviewCount + 1,
+      lastReviewedAt: now
+    };
+  });
   const reaction: DialogueTurn = {
     id: `turn_${crypto.randomUUID()}`,
     speaker: "aguri",
@@ -79,6 +91,7 @@ export function applyResponse(
       updatedAt: now
     },
     relations: updatedRelations,
+    concepts: updatedConcepts,
     session: {
       ...sessionWithoutQuestion,
       phase: "reaction" as const,

@@ -2,6 +2,7 @@ import type { DialogueHistoryEntry } from "../model/conversation";
 import type { Concept } from "../model/concept";
 import type { DiaryEntry, MemoryEvent } from "../model/memory";
 import { displayConcept } from "../grammar/japaneseRealizer";
+import { diaryTemplates } from "../../data/diary-templates/diaryTemplates";
 
 export function generateDiary(input: {
   date: string;
@@ -17,9 +18,22 @@ export function generateDiary(input: {
     .map((id) => input.concepts.find((concept) => concept.id === id))
     .filter((concept): concept is Concept => Boolean(concept))
     .map(displayConcept);
-  const body = names.length
-    ? `今日は${names.map((name) => `「${name}」`).join("と")}のことを話したっ！ 教えてもらった線を、ノートにちゃんと残しましたァっ！`
-    : "今日は静かな日でしたっ。次に会えたら、新しい言葉を聞いてみたいですっ！";
+  const learnedIds = new Set(todaysMemories.filter((memory) => memory.type === "word_learned").flatMap((memory) => memory.conceptIds));
+  const learnedNames = conceptIds
+    .filter((id) => learnedIds.has(id))
+    .map((id) => input.concepts.find((concept) => concept.id === id))
+    .filter((concept): concept is Concept => Boolean(concept))
+    .map(displayConcept);
+  const corrected = todaysMemories.some((memory) => memory.type === "player_choice" && memory.payload.effect === "deny");
+  const templateIndex = hash(`${input.date}:${conceptIds.join(":")}`) % diaryTemplates.length;
+  const reflection = diaryTemplates[templateIndex]?.text ?? "今日の気分と一緒に、短いメモへ残しておいた。";
+  const parts = names.length
+    ? [`今日は${names.map((name) => `「${name}」`).join("と")}のことを話したっ！`]
+    : ["今日は静かな時間を過ごしたっ！"];
+  if (learnedNames.length) parts.push(`新しく覚えたのは${learnedNames.map((name) => `「${name}」`).join("と")}っ！`);
+  if (corrected) parts.push("ちがう線を教えてもらったから、ノートを引き直したっ！");
+  parts.push(reflection);
+  const body = parts.join("\n");
   return {
     id: `diary_${input.date}`,
     date: input.date,
@@ -29,4 +43,8 @@ export function generateDiary(input: {
     memoryIds: todaysMemories.map((memory) => memory.id),
     createdAt: input.now
   };
+}
+
+function hash(value: string) {
+  return Array.from(value).reduce((total, character) => (total * 31 + (character.codePointAt(0) ?? 0)) >>> 0, 11);
 }

@@ -3,6 +3,7 @@ import type { Concept } from "../model/concept";
 import type { ConversationSession } from "../model/conversation";
 import type { ConceptRelation } from "../model/relation";
 import type { DialogueTemplate } from "../../data/schema/dialogue";
+import type { IntentBias } from "./intentPolicy";
 
 export const SCORE = {
   contextMatch: 35,
@@ -34,13 +35,16 @@ export function scoreCandidate(
   locationId: string,
   relations: ConceptRelation[],
   recentSessions: ConversationSession[],
-  character: CharacterState
+  character: CharacterState,
+  intentBias: IntentBias = {}
 ): ScoredCandidate {
   let score = 0;
   const reasons: string[] = [];
   const concepts = Object.values(slots);
   const ids = concepts.map((concept) => concept.id);
   const tupleKey = [...ids].sort().join("|");
+  score += intentBias[template.intent] ?? 0;
+  if ((intentBias[template.intent] ?? 0) > 0) reasons.push("intent-context");
   if (template.locations.includes(locationId)) {
     score += SCORE.contextMatch;
     reasons.push("location");

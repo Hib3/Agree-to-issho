@@ -8,12 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["assets/characters/main/fullbody/approved/aguri_normal.png"],
+      includeAssets: ["assets/**/*.{png,webp}"],
       manifest: {
         name: "アグリといっしょ",
         short_name: "アグリといっしょ",
         description: "言葉を教えて一緒に暮らす、完全オフライン会話ゲーム",
-        theme_color: "#71537f",
+        theme_color: "#f3eadc",
         background_color: "#f3eadc",
         display: "standalone",
         orientation: "portrait-primary",
@@ -30,12 +30,12 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "index.html",
-        globPatterns: ["**/*.{js,css,html,png,json,woff2}"],
+        globPatterns: ["**/*.{js,css,html,png,webp,json,woff2}"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === "image",
             handler: "CacheFirst",
-            options: { cacheName: "aguri-approved-assets-v1" }
+            options: { cacheName: "aguri-approved-assets-v2" }
           }
         ]
       }

@@ -11,7 +11,21 @@ for (const file of files) {
 }
 
 const publicFiles = walk(join(root, "public")).map((path) => relative(join(root, "public"), path).replaceAll("\\", "/"));
-const allowedPublic = new Set(["assets/characters/main/fullbody/approved/aguri_normal.png"]);
+const allowedPublic = new Set([
+  "assets/characters/main/fullbody/approved/aguri_normal.png",
+  "assets/characters/main/fullbody/approved/aguri_talk_happy.png",
+  "assets/characters/main/fullbody/approved/aguri_thinking.png",
+  "assets/characters/main/fullbody/approved/aguri_confused.png",
+  "assets/characters/main/fullbody/approved/aguri_sleepy.png",
+  "assets/backgrounds/aguri_room_day.webp",
+  "assets/backgrounds/aguri_room_evening.webp",
+  "assets/backgrounds/aguri_room_night.webp",
+  "assets/backgrounds/aguri_street_day.webp",
+  "assets/backgrounds/aguri_rooftop_evening.webp",
+  "assets/ui/textures/dialogue-paper.webp",
+  "assets/ui/textures/choice-paper.webp",
+  "assets/ui/textures/primary-fabric.webp"
+]);
 for (const file of publicFiles) if (!allowedPublic.has(file)) errors.push(`unapproved public runtime file: ${file}`);
 
 if (errors.length > 0) {

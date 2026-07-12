@@ -11,6 +11,7 @@ import type { AppScreen } from "../../app/routes";
 import { CharacterStage } from "../../ui/components/CharacterStage";
 import { ChoiceButtons } from "../../ui/components/ChoiceButtons";
 import { DialogueBox } from "../../ui/components/DialogueBox";
+import { ArchiveRestore, BookOpenText, CircleHelp, DoorOpen, MapPinned, MessageCircle, NotebookTabs, Settings, Sparkles } from "lucide-react";
 import { advanceConversation, answerConversation, startConversation } from "../conversation/conversationService";
 
 export function MainRoom({ player, character, settings, concepts, sessions, saving, onNavigate, onChanged }: {
@@ -30,6 +31,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
   const [clock, setClock] = useState(() => Date.now());
   const timerRef = useRef<number | null>(null);
   const location = locations.find((item) => item.id === character.currentLocationId) ?? locations[0]!;
+  const timeOfDay = getTimeOfDay(clock);
   const userWordCount = concepts.filter((concept) => concept.source === "user").length;
   const lastTurn = active?.history.at(-1);
   const dialogueText = active?.phase === "awaiting_answer" && active.pendingQuestion
@@ -37,12 +39,12 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     : lastTurn?.page ?? `まァっ、${player.callName}っ！ 今日はどんな話をしましょうかっ？`;
   const hasNext = Boolean(active && active.phase !== "awaiting_answer" && active.phase !== "completed");
 
-  const speak = useCallback(async () => {
+  const speak = useCallback(async (initiatedByUser = true) => {
     if (busy || saving) return;
     setBusy(true);
     try {
-      if (active) await advanceConversation(active.id);
-      else await startConversation();
+      if (active) await advanceConversation(active.id, Date.now(), initiatedByUser);
+      else await startConversation(Date.now(), initiatedByUser);
       await onChanged();
     } finally {
       setBusy(false);
@@ -83,7 +85,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
         timerRef.current = window.setTimeout(schedule, 5000);
         return;
       }
-      timerRef.current = window.setTimeout(() => void speak(), autonomousDelayMs(location, systemRandom));
+      timerRef.current = window.setTimeout(() => void speak(false), autonomousDelayMs(location, systemRandom));
     };
     schedule();
     return () => {
@@ -108,37 +110,37 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     () => active?.pendingQuestion?.choices.map((choice) => ({ value: choice.id, label: choice.label })) ?? [],
     [active?.pendingQuestion]
   );
+  const currentSelection = answerOptions.some((option) => option.value === selected) ? selected : "";
 
   return (
     <main className={`room-screen location-shell-${location.id}`}>
-      <header className="room-topbar">
-        <div><strong>{timeLabels[getTimeOfDay(clock)]}</strong><span>{location.name}</span></div>
-        <div className="room-status"><span>{online ? "端末内保存" : "オフライン"}</span><span>言葉 {userWordCount}こ</span><button type="button" aria-label="設定" onClick={() => onNavigate("settings")}>⚙</button></div>
-      </header>
-
-      <section className="room-composition">
-        <CharacterStage emotion={lastTurn?.emotion ?? character.emotion} locationId={location.id} reducedMotion={settings.reducedMotion} />
+      <section className={`room-composition${active?.phase === "awaiting_answer" ? " answering" : ""}`}>
+        <CharacterStage emotion={lastTurn?.emotion ?? character.emotion} locationId={location.id} timeOfDay={timeOfDay} reducedMotion={settings.reducedMotion} isSpeaking={Boolean(active)} />
+        <header className="room-topbar">
+          <div className="place-chip"><strong>{timeLabels[timeOfDay]}</strong><span>{location.name}</span></div>
+          <div className="room-status"><span>{online ? "端末内保存" : "オフライン"}</span><span>言葉 {userWordCount}こ</span><button className="icon-button" type="button" aria-label="設定" title="設定" onClick={() => onNavigate("settings")}><Settings aria-hidden="true" /></button></div>
+        </header>
         <DialogueBox speaker="アグリちゃん" text={dialogueText} emotion={lastTurn?.emotion ?? character.emotion} textSpeed={settings.textSpeed} hasNext={hasNext} onNext={() => void speak()} />
 
         {active?.phase === "awaiting_answer" && active.pendingQuestion ? (
           <section className="answer-panel">
-            <ChoiceButtons options={answerOptions} value={selected} disabled={busy} onChoose={setSelected} label="返事" />
-            <button className="primary" type="button" disabled={!selected || busy} onClick={() => void submitAnswer()}>この返事にする</button>
+            <ChoiceButtons options={answerOptions} value={currentSelection} disabled={busy} onChoose={setSelected} label="返事" />
+            <button className="primary" type="button" disabled={!currentSelection || busy} onClick={() => void submitAnswer()}>この返事にする</button>
           </section>
         ) : null}
         <div className="main-actions">
-          <button className="primary" type="button" disabled={busy || saving || active?.phase === "awaiting_answer"} onClick={() => void speak()}>{active ? "会話を続ける" : "話す"}</button>
-          <button className="primary teach" type="button" disabled={busy || saving || Boolean(active)} onClick={() => onNavigate("teach")}>言葉を教える</button>
+          <button className="primary" type="button" disabled={busy || saving || active?.phase === "awaiting_answer"} onClick={() => void speak()}><MessageCircle aria-hidden="true" />{active ? "会話を続ける" : "話す"}</button>
+          <button className="primary teach" type="button" disabled={busy || saving || Boolean(active)} onClick={() => onNavigate("teach")}><Sparkles aria-hidden="true" />言葉を教える</button>
         </div>
       </section>
 
       <nav className="sub-actions" aria-label="補助メニュー">
-        <button type="button" onClick={() => onNavigate("wordbook")}>単語帳</button>
-        <button type="button" onClick={() => onNavigate("diary")}>日記</button>
-        <button type="button" onClick={() => onNavigate("locations")}>移動</button>
-        <button type="button" onClick={() => onNavigate("backup")}>保存</button>
-        <button type="button" onClick={() => onNavigate("manual")}>説明</button>
-        <button type="button" onClick={() => onNavigate("title")}>タイトル</button>
+        <button type="button" onClick={() => onNavigate("wordbook")}><BookOpenText aria-hidden="true" /><span>単語帳</span></button>
+        <button type="button" onClick={() => onNavigate("diary")}><NotebookTabs aria-hidden="true" /><span>日記</span></button>
+        <button type="button" onClick={() => onNavigate("locations")}><MapPinned aria-hidden="true" /><span>移動</span></button>
+        <button type="button" onClick={() => onNavigate("backup")}><ArchiveRestore aria-hidden="true" /><span>保存</span></button>
+        <button type="button" onClick={() => onNavigate("manual")}><CircleHelp aria-hidden="true" /><span>説明</span></button>
+        <button type="button" onClick={() => onNavigate("title")}><DoorOpen aria-hidden="true" /><span>タイトル</span></button>
       </nav>
     </main>
   );

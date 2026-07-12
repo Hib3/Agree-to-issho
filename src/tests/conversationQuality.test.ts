@@ -8,6 +8,11 @@ import { createUserConcept } from "../domain/learning/conceptFactory";
 import type { CharacterState } from "../domain/model/character";
 import { SeededRandom } from "../infrastructure/random/random";
 import { splitJapanesePages } from "../domain/grammar/japaneseRealizer";
+import { buildIntentBias } from "../domain/conversation/intentPolicy";
+import { locations } from "../data/locations/locations";
+import { advanceConversation, answerConversation } from "../features/conversation/conversationService";
+import { db } from "../infrastructure/db/database";
+import type { ConversationSession, DialogueTurn } from "../domain/model/conversation";
 
 const now = 1_700_000_000_000;
 const character: CharacterState = {
@@ -75,10 +80,96 @@ describe("clean-room conversation composition", () => {
     expect(reaction).not.toContain("そのつながり");
     expect(result.relations).toHaveLength(1);
     expect(result.relations[0]?.source).toBe("answer");
+    const reviewed = result.concepts.find((concept) => concept.id === ids[0]);
+    const before = starterConcepts.find((concept) => concept.id === ids[0]);
+    expect(reviewed?.reviewCount).toBe((before?.reviewCount ?? 0) + 1);
+  });
+
+  it("prioritizes meaning checks for an uncertain learned word", () => {
+    const learned = { ...createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "uncertain"), understanding: 0.25, ambiguity: 0.82 };
+    const bias = buildIntentBias({ concepts: [...starterConcepts, learned], recentSessions: [], character, location: locations[0]!, now });
+    expect(bias.ask_meaning).toBeGreaterThan(bias.small_talk ?? 0);
+    expect(bias.misunderstanding).toBeGreaterThan(0);
   });
 
   it("never cuts a Japanese sentence in the middle of a word", () => {
     const sentence = "「消しゴム」の中に「星形クッキー」があったら、開ける前から少しわくわくしますっ。";
     expect(splitJapanesePages(sentence, 20)).toEqual([sentence]);
+  });
+
+  it("shows the final spoken page before opening its answer choices", async () => {
+    await db.open();
+    await db.transaction("rw", db.tables, async () => {
+      for (const table of db.tables) await table.clear();
+    });
+    const turn: DialogueTurn = {
+      id: "turn_last",
+      speaker: "aguri",
+      page: "質問の前に見せる最後のページですっ！",
+      emotion: "curious",
+      conceptIds: [],
+      createdAt: now
+    };
+    const session: ConversationSession = {
+      id: "session_phase_order",
+      phase: "premise",
+      intent: "ask_relation",
+      locationId: "room",
+      templateIds: ["test"],
+      slotConceptIds: {},
+      history: [],
+      queuedTurns: [turn],
+      pendingQuestion: {
+        id: "question_test",
+        prompt: "この質問に答えますかっ？",
+        choices: [{ id: "yes", label: "はい", effect: "affirm" }]
+      },
+      absurdityCount: 0,
+      startedAt: now,
+      updatedAt: now
+    };
+    await db.character.put(character);
+    await db.conversationSessions.put(session);
+
+    const spoken = await advanceConversation(session.id, now + 1);
+    expect(spoken.phase).toBe("closing");
+    expect(spoken.history.at(-1)?.page).toBe(turn.page);
+
+    const asking = await advanceConversation(session.id, now + 2);
+    expect(asking.phase).toBe("awaiting_answer");
+  });
+
+  it("shows Aguri's correction reaction immediately after a deny answer", async () => {
+    await db.open();
+    await db.transaction("rw", db.tables, async () => {
+      for (const table of db.tables) await table.clear();
+    });
+    const learned = createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "answer-flow");
+    const session: ConversationSession = {
+      id: "session_answer_reaction",
+      phase: "awaiting_answer",
+      intent: "ask_relation",
+      locationId: "room",
+      templateIds: ["test"],
+      slotConceptIds: { subject: learned.id },
+      history: [],
+      queuedTurns: [],
+      pendingQuestion: {
+        id: "question_test",
+        prompt: "このつながりですかっ？",
+        choices: [{ id: "no", label: "違う", effect: "deny" }]
+      },
+      absurdityCount: 0,
+      startedAt: now,
+      updatedAt: now
+    };
+    await db.character.put(character);
+    await db.concepts.put(learned);
+    await db.conversationSessions.put(session);
+
+    const reacted = await answerConversation(session.id, { id: "no", label: "違う", effect: "deny" }, now + 1);
+    expect(reacted.phase).toBe("closing");
+    expect(reacted.history.at(-1)?.page).toContain("違うんですね");
+    expect(reacted.pendingQuestion).toBeUndefined();
   });
 });

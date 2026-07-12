@@ -23,7 +23,7 @@ export function FirstStartWizard({ onComplete }: { onComplete: () => Promise<voi
 
   return (
     <main className="wizard-screen">
-      <CharacterStage emotion="excited" locationId="room" />
+      <CharacterStage emotion={step === "hello" ? "happy" : "curious"} locationId="room" timeOfDay="day" isSpeaking />
       <DialogueBox speaker="アグリちゃん" text={prompt} />
       <section className="wizard-panel">
         {step === "hello" ? <button className="primary" type="button" onClick={() => setStep("name")}>はじめまして</button> : null}

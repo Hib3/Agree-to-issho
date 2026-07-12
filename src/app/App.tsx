@@ -10,6 +10,7 @@ import { LocationsScreen } from "../features/locations/LocationsScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { BackupScreen } from "../features/backup/BackupScreen";
 import { ManualScreen } from "../features/settings/ManualScreen";
+import { resetGameData } from "./bootstrap";
 
 export function App() {
   const store = useGameStore();
@@ -26,6 +27,12 @@ export function App() {
   const screen = !store.player && store.screen !== "onboarding" ? "onboarding" : store.screen;
   const rootClass = [store.settings?.highContrast ? "high-contrast" : "", store.settings ? `font-${store.settings.fontScale}` : ""].filter(Boolean).join(" ");
 
+  async function startNewGame() {
+    if (store.player && !window.confirm("教えた言葉、会話、日記をこの端末から消して、最初から始めますか？\n必要なら先に保存データを作ってください。")) return;
+    await resetGameData();
+    await store.initialize();
+  }
+
   return (
     <div className={rootClass}>
       {screen === "title" ? (
@@ -33,7 +40,7 @@ export function App() {
           hasSave={Boolean(store.player)}
           userWordCount={userWordCount}
           onContinue={() => store.setScreen("room")}
-          onStart={() => store.setScreen("onboarding")}
+          onStart={() => { void startNewGame(); }}
           onManual={() => store.setScreen("manual")}
           onBackup={() => store.setScreen("backup")}
         />

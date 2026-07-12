@@ -38,7 +38,7 @@ const intentOpeners: Record<ConversationIntent, string> = {
   invitation: "今度の誘いとして、",
   discovery: "まァっ、発見したんですけど、",
   comparison: "二つを比べてみたら、",
-  daydream: "ぼんやり想像していたら、",
+  daydream: "ぼんやり想像したんですけど、",
   misunderstanding: "なんかっ、アグリの覚え方だと、",
   outing_report: "帰ってから思い出したのが、",
   quiet_moment: "静かにしていると、"

@@ -31,6 +31,13 @@ export async function loadSnapshot() {
   return { player: player ?? null, character: character ?? null, settings: settings ?? null, concepts, relations, memories, sessions, dialogue, diaries, learningSession: learningSession ?? null };
 }
 
+export async function resetGameData(now = Date.now()) {
+  await db.transaction("rw", db.tables, async () => {
+    for (const table of db.tables) await table.clear();
+  });
+  return bootstrapApp(now);
+}
+
 function defaultCharacter(now: number): CharacterState {
   return {
     id: "aguri",

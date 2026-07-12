@@ -7,6 +7,7 @@ import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
 import { buildCandidates } from "./candidateBuilder";
 import { realizeCandidate } from "./realization";
+import type { IntentBias } from "./intentPolicy";
 
 export function planConversation(input: {
   templates: DialogueTemplate[];
@@ -18,6 +19,7 @@ export function planConversation(input: {
   locationId: string;
   now: number;
   random: RandomSource;
+  intentBias?: IntentBias;
 }) {
   const candidates = buildCandidates(input);
   if (candidates.length === 0) throw new Error("会話候補を作れませんでした。");

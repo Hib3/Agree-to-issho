@@ -14,7 +14,7 @@ test("初回設定から学習語を使う会話まで進める", async ({ page 
   await page.getByRole("button", { name: "食べる" }).click();
   await page.getByRole("button", { name: "大好き" }).click();
   await page.getByRole("button", { name: "この覚え方で保存" }).click();
-  await page.getByRole("button", { name: "部屋へ戻る" }).click();
+  await page.getByRole("button", { name: "覚えた言葉を持って部屋へ戻る" }).click();
 
   await expect(page.getByRole("button", { name: "話す" })).toBeVisible();
   await expect(page.getByRole("button", { name: "言葉を教える" })).toBeVisible();

@@ -35,9 +35,12 @@
 表示するキャラクターは、ユーザー提供画像を正とする人間の少女「アグリちゃん」です。
 
 - 承認済み通常立ち絵: `public/assets/characters/main/fullbody/approved/aguri_normal.png`
-- 現在は表情差分を使いません。
+- 承認済み差分: `aguri_talk_happy.png`, `aguri_thinking.png`, `aguri_confused.png`, `aguri_sleepy.png`
+- 感情に応じて立ち絵を切り替え、発話中・喜び・困惑・眠気はCSSの小さな動きも重ねます。
 - 生成失敗画像、未承認画像、原作画像は公開領域へ置きません。
 - 発話は全てアグリちゃん用の口調レイヤーを通します。学習語や否定・疑問の意味を残しながら、高いテンションと崩し敬語を適用します。
+
+背景は本作向けに生成・検査した部屋の日中・夕方・夜、商店街、屋上を使用します。会話紙、選択紙、主ボタン布も専用生成テクスチャです。未生成の追加差分は、1画像1ファイルのプロンプトを `docs/assets/imagegen-prompts/` に用意しています。
 
 ## Development
 

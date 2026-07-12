@@ -8,6 +8,7 @@ import { db } from "../../infrastructure/db/database";
 import { ChoiceButtons } from "../../ui/components/ChoiceButtons";
 import { DialogueBox } from "../../ui/components/DialogueBox";
 import { ScreenHeader } from "../../ui/components/ScreenHeader";
+import { CharacterStage } from "../../ui/components/CharacterStage";
 import {
   beginLearning,
   cancelLearning,
@@ -113,11 +114,19 @@ export function TeachWordFlow({ concepts, initialSession, onChanged, onComplete 
             : state === "confirmation"
               ? `「${learnedSurface}」は、この覚え方で合っていますかっ？`
               : prompt;
+  const progress = state === "category_select" ? 2 : ["category_attributes", "preference_question"].includes(state) ? 3 : state === "confirmation" || saved ? 4 : 1;
+  const teachEmotion = saved ? "happy" : state === "duplicate_resolution" ? "confused" : state === "confirmation" ? "curious" : "excited";
 
   return (
     <main className="feature-screen teach-screen">
       <ScreenHeader title="言葉を教える" onBack={() => { void cancelLearning().then(onComplete); }} />
-      <DialogueBox speaker="アグリちゃん" text={dialogueText} />
+      <section className="teach-scene">
+        <CharacterStage emotion={teachEmotion} locationId="room" timeOfDay="day" compact isSpeaking />
+        <DialogueBox speaker="アグリちゃん" text={dialogueText} emotion={teachEmotion} />
+      </section>
+      <div className="teach-progress" aria-label={`言葉を教える手順 ${progress}/4`}>
+        {[1, 2, 3, 4].map((step) => <span key={step} className={step <= progress ? "done" : ""}>{step}</span>)}
+      </div>
 
       <section className="paper-panel teach-panel">
         {!active || ["contextual_prompt", "text_input"].includes(state) ? (
@@ -182,7 +191,7 @@ export function TeachWordFlow({ concepts, initialSession, onChanged, onComplete 
           </div>
         ) : null}
 
-        {saved ? <button className="primary" type="button" onClick={() => { void cancelLearning().then(onComplete); }}>部屋へ戻る</button> : null}
+        {saved ? <button className="primary" type="button" onClick={() => { void cancelLearning().then(onComplete); }}>覚えた言葉を持って部屋へ戻る</button> : null}
         {!saved && active ? <div className="teach-secondary"><button type="button" onClick={() => void restart()}>入力し直す</button><button type="button" onClick={() => { void cancelLearning().then(onComplete); }}>やめる</button></div> : null}
       </section>
     </main>

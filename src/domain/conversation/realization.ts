@@ -1,6 +1,6 @@
 import type { ResponsePattern } from "../../data/schema/dialogue";
 import type { CharacterState } from "../model/character";
-import type { ConversationSession, DialogueTurn, PendingQuestion } from "../model/conversation";
+import type { ConversationIntent, ConversationSession, DialogueTurn, PendingQuestion } from "../model/conversation";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
 import { realize, splitJapanesePages } from "../grammar/japaneseRealizer";
@@ -30,11 +30,12 @@ export function realizeCandidate(
     .slice(0, 5);
   const conceptIds = Object.values(candidate.slots).map((concept) => concept.id);
   const history: DialogueTurn[] = [];
+  const conversationEmotion = emotionForIntent(candidate.template.intent, character);
   const queuedTurns = pages.map((page, index): DialogueTurn => ({
     id: `turn_${crypto.randomUUID()}`,
     speaker: "aguri",
     page,
-    emotion: candidate.template.intent === "misunderstanding" ? "confused" : character.emotion,
+    emotion: index === 0 && conversationEmotion === "confused" ? "curious" : conversationEmotion,
     conceptIds,
     createdAt: now + index
   }));
@@ -53,7 +54,7 @@ export function realizeCandidate(
     }
     pendingQuestion = {
       id: `question_${crypto.randomUUID()}`,
-      prompt: `${subject}をこんなふうに組み合わせても、変じゃないですかっ？`,
+      prompt: questionForIntent(candidate.template.intent, subject),
       choices
     };
   }
@@ -71,4 +72,22 @@ export function realizeCandidate(
     startedAt: now,
     updatedAt: now
   };
+}
+
+function emotionForIntent(intent: ConversationIntent, character: CharacterState) {
+  if (intent === "misunderstanding") return "confused" as const;
+  if (["invitation", "discovery", "outing_report"].includes(intent)) return "excited" as const;
+  if (["recall_memory", "ask_preference"].includes(intent)) return "happy" as const;
+  if (intent === "quiet_moment") return character.energy < 35 ? "sleepy" as const : "calm" as const;
+  return "curious" as const;
+}
+
+function questionForIntent(intent: ConversationIntent, subject: string) {
+  if (intent === "ask_preference") return `${subject}の話、好きな感じですかっ？`;
+  if (intent === "ask_meaning") return `${subject}の意味の置き方、これで近いですかっ？`;
+  if (intent === "recall_memory") return `${subject}のこと、前にもこんな感じで話しましたかっ？`;
+  if (intent === "misunderstanding") return `${subject}を同じ線で結んだんですけど、ここは違いますかっ？`;
+  if (intent === "warning") return `${subject}のとき、気をつける所はありますかっ？`;
+  if (intent === "invitation") return `${subject}の組み合わせで出かけたら、楽しそうですかっ？`;
+  return `${subject}をこんなふうに組み合わせても、変じゃないですかっ？`;
 }

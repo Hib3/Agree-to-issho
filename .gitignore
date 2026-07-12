@@ -25,6 +25,7 @@ doko-demo-issyo/**
 *.[cC][hH][dD]
 
 docs/research/generated/
+docs/assets/generated/
 __pycache__/
 *.pyc
 
