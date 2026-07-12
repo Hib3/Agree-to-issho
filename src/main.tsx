@@ -1,13 +1,16 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./app/App";
-import { registerServiceWorker } from "./pwa/registerServiceWorker";
-import "./styles.css";
+import { AppProviders } from "./app/providers";
+import "./ui/theme/styles.css";
+import { registerServiceWorker } from "./infrastructure/pwa/registerServiceWorker";
 
-registerServiceWorker(import.meta.env.BASE_URL);
-
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <AppProviders>
+      <App />
+    </AppProviders>
   </React.StrictMode>
 );
+
+registerServiceWorker();
