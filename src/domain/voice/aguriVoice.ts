@@ -13,11 +13,13 @@ export function applyAguriVoice(text: string, emotion: CharacterEmotion = "curio
   const clean = text.trim();
   if (!clean) return clean;
 
-  const energetic = transformOutsideQuotes(clean, (part) => applySentenceRhythm(part, emotion));
+  const energetic = transformOutsideQuotes(clean, (part, isFinal) =>
+    applySentenceRhythm(part, emotion, isFinal)
+  );
   return `${softenerFor(clean, emotion)}${energetic}`;
 }
 
-function applySentenceRhythm(text: string, emotion: CharacterEmotion) {
+function applySentenceRhythm(text: string, emotion: CharacterEmotion, allowTerminalAppend = true) {
   if (!text) return text;
   const questionEnding = quietEmotions.has(emotion) ? "っ？" : "っ！？";
   let result = text
@@ -43,6 +45,7 @@ function applySentenceRhythm(text: string, emotion: CharacterEmotion) {
 
   result = result.replace(/。/gu, "っ！");
   if (
+    allowTerminalAppend &&
     !["。", "！", "？", "!", "?"].some((ending) => result.endsWith(ending)) &&
     ["happy", "excited"].includes(emotion)
   ) {
@@ -51,18 +54,18 @@ function applySentenceRhythm(text: string, emotion: CharacterEmotion) {
   return result;
 }
 
-function transformOutsideQuotes(text: string, transform: (part: string) => string) {
-  let result = "";
+function transformOutsideQuotes(text: string, transform: (part: string, isFinal: boolean) => string) {
+  const segments: Array<{ text: string; protected: boolean }> = [];
   let unquoted = "";
   let quoted = "";
   const expectedClosers: string[] = [];
 
   const flushUnquoted = () => {
-    result += transform(unquoted);
+    if (unquoted) segments.push({ text: unquoted, protected: false });
     unquoted = "";
   };
   const flushQuoted = () => {
-    result += quoted;
+    if (quoted) segments.push({ text: quoted, protected: true });
     quoted = "";
   };
 
@@ -90,7 +93,11 @@ function transformOutsideQuotes(text: string, transform: (part: string) => strin
 
   if (expectedClosers.length > 0) return text;
   flushUnquoted();
-  return result;
+  return segments
+    .map((segment, index) =>
+      segment.protected ? segment.text : transform(segment.text, index === segments.length - 1)
+    )
+    .join("");
 }
 
 function softenerFor(text: string, emotion: CharacterEmotion) {

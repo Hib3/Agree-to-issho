@@ -27,6 +27,13 @@ describe("Aguri voice layer", () => {
     expect(applyAguriVoice(text, "happy")).toBe(text);
   });
 
+  it("does not insert sentence endings between quoted concepts", () => {
+    expect(applyAguriVoice("あっ、「木」から思いつきました。", "excited")).toBe(
+      "あっ、「木」から思いつきましたっ！"
+    );
+    expect(applyAguriVoice("「商店街」で「木」を見ます。", "excited")).toBe("「商店街」で「木」を見ますっ！");
+  });
+
   it("does not append a second ending after an existing energetic ending", () => {
     const result = applyAguriVoice("あなたの名前を教えてくださいっ。", "curious");
     expect(result).toBe("あなたの名前を教えてくださいっ！");
