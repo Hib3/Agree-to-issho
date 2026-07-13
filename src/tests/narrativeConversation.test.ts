@@ -37,6 +37,7 @@ describe("multi-page narrative conversation", () => {
     const recent: ConversationSession[] = [];
     const transcripts = new Set<string>();
     let narrativeCount = 0;
+    let punchlineStoryCount = 0;
     let driftCount = 0;
     let maaOpeningCount = 0;
     const intentCounts = new Map<string, number>();
@@ -61,7 +62,8 @@ describe("multi-page narrative conversation", () => {
       intentCounts.set(session.intent, (intentCounts.get(session.intent) ?? 0) + 1);
 
       if (errors.length > 0) failures.push(`${seed}:validation:${errors.join(",")}`);
-      if (session.validationErrors.length > 0) failures.push(`${seed}:fallback:${session.validationErrors.join(",")}`);
+      if (session.validationErrors.length > 0)
+        failures.push(`${seed}:fallback:${session.validationErrors.join(",")}`);
       if (/まァっす|二つを比べてみたら|どんな一日になる|undefined|null|\[object Object\]/u.test(transcript)) {
         failures.push(`${seed}:broken-text`);
       }
@@ -70,14 +72,20 @@ describe("multi-page narrative conversation", () => {
         narrativeCount += 1;
         if (session.queuedTurns.length < 3) failures.push(`${seed}:short-story`);
       }
+      if (["single_word", "scene_hypothesis"].includes(session.proposition.relationType)) {
+        if (session.queuedTurns.length < 5) failures.push(`${seed}:missing-punchline`);
+        else punchlineStoryCount += 1;
+      }
       if (session.proposition.relationType === "drift_hypothesis") {
         driftCount += 1;
-        if (session.absurdityCount !== 1 || session.questionIntent !== "correction_request") failures.push(`${seed}:uncontrolled-drift`);
+        if (session.absurdityCount !== 1 || session.questionIntent !== "correction_request")
+          failures.push(`${seed}:uncontrolled-drift`);
       }
       if (session.pendingQuestion) {
         for (const conceptId of session.proposition.wordIds) {
           const surface = concepts.find((concept) => concept.id === conceptId)?.surface;
-          if (surface && !session.pendingQuestion.prompt.includes(surface)) failures.push(`${seed}:unnamed-question-target:${surface}`);
+          if (surface && !session.pendingQuestion.prompt.includes(surface))
+            failures.push(`${seed}:unnamed-question-target:${surface}`);
         }
       }
 
@@ -88,26 +96,34 @@ describe("multi-page narrative conversation", () => {
 
     expect(failures).toEqual([]);
     expect(narrativeCount).toBeGreaterThan(500);
+    expect(punchlineStoryCount).toBeGreaterThan(650);
     expect(driftCount).toBeGreaterThan(10);
     expect(driftCount).toBeLessThan(130);
     expect(intentCounts.size).toBeGreaterThanOrEqual(10);
     expect(intentCounts.get("ask_meaning") ?? 0).toBeGreaterThan(10);
     expect(intentCounts.get("ask_preference") ?? 0).toBeGreaterThan(0);
     expect(intentCounts.get("ask_preference") ?? 0).toBeLessThan(80);
-    expect(transcripts.size).toBeGreaterThan(700);
+    expect(transcripts.size).toBeGreaterThan(850);
     expect(maaOpeningCount).toBeLessThan(25);
   });
 
   it("keeps every generated frame within its declared semantic roles", () => {
-    const concepts = starterConcepts.map((concept, index) => ({
-      ...concept,
-      id: `all_user_${index}`,
-      source: "user" as const
-    } satisfies Concept));
+    const concepts = starterConcepts.map(
+      (concept, index) =>
+        ({
+          ...concept,
+          id: `all_user_${index}`,
+          source: "user" as const
+        }) satisfies Concept
+    );
     const failures: string[] = [];
 
     for (const [index, template] of dialogueTemplates.entries()) {
-      if (template.grounding === "relation_required" && !["ask_relation", "misunderstanding"].includes(template.intent)) continue;
+      if (
+        template.grounding === "relation_required" &&
+        !["ask_relation", "misunderstanding"].includes(template.intent)
+      )
+        continue;
       const locationId = template.locations[0] ?? "room";
       const session = planConversation({
         templates: [template],
@@ -123,11 +139,17 @@ describe("multi-page narrative conversation", () => {
       });
       const transcript = session.queuedTurns.map((turn) => turn.page).join("\n");
       if (validateConversationSession(session).length > 0) failures.push(`${template.id}:invalid`);
-      if (session.proposition.wordIds.some((id) => !session.topicWordIds.includes(id))) failures.push(`${template.id}:topic-mismatch`);
-      if (template.slots.length >= 2 && session.proposition.relationType !== "relation_discovery" && session.queuedTurns.length < 3) {
+      if (session.proposition.wordIds.some((id) => !session.topicWordIds.includes(id)))
+        failures.push(`${template.id}:topic-mismatch`);
+      if (
+        template.slots.length >= 2 &&
+        session.proposition.relationType !== "relation_discovery" &&
+        session.queuedTurns.length < 3
+      ) {
         failures.push(`${template.id}:missing-story-beat`);
       }
-      if (template.intent === "comparison" && !/(比べ|違い)/u.test(transcript)) failures.push(`${template.id}:not-comparison`);
+      if (template.intent === "comparison" && !/(比べ|違い)/u.test(transcript))
+        failures.push(`${template.id}:not-comparison`);
     }
 
     expect(failures).toEqual([]);

@@ -6,6 +6,7 @@ import { displayConcept } from "../grammar/japaneseRealizer";
 import { controlledPremise } from "./absurdityController";
 import type { ScoredCandidate } from "./scorer";
 import { attributeMemoryBeat } from "./attributeNarration";
+import { renderStoryArc } from "./storyArcGenerator";
 
 export function buildNarrativePages(input: {
   candidate: ScoredCandidate;
@@ -30,7 +31,10 @@ export function buildNarrativePages(input: {
     ].filter(Boolean);
   }
 
-  if (input.proposition.relationType === "confirmed_relation" && input.candidate.template.grounding === "relation_required") {
+  if (
+    input.proposition.relationType === "confirmed_relation" &&
+    input.candidate.template.grounding === "relation_required"
+  ) {
     const frameId = input.candidate.template.semanticFrame.split(".").at(-1) ?? "";
     if (frameId !== "word_pair_relation" && input.candidate.template.intent !== "ask_relation") {
       return [
@@ -50,14 +54,23 @@ export function buildNarrativePages(input: {
 
   if (input.proposition.relationType === "single_word") {
     const frameId = input.candidate.template.semanticFrame.split(".").at(-1) ?? "";
+    const storyArc = renderStoryArc({ focus, random: input.random });
     if (frameId === "single_topic") {
-      return [openingForIntent(input.candidate.template.intent, focus), learnedAttributeBeat, memoryBeat(focus)].filter(Boolean);
+      return [
+        openingForIntent(input.candidate.template.intent, focus),
+        learnedAttributeBeat,
+        memoryBeat(focus),
+        storyArc.turn,
+        storyArc.punchline
+      ].filter(Boolean);
     }
     return [
       openingForIntent(input.candidate.template.intent, focus),
       learnedAttributeBeat,
       input.rendered,
-      outcomeForFrame(input.candidate, input.random)
+      outcomeForFrame(input.candidate, input.random),
+      storyArc.turn,
+      storyArc.punchline
     ].filter(Boolean);
   }
 
@@ -75,7 +88,10 @@ export function buildNarrativePages(input: {
   }
 
   const outcome = outcomeForFrame(input.candidate, input.random);
-  return [opening, learnedAttributeBeat, input.rendered, outcome].filter(Boolean);
+  const storyArc = renderStoryArc({ focus, random: input.random });
+  return [opening, learnedAttributeBeat, input.rendered, outcome, storyArc.turn, storyArc.punchline].filter(
+    Boolean
+  );
 }
 
 function openingForIntent(intent: ConversationIntent, focus: Concept) {
@@ -102,9 +118,12 @@ function openingForIntent(intent: ConversationIntent, focus: Concept) {
 
 function memoryBeat(concept: Concept) {
   const word = quoted(concept);
-  if (concept.preference !== undefined && concept.preference >= 2) return `${word}は好きだと教わっていますっ！`;
-  if (concept.preference !== undefined && concept.preference <= -2) return `${word}は苦手だと教わったから、話に出しすぎませんっ。`;
-  if (concept.understanding < 0.58 || concept.ambiguity > 0.52) return `${word}は、まだ覚え方が少しふわふわしていますっ。`;
+  if (concept.preference !== undefined && concept.preference >= 2)
+    return `${word}は好きだと教わっていますっ！`;
+  if (concept.preference !== undefined && concept.preference <= -2)
+    return `${word}は苦手だと教わったから、話に出しすぎませんっ。`;
+  if (concept.understanding < 0.58 || concept.ambiguity > 0.52)
+    return `${word}は、まだ覚え方が少しふわふわしていますっ。`;
   if (concept.usageCount === 0) return `${word}を話に使うのは、今日が初めてですっ！`;
   return `${word}は前より少し、迷わず使えるようになりましたっ。`;
 }

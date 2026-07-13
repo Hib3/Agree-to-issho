@@ -27,6 +27,7 @@ let narrative = 0;
 let drift = 0;
 let questions = 0;
 let attributeGrounded = 0;
+let punchlineStories = 0;
 
 const character: CharacterState = {
   id: "aguri",
@@ -70,6 +71,12 @@ for (let seed = 1; seed <= 1000; seed += 1) {
   if (session.proposition.relationType === "drift_hypothesis") drift += 1;
   if (session.pendingQuestion) questions += 1;
   if (session.queuedTurns.some((turn) => /教わって|教わりました/u.test(turn.page))) attributeGrounded += 1;
+  if (
+    ["single_word", "scene_hypothesis"].includes(session.proposition.relationType) &&
+    session.queuedTurns.length >= 5
+  ) {
+    punchlineStories += 1;
+  }
   if (samples.length < 5 && session.queuedTurns.length >= 3) {
     samples.push({
       seed,
@@ -96,6 +103,7 @@ console.log(
       controlledDrift: drift,
       questions,
       attributeGrounded,
+      punchlineStories,
       intentCounts,
       samples
     },

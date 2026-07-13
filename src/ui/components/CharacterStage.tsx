@@ -2,9 +2,21 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { CharacterEmotion } from "../../domain/model/character";
 import type { LocationId } from "../../domain/model/location";
 import type { TimeOfDay } from "../../domain/schedule/timeOfDay";
-import { characterImageFor, fallbackCharacterImage, sceneBackgroundFor } from "../../data/assets/visualAssets";
+import {
+  characterImageFor,
+  fallbackCharacterImage,
+  sceneBackgroundFor
+} from "../../data/assets/visualAssets";
 
-export function CharacterStage({ emotion, locationId, timeOfDay = "day", weather = "clear", reducedMotion = false, isSpeaking = false, compact = false }: {
+export function CharacterStage({
+  emotion,
+  locationId,
+  timeOfDay = "day",
+  weather = "clear",
+  reducedMotion = false,
+  isSpeaking = false,
+  compact = false
+}: {
   emotion: CharacterEmotion;
   locationId: LocationId;
   timeOfDay?: TimeOfDay;
@@ -17,7 +29,9 @@ export function CharacterStage({ emotion, locationId, timeOfDay = "day", weather
   const [idlePosition, setIdlePosition] = useState<"center" | "left" | "right">("center");
   const blinkEnabled = !reducedMotion && !isSpeaking && emotion === "calm";
   const image = characterImageFor(emotion, isSpeaking, blinkEnabled && isBlinking);
-  const style = { "--scene-background": `url("${sceneBackgroundFor(locationId, timeOfDay, weather)}")` } as CSSProperties;
+  const style = {
+    "--scene-background": `url("${sceneBackgroundFor(locationId, timeOfDay, weather)}")`
+  } as CSSProperties;
 
   useEffect(() => {
     if (!blinkEnabled) return;
@@ -49,14 +63,20 @@ export function CharacterStage({ emotion, locationId, timeOfDay = "day", weather
   }, [compact, isSpeaking, reducedMotion]);
 
   return (
-    <div className={`character-stage location-${locationId} mood-${emotion} idle-${idlePosition}${compact ? " compact" : ""}${isSpeaking ? " speaking" : ""}`} style={style} aria-label="アグリちゃんのいる場所">
+    <div
+      className={`character-stage location-${locationId} time-${timeOfDay} weather-${weather} mood-${emotion} idle-${idlePosition}${compact ? " compact" : ""}${isSpeaking ? " speaking" : ""}`}
+      style={style}
+      aria-label="アグリちゃんのいる場所"
+    >
       <div className="scene-light" aria-hidden="true" />
       <img
         key={image}
         className={reducedMotion ? "character still" : "character"}
         src={image}
         alt={`アグリちゃん・${emotion}`}
-        onError={(event) => { event.currentTarget.src = fallbackCharacterImage; }}
+        onError={(event) => {
+          event.currentTarget.src = fallbackCharacterImage;
+        }}
       />
     </div>
   );

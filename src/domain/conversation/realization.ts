@@ -1,6 +1,12 @@
 import type { ResponsePattern } from "../../data/schema/dialogue";
 import type { CharacterState } from "../model/character";
-import type { CompositionProposition, ConversationIntent, ConversationSession, DialogueTurn, PendingQuestion } from "../model/conversation";
+import type {
+  CompositionProposition,
+  ConversationIntent,
+  ConversationSession,
+  DialogueTurn,
+  PendingQuestion
+} from "../model/conversation";
 import type { Concept } from "../model/concept";
 import type { ConceptRelation } from "../model/relation";
 import type { RandomSource } from "../../infrastructure/random/random";
@@ -22,9 +28,11 @@ export function realizeCandidate(
   random: RandomSource,
   randomSeed = 0
 ): ConversationSession {
-  const variant = pickOne(candidate.template.variants, random) ?? candidate.template.variants[0] ?? "今日は静かですね。";
+  const variant =
+    pickOne(candidate.template.variants, random) ?? candidate.template.variants[0] ?? "今日は静かですね。";
   const rendered = realize(variant, candidate.slots);
-  if (/\{[^}]+\}/u.test(rendered)) throw new Error("未解決の会話スロットがあります: " + candidate.template.id);
+  if (/\{[^}]+\}/u.test(rendered))
+    throw new Error("未解決の会話スロットがあります: " + candidate.template.id);
   const configuredPattern = responsePatterns.find((pattern) =>
     (candidate.template.responsePatternIds ?? []).includes(pattern.id)
   );
@@ -43,7 +51,8 @@ export function realizeCandidate(
   if (!focus) throw new Error("会話に使える言葉がありません: " + candidate.template.id);
 
   const storyPages = buildNarrativePages({ candidate, proposition, rendered, random });
-  const pages = storyPages.flatMap((page) => splitJapanesePages(page)).filter(Boolean).slice(0, 5);
+  const splitPages = storyPages.flatMap((page) => splitJapanesePages(page)).filter(Boolean);
+  const pages = splitPages.length <= 6 ? splitPages : [...splitPages.slice(0, 5), splitPages.at(-1)!];
   const emotion = emotionForIntent(candidate.template.intent, character);
   const wordSurfaces = usedConcepts.map(displayConcept);
   const queuedTurns = pages.map((page, index) =>
@@ -97,7 +106,9 @@ export function realizeCandidate(
     intent: candidate.template.intent,
     locationId,
     templateIds: [candidate.template.id],
-    slotConceptIds: Object.fromEntries(Object.entries(candidate.slots).map(([key, value]) => [key, value.id])),
+    slotConceptIds: Object.fromEntries(
+      Object.entries(candidate.slots).map(([key, value]) => [key, value.id])
+    ),
     topicWordIds: proposition.wordIds,
     proposition,
     questionIntent: proposition.questionIntent,
@@ -208,6 +219,6 @@ function emotionForIntent(intent: ConversationIntent, character: CharacterState)
   if (intent === "misunderstanding") return "confused" as const;
   if (["invitation", "discovery", "outing_report"].includes(intent)) return "excited" as const;
   if (["recall_memory", "ask_preference"].includes(intent)) return "happy" as const;
-  if (intent === "quiet_moment") return character.energy < 35 ? "sleepy" as const : "calm" as const;
+  if (intent === "quiet_moment") return character.energy < 35 ? ("sleepy" as const) : ("calm" as const);
   return "curious" as const;
 }
