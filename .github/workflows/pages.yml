@@ -2,7 +2,7 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [main, rewrite/cleanroom-v1]
+    branches: [main, rewrite/cleanroom-v1, rewrite/ultra-aguri-news-language-quality]
   workflow_dispatch:
 
 permissions:
@@ -33,8 +33,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Lint and format
+        run: npm run lint && npm run format:check
+
       - name: Test
         run: npm run test
+
+      - name: Dialogue and RSS gates
+        run: npm run test:dialogue && npm run test:rss
+
+      - name: Lightweight simulations
+        run: SIMULATION_SESSIONS=500 npm run simulate:dialogue && npm run simulate:news
 
       - name: Build
         run: npm run build

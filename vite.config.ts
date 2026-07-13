@@ -3,13 +3,15 @@ import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 import { execSync } from "node:child_process";
 
-const gitSha = process.env.GITHUB_SHA ?? (() => {
-  try {
-    return execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
-  } catch {
-    return "unknown";
-  }
-})();
+const gitSha =
+  process.env.GITHUB_SHA ??
+  (() => {
+    try {
+      return execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
+    } catch {
+      return "unknown";
+    }
+  })();
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? "/Agree-to-issho/",
@@ -54,6 +56,17 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom", "zustand"],
+          "storage-vendor": ["dexie", "zod"],
+          "icons-vendor": ["lucide-react"]
+        }
+      }
+    }
+  },
   server: { host: "127.0.0.1", port: 5173 },
   test: {
     environment: "jsdom",

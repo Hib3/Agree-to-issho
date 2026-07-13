@@ -11,11 +11,16 @@ const topics = [
   ["地震", "自治体が地震の被害を確認している。"]
 ] as const;
 
-describe("100-news grounded corpus", () => {
+describe("150-news grounded corpus", () => {
   it("keeps every conversation bounded, sourced and sensitive-aware", () => {
-    const concepts = topics.map(([word], index) => createUserConcept({ surface: word, category: "abstract" }, 1_700_000_000_000, `news-word-${index}`));
-    const plans = Array.from({ length: 100 }, (_, index) => {
-      const [word, summary] = topics[index % topics.length]!;
+    const concepts = topics
+      .slice(0, 2)
+      .map(([word], index) =>
+        createUserConcept({ surface: word, category: "abstract" }, 1_700_000_000_000, `news-word-${index}`)
+      );
+    const plans = Array.from({ length: 150 }, (_, index) => {
+      const topicIndex = index < 100 ? index % 4 : 4;
+      const [word, summary] = topics[topicIndex]!;
       const item: NewsItem = {
         id: `corpus_${index}`,
         feedId: "corpus_feed",
@@ -29,27 +34,48 @@ describe("100-news grounded corpus", () => {
       const sensitive = word === "地震";
       const digest: ArticleDigest = {
         newsItemId: item.id,
-        contentLevel: index % 3 === 0 ? "headline_only" : "feed_summary",
+        contentLevel:
+          index % 3 === 0 ? "headline_only" : index % 3 === 1 ? "feed_summary" : "article_extract",
         sourceUrl: item.url,
         extractedAt: item.fetchedAt,
-        keyFacts: index % 3 === 0 ? [] : [{ id: `${item.id}_fact`, text: summary, evidenceId: `${item.id}_summary` }],
-        keySentences: [{ id: `${item.id}_headline`, text: item.title, source: "headline" }, ...(index % 3 === 0 ? [] : [{ id: `${item.id}_summary`, text: summary, source: "feed_summary" as const }])],
+        keyFacts:
+          index % 3 === 0 ? [] : [{ id: `${item.id}_fact`, text: summary, evidenceId: `${item.id}_detail` }],
+        keySentences: [
+          { id: `${item.id}_headline`, text: item.title, source: "headline" },
+          ...(index % 3 === 0
+            ? []
+            : [
+                {
+                  id: `${item.id}_detail`,
+                  text: summary,
+                  source: index % 3 === 1 ? ("feed_summary" as const) : ("article" as const)
+                }
+              ])
+        ],
         entities: [],
-        topics: [{ key: word === "駅" ? "transport" : word === "宇宙" ? "science_technology" : "general", label: `${word}の話題` }],
+        topics: [
+          {
+            key: word === "駅" ? "transport" : word === "宇宙" ? "science_technology" : "general",
+            label: `${word}の話題`
+          }
+        ],
         events: [],
         numericalFacts: [],
         uncertainties: ["記事全体の背景"],
         tone: sensitive ? "sensitive" : "neutral",
-        confidence: index % 3 === 0 ? 0.25 : 0.5
+        confidence: index % 3 === 0 ? 0.25 : index % 3 === 1 ? 0.5 : 0.78
       };
       return buildNewsConversationPlan(item, digest, concepts);
     });
-    expect(plans).toHaveLength(100);
+    expect(plans).toHaveLength(150);
+    expect(plans.filter((plan) => plan.pages.some((page) => page.text.includes("地震")))).toHaveLength(50);
     for (const plan of plans) {
       expect(plan.pages.length).toBeGreaterThanOrEqual(3);
       expect(plan.pages.length).toBeLessThanOrEqual(6);
       expect(plan.pages.every((page) => Boolean(page.source) && Boolean(page.text))).toBe(true);
-      expect(plan.pages.map((page) => page.text).join(" ")).not.toMatch(/(?:^|[。！？\s])(?:これ|それ|あれ)(?:は|が|を|に|で)/u);
+      expect(plan.pages.map((page) => page.text).join(" ")).not.toMatch(
+        /(?:^|[。！？\s])(?:これ|それ|あれ)(?:は|が|を|に|で)/u
+      );
       if (plan.pages.some((page) => page.text.includes("地震"))) {
         expect(plan.pages.every((page) => page.source !== "imagination")).toBe(true);
       }

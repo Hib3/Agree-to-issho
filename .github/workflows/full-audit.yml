@@ -1,0 +1,39 @@
+name: Full Conversation Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare audit directory
+        run: mkdir -p output/ultra-audit
+      - name: Simulate 10,000 conversations
+        run: npm run simulate:dialogue > output/ultra-audit/dialogue-metrics.json
+      - name: Simulate news corpus
+        run: npm run simulate:news > output/ultra-audit/news-metrics.json
+      - name: Generate human-review samples
+        run: npm run audit:golden
+      - run: npm run test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload complete audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-audit-${{ github.run_id }}
+          path: |
+            output/ultra-audit/
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore

@@ -20,38 +20,47 @@ async function enterRoom(page: Page) {
   await page.getByRole("button", { name: "覚えた言葉を持って部屋へ戻る" }).click();
 }
 
-async function revealAndAdvance(page: Page) {
-  const reveal = page.getByRole("button", { name: "全文を表示" });
-  if (await reveal.isVisible()) await reveal.click();
-  const next = page.getByRole("button", { name: "次へ" });
-  if (await next.isVisible()) await next.click();
-}
-
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     const state = window as typeof window & { __aguriSoundStarts?: number };
     state.__aguriSoundStarts = 0;
     class FakeAudioParam {
-      setValueAtTime() { return this; }
-      exponentialRampToValueAtTime() { return this; }
+      setValueAtTime() {
+        return this;
+      }
+      exponentialRampToValueAtTime() {
+        return this;
+      }
     }
     class FakeNode {
-      connect() { return this; }
+      connect() {
+        return this;
+      }
     }
     class FakeOscillator extends FakeNode {
       type = "sine";
       frequency = new FakeAudioParam();
-      start() { state.__aguriSoundStarts = (state.__aguriSoundStarts ?? 0) + 1; }
+      start() {
+        state.__aguriSoundStarts = (state.__aguriSoundStarts ?? 0) + 1;
+      }
       stop() {}
     }
-    class FakeGain extends FakeNode { gain = new FakeAudioParam(); }
+    class FakeGain extends FakeNode {
+      gain = new FakeAudioParam();
+    }
     class FakeAudioContext {
       state = "running";
       currentTime = 0;
       destination = {};
-      createOscillator() { return new FakeOscillator(); }
-      createGain() { return new FakeGain(); }
-      resume() { return Promise.resolve(); }
+      createOscillator() {
+        return new FakeOscillator();
+      }
+      createGain() {
+        return new FakeGain();
+      }
+      resume() {
+        return Promise.resolve();
+      }
     }
     Object.defineProperty(window, "AudioContext", { configurable: true, value: FakeAudioContext });
   });
@@ -75,34 +84,84 @@ test("settings-controlled sound and RSS news work through the player UI", async 
       body: `<?xml version="1.0"?><rss version="2.0"><channel><title>科学便り</title><item><guid>space-1</guid><title>宇宙観測の新しい結果</title><link>https://news.example.test/articles/space-1</link><pubDate>Mon, 13 Jul 2026 09:00:00 GMT</pubDate><description>研究チームが観測結果を公開した。</description></item></channel></rss>`
     });
   });
+  await page.route("https://news.example.test/articles/space-1", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<article><p>研究チームは新しい望遠鏡で宇宙観測を行い、その結果を公開しました。</p><p>観測は三か月続き、複数の地点から得た記録を比較しました。</p></article>`
+    });
+  });
   await enterRoom(page);
 
   await page.getByRole("button", { name: "設定" }).click();
   const preview = page.getByRole("button", { name: "音を試す" });
   await expect(preview).toBeEnabled();
   await preview.click();
-  await expect.poll(() => page.evaluate(() => (window as typeof window & { __aguriSoundStarts?: number }).__aguriSoundStarts ?? 0)).toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as typeof window & { __aguriSoundStarts?: number }).__aguriSoundStarts ?? 0)
+    )
+    .toBeGreaterThan(0);
   const mute = page.getByRole("checkbox", { name: "ミュート" });
   await mute.check();
   await expect(preview).toBeDisabled();
   await mute.uncheck();
 
-  await page.getByRole("checkbox", { name: "直接読めないRSSの取得補助を使う" }).check();
+  await page.getByRole("checkbox", { name: "サイトからRSSを探す補助を使う" }).check();
   await page.getByRole("textbox", { name: "サイトまたはRSSのURL" }).fill("https://science.example.test/");
   await page.getByRole("button", { name: "探して追加" }).click();
+  await expect(page.getByRole("status")).toContainText("RSS候補を1件");
+  await page.getByRole("button", { name: "このRSSを追加" }).click();
   await expect(page.getByRole("status")).toContainText("新しいニュースを1件保存しました");
   await page.getByRole("button", { name: "部屋へ戻る" }).click();
 
   await page.getByRole("button", { name: /^ニュース/u }).click();
   await expect(page.getByText("宇宙観測の新しい結果", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "アグリに話してもらう" }).click();
-  await revealAndAdvance(page);
-  await revealAndAdvance(page);
-  const reveal = page.getByRole("button", { name: "全文を表示" });
-  if (await reveal.isVisible()) await reveal.click();
-  await expect(page.getByText(/背景や真偽までは決められません/u)).toBeVisible();
-  await expect(page.getByRole("link", { name: "元の記事を開く" })).toHaveAttribute("href", "https://news.example.test/articles/space-1");
+  await expect(page.getByRole("status")).toContainText("取得できた記事本文の一部まで");
+  await expect(page.getByRole("link", { name: "元の記事を開く" })).toHaveAttribute(
+    "href",
+    "https://news.example.test/articles/space-1"
+  );
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("multiple RSS candidates stay selectable until the player chooses one", async ({ page }) => {
+  await page.route("https://multi.example.test/", async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<link rel="alternate" type="application/rss+xml" href="/main.xml"><link rel="alternate" type="application/atom+xml" href="/comments.xml">`
+    })
+  );
+  await page.route("https://multi.example.test/main.xml", async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/rss+xml",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<?xml version="1.0"?><rss version="2.0"><channel><title>全体通信</title><item><title>町の更新</title><link>https://multi.example.test/article</link></item></channel></rss>`
+    })
+  );
+  await page.route("https://multi.example.test/comments.xml", async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/atom+xml",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>コメント通信</title><entry><title>返信</title><link href="https://multi.example.test/reply"/></entry></feed>`
+    })
+  );
+  await enterRoom(page);
+  await page.getByRole("button", { name: "設定" }).click();
+  await page.getByRole("textbox", { name: "サイトまたはRSSのURL" }).fill("https://multi.example.test/");
+  await page.getByRole("button", { name: "探して追加" }).click();
+  await expect(page.getByRole("button", { name: "このRSSを追加" })).toHaveCount(2);
+  const mainCandidate = page.locator(".rss-candidate-list li").filter({ hasText: "全体通信" });
+  await mainCandidate.getByRole("button", { name: "このRSSを追加" }).click();
+  await expect(page.getByRole("status")).toContainText("新しいニュースを1件保存しました");
+  await expect(page.getByText("全体通信", { exact: true })).toBeVisible();
+  await expect(page.getByText("コメント通信", { exact: true })).toHaveCount(0);
 });
 
 test("character remains bright, layered correctly, and large while teaching", async ({ page }) => {
@@ -114,9 +173,14 @@ test("character remains bright, layered correctly, and large while teaching", as
   const lighting = await character.evaluate((element) => ({
     filter: getComputedStyle(element).filter,
     zIndex: Number(getComputedStyle(element).zIndex),
-    overlayZIndex: Number(getComputedStyle(element.parentElement?.querySelector(".scene-light") as Element).zIndex)
+    overlayZIndex: Number(
+      getComputedStyle(element.parentElement?.querySelector(".scene-light") as Element).zIndex
+    )
   }));
-  const brightness = Number(lighting.filter.match(/brightness\(([^)]+)\)/u)?.[1] ?? 0);
+  const brightness =
+    lighting.filter === "none"
+      ? 1
+      : Number(lighting.filter.match(/brightness\(([^)]+)\)/u)?.[1] ?? 0);
   expect(brightness).toBeGreaterThanOrEqual(1);
   expect(lighting.zIndex).toBeGreaterThan(lighting.overlayZIndex);
   const stageBox = await stage.boundingBox();

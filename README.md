@@ -13,7 +13,7 @@
 - 人物の呼び方・関係や、物の用途・目的などを会話用の型付き記憶として保持
 - 文法役割とカテゴリが一致するスロットだけへ言葉を配置
 - 型付き記憶を導入・展開・転換・オチからなる小話へ反映
-- 5種の進行、8種の転換、10種のオチを組み合わせた400通りの小話構成
+- 5拍のNarrativePlanと11種のオチ機構を400通りの小話構成へ割り当て
 - 未確認の組合せは事実として断定せず、仮定または想像として発話
 - 回答で言葉同士の関係を強化、訂正、保留
 - 使用回数と直近会話による連続使用の抑制
@@ -59,13 +59,18 @@ npm run dev
 
 ```powershell
 npm run lint
+npm run format:check
 npm run typecheck
 npm run validate:data
 npm run verify:cleanroom
 npm run verify:pwa
 npm run test:dialogue
+npm run test:rss
+npm run test:news
 npm run test
 npm run simulate:dialogue
+npm run simulate:news
+npm run audit:golden
 npm run build
 npm run test:e2e
 ```
@@ -83,12 +88,16 @@ npm run test:e2e
 
 設定の「ニュース機能を使う」を有効にして、公開HTTPSのサイトURLまたはRSS URLを登録します。更新間隔は15分、30分、1時間、3時間から選べ、アプリを開いている間とオンラインへ戻った時に確認します。アプリを閉じている間のバックグラウンド更新は行いません。
 
-- サイトURLではHTMLのフィード情報を確認し、必要な場合だけFeedsearchでRSSを探します。
+- サイトURLではHTMLのフィード情報を確認し、許可された場合だけFeedsearchでRSSを探します。
+- 複数の候補が見つかった場合は、形式・検証結果・最新記事例を見てユーザーが選択します。先頭候補の自動登録はしません。
 - RSSはまずブラウザから直接取得します。
 - 配信元のCORS設定により直接取得できない場合があります。
-- 任意の「取得補助」を有効にした場合だけ、サイトURLを `feedsearch.dev`、RSS URLを `rss2json.com` または `r.jina.ai` へ送信します。
+- 「RSS探索補助」「RSS取得補助」「記事本文取得補助」は別々の同意です。
+- 許可した機能だけが、サイトURLを `feedsearch.dev`、RSS URLを `rss2json.com` / `r.jina.ai`、記事URLを `r.jina.ai` へ送信します。
 - `rss2json.com` が変換できないRSSはReaderを第2補助として試します。各外部サービスの停止・制限中は取得できません。
-- アグリちゃんは見出しとRSS内の短い説明だけを扱い、背景や真偽を知っているとは発言しません。
+- RSS更新時は見出しと短い配信情報だけを保存します。記事本文は「アグリに話してもらう」を押した時だけ直接取得し、全文を保存しません。
+- 会話には確認範囲を表示し、見出し、RSS、記事本文、記憶、アグリの整理・感想・想像、不明点を別の根拠として扱います。
+- センシティブなニュースでは明るいオチや空想を停止します。
 - ニュース更新には通信が必要です。保存済みの見出しはオフラインでも確認できます。
 - ニュースキャッシュは端末内データであり、JSONバックアップには含めません。
 
@@ -101,7 +110,7 @@ $env:VITE_BASE_PATH="/Agree-to-issho/"
 npm run build
 ```
 
-`main` または `rewrite/cleanroom-v1` へのpushで `.github/workflows/pages.yml` が型検査、テスト、ビルドを実行し、GitHub Pagesへ配信します。アプリ内ルーティングはURLを変更しないため、再読込で個別パスの404は発生しません。
+配備対象ブランチへのpushで `.github/workflows/pages.yml` が品質ゲートとビルドを実行し、GitHub Pagesへ配信します。PR/pushの全ゲートは `quality.yml`、1万会話とゴールデン資料の完全監査は手動の `full-audit.yml` です。アプリ内ルーティングはURLを変更しないため、再読込で個別パスの404は発生しません。
 
 オフライン確認:
 
