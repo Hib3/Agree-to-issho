@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:dialogue": "vitest run src/tests/semanticComposition.test.ts src/tests/conversationQuality.test.ts src/tests/aguriVoice.test.ts src/tests/narrativeConversation.test.ts src/tests/learningAttributes.test.ts src/tests/storyArcGenerator.test.ts src/tests/newsExplanation.test.ts src/tests/slotResolver.test.ts",
     "test:rss": "vitest run src/tests/rssParser.test.ts src/tests/newsService.test.ts src/tests/articleDigestService.test.ts",
+    "test:rss:live": "tsx scripts/check-live-rss-browser.ts",
     "test:news": "vitest run src/tests/newsExplanation.test.ts src/tests/newsCorpus.test.ts src/tests/articleDigestService.test.ts",
     "simulate:dialogue": "tsx scripts/simulate-dialogue.ts",
     "simulate:news": "tsx scripts/simulate-news.ts",
