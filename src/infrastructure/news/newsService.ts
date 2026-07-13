@@ -6,7 +6,13 @@ import type {
   NewsRefreshReport
 } from "../../domain/model/news";
 import type { GameSettings } from "../../domain/model/player";
-import { normalizeNewsUrl, parseReaderMarkdown, parseRss2Json, parseRssXml, type ParsedFeed } from "../../domain/news/rssParser";
+import {
+  normalizeNewsUrl,
+  parseReaderMarkdown,
+  parseRss2Json,
+  parseRssXml,
+  type ParsedFeed
+} from "../../domain/news/rssParser";
 import { db } from "../db/database";
 
 const FETCH_TIMEOUT_MS = 12_000;
@@ -49,7 +55,15 @@ export function createNewsFeed(urlText: string, now = Date.now(), name?: string)
 }
 
 export function createNewsFeedFromCandidate(candidate: NewsFeedCandidate, now = Date.now()) {
-  if (candidate.validation === "invalid") throw serviceError("parse", "discovery", "direct", "この候補はRSSとして確認できませんでした。", candidate.validationDetail ?? "invalid candidate", false);
+  if (candidate.validation !== "valid")
+    throw serviceError(
+      "parse",
+      "discovery",
+      "direct",
+      "この候補はRSSとして確認できませんでした。",
+      candidate.validationDetail ?? "invalid candidate",
+      false
+    );
   return createNewsFeed(candidate.canonicalUrl, now, candidate.title);
 }
 
@@ -68,12 +82,22 @@ export async function discoverNewsFeeds(
     const response = await fetchBoundedText(input.href, DISCOVERY_ACCEPT, consent.signal);
     directFetch = { status: "success", finalUrl: response.finalUrl, contentType: response.contentType };
     try {
-      const parsed = parseRssXml(response.text, `discovery_${hashText(response.finalUrl)}`, response.finalUrl, now);
+      const parsed = parseRssXml(
+        response.text,
+        `discovery_${hashText(response.finalUrl)}`,
+        response.finalUrl,
+        now
+      );
       directCandidates = [candidateFromParsed(response.finalUrl, input.href, parsed, "direct", 100)];
     } catch (error) {
       const links = extractFeedLinks(response.text, response.finalUrl).slice(0, MAX_DISCOVERY_CANDIDATES);
       directCandidates = await validateCandidates(
-        links.map((url, index) => ({ url, title: "", discoveredBy: "html_alternate" as const, score: 90 - index })),
+        links.map((url, index) => ({
+          url,
+          title: "",
+          discoveredBy: "html_alternate" as const,
+          score: 90 - index
+        })),
         input.href,
         consent,
         now
@@ -87,16 +111,32 @@ export async function discoverNewsFeeds(
       detail: directError.detail.userMessage
     };
     if (looksLikeFeedUrl(input)) {
-      directCandidates = [unverifiedCandidate(input.href, input.href, "direct", 70, directError.detail.userMessage)];
+      directCandidates = consent.useFeedFetchHelper
+        ? await validateCandidates(
+            [{ url: input.href, title: "", discoveredBy: "direct", score: 70 }],
+            input.href,
+            consent,
+            now
+          )
+        : [unverifiedCandidate(input.href, input.href, "direct", 70, directError.detail.userMessage)];
     }
   }
 
   let helperCandidates: NewsFeedCandidate[] = [];
   let usedExternalHelper = false;
-  if (consent.useDiscoveryHelper && inputKind !== "feed" && directCandidates.every((candidate) => candidate.validation !== "valid")) {
+  if (
+    consent.useDiscoveryHelper &&
+    inputKind !== "feed" &&
+    directCandidates.every((candidate) => candidate.validation !== "valid")
+  ) {
     usedExternalHelper = true;
     const raw = await discoverWithFeedsearch(input.href, consent.signal);
-    helperCandidates = await validateCandidates(raw.slice(0, MAX_DISCOVERY_CANDIDATES), input.href, consent, now);
+    helperCandidates = await validateCandidates(
+      raw.slice(0, MAX_DISCOVERY_CANDIDATES),
+      input.href,
+      consent,
+      now
+    );
   }
 
   const candidates = dedupeCandidates([...directCandidates, ...helperCandidates])
@@ -104,13 +144,31 @@ export async function discoverNewsFeeds(
     .slice(0, MAX_DISCOVERY_CANDIDATES);
   if (candidates.length === 0) {
     if (!consent.useDiscoveryHelper && directError?.detail.code === "cors" && !looksLikeFeedUrl(input)) {
-      throw serviceError("cors", "discovery", "direct", "サイトを直接確認できませんでした。RSS探索補助を許可すると探せる場合があります。", directError.detail.debugMessage, true);
+      throw serviceError(
+        "cors",
+        "discovery",
+        "direct",
+        "サイトを直接確認できませんでした。RSS探索補助を許可すると探せる場合があります。",
+        directError.detail.debugMessage,
+        true
+      );
     }
-    throw serviceError("parse", "discovery", "direct", "このURLからRSSを見つけられませんでした。", directError?.detail.debugMessage ?? "no candidates", false);
+    throw serviceError(
+      "parse",
+      "discovery",
+      "direct",
+      "このURLからRSSを見つけられませんでした。",
+      directError?.detail.debugMessage ?? "no candidates",
+      false
+    );
   }
   return {
     inputUrl: input.href,
-    inputKind: inputKind === "unknown" && directCandidates.some((candidate) => candidate.discoveredBy === "html_alternate") ? "site" : inputKind,
+    inputKind:
+      inputKind === "unknown" &&
+      directCandidates.some((candidate) => candidate.discoveredBy === "html_alternate")
+        ? "site"
+        : inputKind,
     directFetch,
     candidates,
     usedExternalHelper,
@@ -119,12 +177,20 @@ export async function discoverNewsFeeds(
 }
 
 // Backward-compatible helper for callers that can only accept one feed.
-export async function discoverNewsFeed(urlText: string, useHelper: boolean, now = Date.now()): Promise<NewsFeedConfig> {
-  const result = await discoverNewsFeeds(urlText, {
-    useDiscoveryHelper: useHelper,
-    useFeedFetchHelper: useHelper
-  }, now);
-  const candidate = result.candidates.find((item) => item.validation === "valid") ?? result.candidates[0];
+export async function discoverNewsFeed(
+  urlText: string,
+  useHelper: boolean,
+  now = Date.now()
+): Promise<NewsFeedConfig> {
+  const result = await discoverNewsFeeds(
+    urlText,
+    {
+      useDiscoveryHelper: useHelper,
+      useFeedFetchHelper: useHelper
+    },
+    now
+  );
+  const candidate = result.candidates.find((item) => item.validation === "valid");
   if (!candidate) throw new Error("このURLからRSSを見つけられませんでした。");
   return createNewsFeedFromCandidate(candidate, now);
 }
@@ -135,15 +201,40 @@ export function shouldRefreshNews(settings: GameSettings, now = Date.now()) {
   return settings.newsFeeds.some((feed) => feed.enabled && now - (feed.lastCheckedAt ?? 0) >= interval);
 }
 
-export async function refreshNews(
+let backgroundRefresh: Promise<NewsRefreshReport> | null = null;
+
+export function refreshNews(
   settings: GameSettings,
   now = Date.now(),
   force = false,
   signal?: AbortSignal
 ): Promise<NewsRefreshReport> {
-  const report: NewsRefreshReport = { checkedFeeds: 0, successfulFeeds: 0, addedItems: 0, errors: [], errorDetails: [] };
+  if (!force && !signal) {
+    backgroundRefresh ??= refreshNewsInternal(settings, now, false).finally(() => {
+      backgroundRefresh = null;
+    });
+    return backgroundRefresh;
+  }
+  return refreshNewsInternal(settings, now, force, signal);
+}
+
+async function refreshNewsInternal(
+  settings: GameSettings,
+  now: number,
+  force: boolean,
+  signal?: AbortSignal
+): Promise<NewsRefreshReport> {
+  const report: NewsRefreshReport = {
+    checkedFeeds: 0,
+    successfulFeeds: 0,
+    addedItems: 0,
+    errors: [],
+    errorDetails: []
+  };
   const interval = settings.newsRefreshMinutes * 60_000;
-  const feeds = settings.newsFeeds.filter((feed) => feed.enabled && (force || now - (feed.lastCheckedAt ?? 0) >= interval));
+  const feeds = settings.newsFeeds.filter(
+    (feed) => feed.enabled && (force || now - (feed.lastCheckedAt ?? 0) >= interval)
+  );
   for (const feed of feeds) {
     if (signal?.aborted) break;
     report.checkedFeeds += 1;
@@ -185,7 +276,12 @@ async function saveRefreshSuccess(feed: NewsFeedConfig, parsed: ParsedFeed, now:
   return db.transaction("rw", db.settings, db.newsItems, async () => {
     const latest = await db.settings.get("local");
     const current = latest?.newsFeeds.find((item) => item.id === feed.id);
-    if (!latest || !current || !current.enabled || normalizeNewsUrl(current.url) !== normalizeNewsUrl(feed.url)) {
+    if (
+      !latest ||
+      !current ||
+      !current.enabled ||
+      normalizeNewsUrl(current.url) !== normalizeNewsUrl(feed.url)
+    ) {
       return { saved: false, addedItems: 0 };
     }
     const existing = await db.newsItems.bulkGet(parsed.items.map((item) => item.id));
@@ -197,9 +293,11 @@ async function saveRefreshSuccess(feed: NewsFeedConfig, parsed: ParsedFeed, now:
     await db.newsItems.bulkPut(merged);
     await db.settings.put({
       ...latest,
-      newsFeeds: latest.newsFeeds.map((item) => item.id === feed.id
-        ? withoutLastError({ ...item, name: parsed.title, lastCheckedAt: now, lastSuccessAt: now })
-        : item),
+      newsFeeds: latest.newsFeeds.map((item) =>
+        item.id === feed.id
+          ? withoutLastError({ ...item, name: parsed.title, lastCheckedAt: now, lastSuccessAt: now })
+          : item
+      ),
       updatedAt: now
     });
     return { saved: true, addedItems };
@@ -212,7 +310,9 @@ async function saveRefreshError(feed: NewsFeedConfig, message: string, now: numb
     if (!latest || !latest.newsFeeds.some((item) => item.id === feed.id)) return;
     await db.settings.put({
       ...latest,
-      newsFeeds: latest.newsFeeds.map((item) => item.id === feed.id ? { ...item, lastCheckedAt: now, lastError: message } : item),
+      newsFeeds: latest.newsFeeds.map((item) =>
+        item.id === feed.id ? { ...item, lastCheckedAt: now, lastError: message } : item
+      ),
       updatedAt: now
     });
   });
@@ -250,7 +350,12 @@ async function fetchFeed(feed: NewsFeedConfig, useHelper: boolean, now: number, 
 }
 
 async function validateCandidates(
-  records: Array<{ url: string; title: string; discoveredBy: NewsFeedCandidate["discoveredBy"]; score: number }>,
+  records: Array<{
+    url: string;
+    title: string;
+    discoveredBy: NewsFeedCandidate["discoveredBy"];
+    score: number;
+  }>,
   inputUrl: string,
   consent: DiscoveryConsent,
   now: number
@@ -300,15 +405,14 @@ async function discoverWithFeedsearch(siteUrl: string, signal?: AbortSignal) {
   try {
     const response = await fetchBoundedText(endpoint, "application/json", signal);
     const data: unknown = JSON.parse(response.text);
-    const candidates = feedsearchCandidates(data)
-      .filter((candidate) => {
-        try {
-          publicFeedUrl(candidate.url);
-          return true;
-        } catch {
-          return false;
-        }
-      });
+    const candidates = feedsearchCandidates(data).filter((candidate) => {
+      try {
+        publicFeedUrl(candidate.url);
+        return true;
+      } catch {
+        return false;
+      }
+    });
     if (candidates.length === 0) throw new Error("no candidates");
     return candidates;
   } catch (error) {
@@ -324,19 +428,29 @@ export function extractFeedLinks(html: string, baseUrl: string) {
     'a[type="application/rss+xml"]',
     'a[type="application/atom+xml"]'
   ];
-  const links = selectors.flatMap((selector) => Array.from(document.querySelectorAll<HTMLLinkElement | HTMLAnchorElement>(selector)));
-  return [...new Set(links.flatMap((link) => {
-    const href = link.getAttribute("href");
-    if (!href) return [];
-    try {
-      return [normalizeNewsUrl(publicFeedUrl(new URL(href, baseUrl).href).href)];
-    } catch {
-      return [];
-    }
-  }))];
+  const links = selectors.flatMap((selector) =>
+    Array.from(document.querySelectorAll<HTMLLinkElement | HTMLAnchorElement>(selector))
+  );
+  return [
+    ...new Set(
+      links.flatMap((link) => {
+        const href = link.getAttribute("href");
+        if (!href) return [];
+        try {
+          return [normalizeNewsUrl(publicFeedUrl(new URL(href, baseUrl).href).href)];
+        } catch {
+          return [];
+        }
+      })
+    )
+  ];
 }
 
-async function fetchBoundedText(url: string, accept: string, parentSignal?: AbortSignal): Promise<FetchResult> {
+async function fetchBoundedText(
+  url: string,
+  accept: string,
+  parentSignal?: AbortSignal
+): Promise<FetchResult> {
   const controller = new AbortController();
   const onParentAbort = () => controller.abort(parentSignal?.reason);
   parentSignal?.addEventListener("abort", onParentAbort, { once: true });
@@ -350,7 +464,15 @@ async function fetchBoundedText(url: string, accept: string, parentSignal?: Abor
       headers: { Accept: accept }
     });
     if (!response.ok) {
-      throw serviceError("http", "feed_fetch", "direct", httpUserMessage(response.status), `HTTP ${response.status} ${response.statusText}`.trim(), retryableStatus(response.status), response.status);
+      throw serviceError(
+        "http",
+        "feed_fetch",
+        "direct",
+        httpUserMessage(response.status),
+        `HTTP ${response.status} ${response.statusText}`.trim(),
+        retryableStatus(response.status),
+        response.status
+      );
     }
     const text = await readLimitedBody(response, controller);
     return {
@@ -361,10 +483,33 @@ async function fetchBoundedText(url: string, accept: string, parentSignal?: Abor
   } catch (error) {
     if (error instanceof NewsServiceError) throw error;
     if (controller.signal.aborted) {
-      if (parentSignal?.aborted) throw serviceError("aborted", "feed_fetch", "direct", "更新を中止しました。", "parent signal aborted", false);
-      throw serviceError("timeout", "feed_fetch", "direct", "時間内に応答がありませんでした。", "request or body timeout", true);
+      if (parentSignal?.aborted)
+        throw serviceError(
+          "aborted",
+          "feed_fetch",
+          "direct",
+          "更新を中止しました。",
+          "parent signal aborted",
+          false
+        );
+      throw serviceError(
+        "timeout",
+        "feed_fetch",
+        "direct",
+        "時間内に応答がありませんでした。",
+        "request or body timeout",
+        true
+      );
     }
-    if (error instanceof TypeError) throw serviceError("cors", "feed_fetch", "direct", "ブラウザから直接取得できませんでした。", error.message, true);
+    if (error instanceof TypeError)
+      throw serviceError(
+        "cors",
+        "feed_fetch",
+        "direct",
+        "ブラウザから直接取得できませんでした。",
+        error.message,
+        true
+      );
     throw asNewsError(error, "feed_fetch", "direct");
   } finally {
     globalThis.clearTimeout(timer);
@@ -374,10 +519,26 @@ async function fetchBoundedText(url: string, accept: string, parentSignal?: Abor
 
 async function readLimitedBody(response: Response, controller: AbortController) {
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_FEED_BYTES) throw serviceError("size", "feed_fetch", "direct", "RSSが大きすぎるため読み込みませんでした。", `content-length=${declaredLength}`, false);
+  if (declaredLength > MAX_FEED_BYTES)
+    throw serviceError(
+      "size",
+      "feed_fetch",
+      "direct",
+      "RSSが大きすぎるため読み込みませんでした。",
+      `content-length=${declaredLength}`,
+      false
+    );
   if (!response.body) {
     const text = await response.text();
-    if (new Blob([text]).size > MAX_FEED_BYTES) throw serviceError("size", "feed_fetch", "direct", "RSSが大きすぎるため読み込みませんでした。", "body exceeded limit", false);
+    if (new Blob([text]).size > MAX_FEED_BYTES)
+      throw serviceError(
+        "size",
+        "feed_fetch",
+        "direct",
+        "RSSが大きすぎるため読み込みませんでした。",
+        "body exceeded limit",
+        false
+      );
     return text;
   }
   const reader = response.body.getReader();
@@ -390,14 +551,27 @@ async function readLimitedBody(response: Response, controller: AbortController) 
     bytes += value.byteLength;
     if (bytes > MAX_FEED_BYTES) {
       controller.abort("size");
-      throw serviceError("size", "feed_fetch", "direct", "RSSが大きすぎるため読み込みませんでした。", `stream bytes>${MAX_FEED_BYTES}`, false);
+      throw serviceError(
+        "size",
+        "feed_fetch",
+        "direct",
+        "RSSが大きすぎるため読み込みませんでした。",
+        `stream bytes>${MAX_FEED_BYTES}`,
+        false
+      );
     }
     text += decoder.decode(value, { stream: true });
   }
   return text + decoder.decode();
 }
 
-function candidateFromParsed(url: string, inputUrl: string, parsed: ParsedFeed, discoveredBy: NewsFeedCandidate["discoveredBy"], score: number): NewsFeedCandidate {
+function candidateFromParsed(
+  url: string,
+  inputUrl: string,
+  parsed: ParsedFeed,
+  discoveredBy: NewsFeedCandidate["discoveredBy"],
+  score: number
+): NewsFeedCandidate {
   const canonicalUrl = normalizeNewsUrl(url);
   return {
     url: canonicalUrl,
@@ -412,7 +586,13 @@ function candidateFromParsed(url: string, inputUrl: string, parsed: ParsedFeed, 
   };
 }
 
-function unverifiedCandidate(url: string, inputUrl: string, discoveredBy: NewsFeedCandidate["discoveredBy"], score: number, detail: string): NewsFeedCandidate {
+function unverifiedCandidate(
+  url: string,
+  inputUrl: string,
+  discoveredBy: NewsFeedCandidate["discoveredBy"],
+  score: number,
+  detail: string
+): NewsFeedCandidate {
   const canonicalUrl = normalizeNewsUrl(url);
   return {
     url: canonicalUrl,
@@ -437,9 +617,11 @@ function dedupeCandidates(candidates: NewsFeedCandidate[]) {
 
 function compareCandidates(left: NewsFeedCandidate, right: NewsFeedCandidate) {
   const validationRank = { valid: 2, unverified: 1, invalid: 0 };
-  return validationRank[right.validation] - validationRank[left.validation]
-    || Number(right.sameHost) - Number(left.sameHost)
-    || right.score - left.score;
+  return (
+    validationRank[right.validation] - validationRank[left.validation] ||
+    Number(right.sameHost) - Number(left.sameHost) ||
+    right.score - left.score
+  );
 }
 
 function candidateScore(base: number, url: string, title: string, inputUrl: string) {
@@ -460,17 +642,21 @@ function feedsearchCandidates(data: unknown) {
     if (!record || typeof record !== "object") return [];
     const candidate = record as { url?: unknown; title?: unknown; score?: unknown };
     if (typeof candidate.url !== "string") return [];
-    return [{
-      url: candidate.url,
-      title: typeof candidate.title === "string" ? candidate.title.slice(0, 80) : "",
-      discoveredBy: "feedsearch" as const,
-      score: typeof candidate.score === "number" ? candidate.score : 0
-    }];
+    return [
+      {
+        url: candidate.url,
+        title: typeof candidate.title === "string" ? candidate.title.slice(0, 80) : "",
+        discoveredBy: "feedsearch" as const,
+        score: typeof candidate.score === "number" ? candidate.score : 0
+      }
+    ];
   });
 }
 
 function looksLikeFeedUrl(url: URL) {
-  return /(?:\.(?:xml|rss|atom)(?:$|[?#])|\/(?:rss(?:_?2(?:\.0)?)?|atom|feed)(?:\/|$)|[?&]feed=(?:rss|rss2|atom))/iu.test(url.href);
+  return /(?:\.(?:xml|rss|atom)(?:$|[?#])|\/(?:rss(?:_?2(?:\.0)?)?|atom|feed)(?:\/|$)|[?&]feed=(?:rss|rss2|atom))/iu.test(
+    url.href
+  );
 }
 
 function sameHost(left: string, right: string) {
@@ -486,10 +672,24 @@ function publicFeedUrl(value: string) {
   try {
     url = new URL(value.trim());
   } catch {
-    throw serviceError("invalid_url", "discovery", "direct", "https:// で始まるRSS URLを入力してください。", `invalid URL: ${value}`, false);
+    throw serviceError(
+      "invalid_url",
+      "discovery",
+      "direct",
+      "https:// で始まるRSS URLを入力してください。",
+      `invalid URL: ${value}`,
+      false
+    );
   }
   if (url.protocol !== "https:" || url.username || url.password) {
-    throw serviceError("invalid_url", "discovery", "direct", "公開されたHTTPSのRSS URLだけ登録できます。", `rejected protocol or credentials: ${url.href}`, false);
+    throw serviceError(
+      "invalid_url",
+      "discovery",
+      "direct",
+      "公開されたHTTPSのRSS URLだけ登録できます。",
+      `rejected protocol or credentials: ${url.href}`,
+      false
+    );
   }
   const host = url.hostname.toLowerCase();
   if (
@@ -499,7 +699,14 @@ function publicFeedUrl(value: string) {
     host === "[::1]" ||
     /^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/u.test(host)
   ) {
-    throw serviceError("invalid_url", "discovery", "direct", "端末内や家庭内ネットワークのURLは登録できません。", `private host: ${host}`, false);
+    throw serviceError(
+      "invalid_url",
+      "discovery",
+      "direct",
+      "端末内や家庭内ネットワークのURLは登録できません。",
+      `private host: ${host}`,
+      false
+    );
   }
   url.hash = "";
   return url;
@@ -514,7 +721,15 @@ function serviceError(
   retryable: boolean,
   status?: number
 ) {
-  return new NewsServiceError({ code, stage, provider, ...(status ? { status } : {}), retryable, userMessage, debugMessage });
+  return new NewsServiceError({
+    code,
+    stage,
+    provider,
+    ...(status ? { status } : {}),
+    retryable,
+    userMessage,
+    debugMessage
+  });
 }
 
 function asNewsError(error: unknown, stage: NewsErrorDetail["stage"], provider: NewsErrorDetail["provider"]) {
@@ -522,10 +737,34 @@ function asNewsError(error: unknown, stage: NewsErrorDetail["stage"], provider: 
     if (error.detail.stage === stage && error.detail.provider === provider) return error;
     return new NewsServiceError({ ...error.detail, stage, provider });
   }
-  if (error instanceof DOMException && error.name === "AbortError") return serviceError("aborted", stage, provider, "更新を中止しました。", error.message, false);
-  if (error instanceof TypeError) return serviceError("cors", stage, provider, "ブラウザから直接取得できませんでした。", error.message, true);
-  if (error instanceof SyntaxError) return serviceError("parse", stage, provider, "取得したデータの形式を読み取れませんでした。", error.message, false);
-  return serviceError("parse", stage, provider, error instanceof Error ? error.message : "RSSを読み取れませんでした。", debugError(error), false);
+  if (error instanceof DOMException && error.name === "AbortError")
+    return serviceError("aborted", stage, provider, "更新を中止しました。", error.message, false);
+  if (error instanceof TypeError)
+    return serviceError(
+      "cors",
+      stage,
+      provider,
+      "ブラウザから直接取得できませんでした。",
+      error.message,
+      true
+    );
+  if (error instanceof SyntaxError)
+    return serviceError(
+      "parse",
+      stage,
+      provider,
+      "取得したデータの形式を読み取れませんでした。",
+      error.message,
+      false
+    );
+  return serviceError(
+    "parse",
+    stage,
+    provider,
+    error instanceof Error ? error.message : "RSSを読み取れませんでした。",
+    debugError(error),
+    false
+  );
 }
 
 function discoveryStatus(detail: NewsErrorDetail): "cors_error" | "http_error" | "timeout" | "parse_error" {
@@ -555,7 +794,11 @@ function withoutLastError(feed: NewsFeedConfig) {
 }
 
 function debugError(error: unknown) {
-  return error instanceof NewsServiceError ? error.detail.debugMessage : error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return error instanceof NewsServiceError
+    ? error.detail.debugMessage
+    : error instanceof Error
+      ? `${error.name}: ${error.message}`
+      : String(error);
 }
 
 function hashText(value: string) {

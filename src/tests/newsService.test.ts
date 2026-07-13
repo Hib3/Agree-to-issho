@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultSettings } from "../domain/settings/gameSettings";
 import { db } from "../infrastructure/db/database";
-import { createNewsFeed, discoverNewsFeed, discoverNewsFeeds, extractFeedLinks, refreshNews, removeNewsFeed } from "../infrastructure/news/newsService";
+import {
+  createNewsFeed,
+  discoverNewsFeed,
+  discoverNewsFeeds,
+  extractFeedLinks,
+  refreshNews,
+  removeNewsFeed
+} from "../infrastructure/news/newsService";
 
 const now = 1_700_000_000_000;
 
@@ -36,11 +43,24 @@ describe("news refresh service", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockRejectedValueOnce(new TypeError("CORS"))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        status: "ok",
-        feed: { title: "町の通信" },
-        items: [{ guid: "one", title: "駅前の更新", link: "https://news.example.test/one", description: "短い説明。", pubDate: "2026-07-13 09:00:00" }]
-      }), { status: 200, headers: { "content-type": "application/json" } }));
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: "ok",
+            feed: { title: "町の通信" },
+            items: [
+              {
+                guid: "one",
+                title: "駅前の更新",
+                link: "https://news.example.test/one",
+                description: "短い説明。",
+                pubDate: "2026-07-13 09:00:00"
+              }
+            ]
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const report = await refreshNews(settings, now + 1, true);
@@ -51,32 +71,61 @@ describe("news refresh service", () => {
   });
 
   it("accepts a directly readable RSS document", async () => {
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(
-      `<?xml version="1.0"?><rss version="2.0"><channel><title>直接読める通信</title><item><guid>one</guid><title>更新</title><link>https://example.com/one</link></item></channel></rss>`,
-      { status: 200, headers: { "content-type": "application/rss+xml" } }
-    )));
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          new Response(
+            `<?xml version="1.0"?><rss version="2.0"><channel><title>直接読める通信</title><item><guid>one</guid><title>更新</title><link>https://example.com/one</link></item></channel></rss>`,
+            { status: 200, headers: { "content-type": "application/rss+xml" } }
+          )
+        )
+    );
 
     const feed = await discoverNewsFeed("https://example.com/news.xml", false, now);
     expect(feed).toMatchObject({ url: "https://example.com/news.xml", name: "直接読める通信" });
   });
 
   it("discovers an RSS URL from an HTML alternate link", async () => {
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(
-      `<html><head><link rel="alternate" type="application/rss+xml" href="/feed.xml"></head></html>`,
-      { status: 200, headers: { "content-type": "text/html" } }
-    )));
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          new Response(
+            `<html><head><link rel="alternate" type="application/rss+xml" href="/feed.xml"></head></html>`,
+            { status: 200, headers: { "content-type": "text/html" } }
+          )
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            `<?xml version="1.0"?><rss version="2.0"><channel><title>確認済み通信</title><item><title>記事</title><link>https://example.com/article</link></item></channel></rss>`,
+            { status: 200, headers: { "content-type": "application/rss+xml" } }
+          )
+        )
+    );
 
     const feed = await discoverNewsFeed("https://example.com/articles", false, now);
     expect(feed.url).toBe("https://example.com/feed.xml");
   });
 
   it("uses Feedsearch for site discovery only when the helper is enabled", async () => {
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi
+      .fn<typeof fetch>()
       .mockRejectedValueOnce(new TypeError("CORS"))
-      .mockResolvedValueOnce(new Response(JSON.stringify([
-        { url: "https://example.com/feed.xml", title: "見つけた通信", score: 10 }
-      ]), { status: 200, headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>見つけた通信</title><item><title>確認用記事</title><link>https://example.com/one</link></item></channel></rss>`, { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([{ url: "https://example.com/feed.xml", title: "見つけた通信", score: 10 }]),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>見つけた通信</title><item><title>確認用記事</title><link>https://example.com/one</link></item></channel></rss>`,
+          { status: 200 }
+        )
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const feed = await discoverNewsFeed("https://example.com/", true, now);
@@ -88,24 +137,48 @@ describe("news refresh service", () => {
     const fetchMock = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError("CORS"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const feed = await discoverNewsFeed("https://example.com/feed.xml", true, now);
-    expect(feed.url).toBe("https://example.com/feed.xml");
+    const result = await discoverNewsFeeds(
+      "https://example.com/feed.xml",
+      { useDiscoveryHelper: true, useFeedFetchHelper: false },
+      now
+    );
+    expect(result.candidates[0]).toMatchObject({
+      canonicalUrl: "https://example.com/feed.xml",
+      validation: "unverified"
+    });
+    expect(result.usedExternalHelper).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not silently accept an HTML page with no feed", async () => {
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response("<html><title>普通のページ</title></html>", { status: 200 })));
-    await expect(discoverNewsFeed("https://example.com/", false, now)).rejects.toThrow("RSSを見つけられませんでした");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response("<html><title>普通のページ</title></html>", { status: 200 }))
+    );
+    await expect(discoverNewsFeed("https://example.com/", false, now)).rejects.toThrow(
+      "RSSを見つけられませんでした"
+    );
   });
 
   it("reports when both direct fetch and the opted-in helper fail", async () => {
     const feed = createNewsFeed("https://news.example.test/feed.xml", now);
-    const settings = { ...createDefaultSettings(now), newsEnabled: true, newsUseFeedFetchHelper: true, newsFeeds: [feed] };
+    const settings = {
+      ...createDefaultSettings(now),
+      newsEnabled: true,
+      newsUseFeedFetchHelper: true,
+      newsFeeds: [feed]
+    };
     await db.settings.put(settings);
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>()
-      .mockRejectedValueOnce(new TypeError("CORS"))
-      .mockResolvedValueOnce(new Response("helper failed", { status: 422 }))
-      .mockResolvedValueOnce(new Response("reader failed", { status: 503 })));
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockRejectedValueOnce(new TypeError("CORS"))
+        .mockResolvedValueOnce(new Response("helper failed", { status: 422 }))
+        .mockResolvedValueOnce(new Response("reader failed", { status: 503 }))
+    );
 
     const report = await refreshNews(settings, now + 1, true);
     expect(report.successfulFeeds).toBe(0);
@@ -116,12 +189,23 @@ describe("news refresh service", () => {
 
   it("falls back to Reader when a feed is blocked and rss2json rejects it", async () => {
     const feed = createNewsFeed("https://news.example.test/feed.xml", now);
-    const settings = { ...createDefaultSettings(now), newsEnabled: true, newsUseFeedFetchHelper: true, newsFeeds: [feed] };
+    const settings = {
+      ...createDefaultSettings(now),
+      newsEnabled: true,
+      newsUseFeedFetchHelper: true,
+      newsFeeds: [feed]
+    };
     await db.settings.put(settings);
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi
+      .fn<typeof fetch>()
       .mockRejectedValueOnce(new TypeError("CORS"))
       .mockResolvedValueOnce(new Response("not convertible", { status: 422 }))
-      .mockResolvedValueOnce(new Response(`Title: 主要ニュース\nMarkdown Content:\n### [新しい発表](https://news.example.test/articles/one)\nMon, 13 Jul 2026 01:00:00 GMT`, { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(
+          `Title: 主要ニュース\nMarkdown Content:\n### [新しい発表](https://news.example.test/articles/one)\nMon, 13 Jul 2026 01:00:00 GMT`,
+          { status: 200 }
+        )
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const report = await refreshNews(settings, now + 1, true);
@@ -162,10 +246,23 @@ describe("news refresh service", () => {
     const settings = { ...createDefaultSettings(now), newsEnabled: true, newsFeeds: [feed] };
     await db.settings.put(settings);
     let release: ((response: Response) => void) | undefined;
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(() => new Promise<Response>((resolve) => { release = resolve; })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            release = resolve;
+          })
+      )
+    );
     const refreshing = refreshNews(settings, now + 1, true);
     await removeNewsFeed(feed.id, settings, now + 2);
-    release?.(new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>遅い通信</title><item><title>遅い記事</title><link>https://news.example.test/late</link></item></channel></rss>`, { status: 200 }));
+    release?.(
+      new Response(
+        `<?xml version="1.0"?><rss version="2.0"><channel><title>遅い通信</title><item><title>遅い記事</title><link>https://news.example.test/late</link></item></channel></rss>`,
+        { status: 200 }
+      )
+    );
     await refreshing;
     expect(await db.newsItems.count()).toBe(0);
     expect((await db.settings.get("local"))?.newsFeeds).toHaveLength(0);
@@ -174,24 +271,41 @@ describe("news refresh service", () => {
 
 describe("RSS discovery markup", () => {
   it("deduplicates and resolves public feed links", () => {
-    expect(extractFeedLinks(`
+    expect(
+      extractFeedLinks(
+        `
       <link rel="alternate" type="application/rss+xml" href="/feed.xml">
       <link rel="alternate" type="application/rss+xml" href="/feed.xml">
       <link rel="alternate" type="application/atom+xml" href="https://example.com/atom.xml">
-    `, "https://example.com/blog")).toEqual([
-      "https://example.com/feed.xml",
-      "https://example.com/atom.xml"
-    ]);
+    `,
+        "https://example.com/blog"
+      )
+    ).toEqual(["https://example.com/feed.xml", "https://example.com/atom.xml"]);
   });
 
   it("returns multiple validated candidates instead of silently choosing the first", async () => {
     const html = `<link rel="alternate" type="application/rss+xml" href="/main.xml"><link rel="alternate" type="application/atom+xml" href="/comments.xml">`;
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(html, { status: 200, headers: { "content-type": "text/html" } }))
-      .mockResolvedValueOnce(new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>全体</title><item><title>記事</title><link>https://example.com/a</link></item></channel></rss>`, { status: 200 }))
-      .mockResolvedValueOnce(new Response(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>コメント</title><entry><title>返信</title><link href="https://example.com/c"/></entry></feed>`, { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>全体</title><item><title>記事</title><link>https://example.com/a</link></item></channel></rss>`,
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>コメント</title><entry><title>返信</title><link href="https://example.com/c"/></entry></feed>`,
+          { status: 200 }
+        )
+      );
     vi.stubGlobal("fetch", fetchMock);
-    const result = await discoverNewsFeeds("https://example.com/", { useDiscoveryHelper: false, useFeedFetchHelper: false }, now);
+    const result = await discoverNewsFeeds(
+      "https://example.com/",
+      { useDiscoveryHelper: false, useFeedFetchHelper: false },
+      now
+    );
     expect(result.candidates).toHaveLength(2);
     expect(result.candidates.every((candidate) => candidate.validation === "valid")).toBe(true);
     expect(result.candidates[0]?.title).toBe("全体");
