@@ -10,7 +10,9 @@ export function normalizeJapanese(input: string) {
 }
 
 export function duplicateKey(input: string) {
-  return normalizeJapanese(input).toLocaleLowerCase("ja-JP").replace(/[\s・･ー]/g, "");
+  return normalizeJapanese(input)
+    .toLocaleLowerCase("ja-JP")
+    .replace(/[\s・･ー]/g, "");
 }
 
 export function safePlayerText(input: string, maxLength = 24) {

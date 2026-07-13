@@ -16,5 +16,6 @@
 - Image generation was attempted for a smile candidate. The generated candidates were not approved because the jagged teeth were weakened or missing, and two candidates were multi-pose sheets with text.
 
 不明:
+
 - 差分素材の正式品質はまだ未確認。
 - 透明化後の細部は自動処理のため、最終公開前に手作業の目視確認が必要。

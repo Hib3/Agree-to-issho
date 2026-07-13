@@ -1,14 +1,7 @@
 import type { LocationId } from "./location";
 
 export type CharacterEmotion =
-  | "calm"
-  | "curious"
-  | "happy"
-  | "excited"
-  | "embarrassed"
-  | "confused"
-  | "lonely"
-  | "sleepy";
+  "calm" | "curious" | "happy" | "excited" | "embarrassed" | "confused" | "lonely" | "sleepy";
 
 export type CharacterState = {
   id: "aguri";

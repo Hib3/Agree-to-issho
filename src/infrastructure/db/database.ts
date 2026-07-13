@@ -48,14 +48,16 @@ export class AguriDatabase extends Dexie {
   constructor(name = CLEANROOM_DB_NAME) {
     super(name);
     this.version(1).stores(storesV2);
-    this.version(2).stores(storesV2).upgrade((transaction) =>
-      transaction
-        .table<ConversationSession>("conversationSessions")
-        .toCollection()
-        .modify((session) => {
-          Object.assign(session, migrateConversationSession(session));
-        })
-    );
+    this.version(2)
+      .stores(storesV2)
+      .upgrade((transaction) =>
+        transaction
+          .table<ConversationSession>("conversationSessions")
+          .toCollection()
+          .modify((session) => {
+            Object.assign(session, migrateConversationSession(session));
+          })
+      );
     this.version(3).stores(storesV3);
   }
 }

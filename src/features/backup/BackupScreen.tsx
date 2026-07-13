@@ -53,19 +53,70 @@ export function BackupScreen({ onBack, onChanged }: { onBack: () => void; onChan
       <ScreenHeader title="保存データ" onBack={onBack} />
       <section className="paper-panel backup-panel">
         <h2>JSONバックアップ</h2>
-        <button className="primary" type="button" onClick={() => void download()}>この端末のデータを書き出す</button>
-        <label>バックアップを選ぶ<input type="file" accept="application/json" onChange={(event) => void readFile(event.target.files?.[0])} /></label>
-        {preview ? <div className={preview.valid ? "import-valid" : "warning"}><strong>{preview.valid ? "読み込み可能" : "読み込めません"}</strong><p>{Object.entries(preview.counts).map(([key, value]) => `${key}: ${value}`).join(" / ")}</p>{preview.errors.map((error) => <p key={error}>{error}</p>)}{preview.unknownFields.map((field) => <p key={field}>未対応項目: {field}</p>)}</div> : null}
-        {preview?.valid ? <><label>読み込み方法<select value={mode} onChange={(event) => setMode(event.target.value as ImportMode)}><option value="merge">今のデータとまとめる</option><option value="replace">今のデータを置き換える</option></select></label><button type="button" onClick={() => void importBackup()}>確認して読み込む</button></> : null}
+        <button className="primary" type="button" onClick={() => void download()}>
+          この端末のデータを書き出す
+        </button>
+        <label>
+          バックアップを選ぶ
+          <input
+            type="file"
+            accept="application/json"
+            onChange={(event) => void readFile(event.target.files?.[0])}
+          />
+        </label>
+        {preview ? (
+          <div className={preview.valid ? "import-valid" : "warning"}>
+            <strong>{preview.valid ? "読み込み可能" : "読み込めません"}</strong>
+            <p>
+              {Object.entries(preview.counts)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join(" / ")}
+            </p>
+            {preview.errors.map((error) => (
+              <p key={error}>{error}</p>
+            ))}
+            {preview.unknownFields.map((field) => (
+              <p key={field}>未対応項目: {field}</p>
+            ))}
+          </div>
+        ) : null}
+        {preview?.valid ? (
+          <>
+            <label>
+              読み込み方法
+              <select value={mode} onChange={(event) => setMode(event.target.value as ImportMode)}>
+                <option value="merge">今のデータとまとめる</option>
+                <option value="replace">今のデータを置き換える</option>
+              </select>
+            </label>
+            <button type="button" onClick={() => void importBackup()}>
+              確認して読み込む
+            </button>
+          </>
+        ) : null}
       </section>
       <section className="paper-panel backup-panel">
         <h2>旧版から言葉を移す</h2>
         <p>旧版の保存領域は読み取りだけ行い、削除や更新はしません。</p>
-        <button type="button" onClick={() => void inspectLegacy()}>旧データを確認</button>
-        {legacy?.available ? <div><p>変換できる言葉: {legacy.concepts.length}こ</p><p>確認事項: {legacy.warnings.length}こ</p><button type="button" onClick={() => void importLegacy()}>新しい単語帳へコピー</button></div> : null}
+        <button type="button" onClick={() => void inspectLegacy()}>
+          旧データを確認
+        </button>
+        {legacy?.available ? (
+          <div>
+            <p>変換できる言葉: {legacy.concepts.length}こ</p>
+            <p>確認事項: {legacy.warnings.length}こ</p>
+            <button type="button" onClick={() => void importLegacy()}>
+              新しい単語帳へコピー
+            </button>
+          </div>
+        ) : null}
       </section>
       <StorageStatus />
-      {message ? <p className="notice" role="status">{message}</p> : null}
+      {message ? (
+        <p className="notice" role="status">
+          {message}
+        </p>
+      ) : null}
     </main>
   );
 }

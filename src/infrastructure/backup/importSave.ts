@@ -64,7 +64,19 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
       json: JSON.stringify(current)
     });
     if (mode === "replace") {
-      for (const table of [db.player, db.character, db.concepts, db.relations, db.memories, db.conversationSessions, db.dialogueHistory, db.diaries, db.settings, db.learningSessions, db.newsItems]) {
+      for (const table of [
+        db.player,
+        db.character,
+        db.concepts,
+        db.relations,
+        db.memories,
+        db.conversationSessions,
+        db.dialogueHistory,
+        db.diaries,
+        db.settings,
+        db.learningSessions,
+        db.newsItems
+      ]) {
         await table.clear();
       }
     }
@@ -74,7 +86,9 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
     await db.relations.bulkPut(data.relations);
     await db.memories.bulkPut(data.memories as MemoryEvent[]);
     await db.conversationSessions.bulkPut(
-      (data.conversationSessions as ConversationSession[]).map((session) => migrateConversationSession(session, now))
+      (data.conversationSessions as ConversationSession[]).map((session) =>
+        migrateConversationSession(session, now)
+      )
     );
     await db.dialogueHistory.bulkPut(data.dialogueHistory as DialogueHistoryEntry[]);
     await db.diaries.bulkPut(data.diaries);

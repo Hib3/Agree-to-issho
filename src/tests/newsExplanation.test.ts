@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createUserConcept } from "../domain/learning/conceptFactory";
 import type { NewsItem } from "../domain/model/news";
 import { buildFeedDigest } from "../infrastructure/news/articleDigestService";
-import { buildNewsConversationPlan, buildNewsExplanation, findNewsConcepts } from "../domain/news/newsExplanation";
+import {
+  buildNewsConversationPlan,
+  buildNewsExplanation,
+  findNewsConcepts
+} from "../domain/news/newsExplanation";
 
 const item: NewsItem = {
   id: "news_test",
@@ -26,7 +30,11 @@ describe("grounded news explanation", () => {
 
   it("connects only a learned word that actually appears in the feed text", () => {
     const space = createUserConcept({ surface: "宇宙", category: "abstract" }, item.fetchedAt, "space");
-    const unrelated = createUserConcept({ surface: "カレー", category: "food_drink" }, item.fetchedAt, "curry");
+    const unrelated = createUserConcept(
+      { surface: "カレー", category: "food_drink" },
+      item.fetchedAt,
+      "curry"
+    );
     const transcript = buildNewsExplanation(item, [space, unrelated]).join("\n");
     expect(transcript).toContain("教えてもらった「宇宙」");
     expect(transcript).not.toContain("教えてもらった「カレー」");
@@ -37,19 +45,33 @@ describe("grounded news explanation", () => {
     const bread = createUserConcept({ surface: "パン", category: "food_drink" }, item.fetchedAt, "bread");
     const rice = createUserConcept({ surface: "米", category: "food_drink" }, item.fetchedAt, "rice");
     const compoundItem = { ...item, title: "RAIL計画とパンデミック対策を米国が発表", summary: "" };
-    const matches = findNewsConcepts(compoundItem, buildFeedDigest(compoundItem, item.fetchedAt), [ai, bread, rice]);
+    const matches = findNewsConcepts(compoundItem, buildFeedDigest(compoundItem, item.fetchedAt), [
+      ai,
+      bread,
+      rice
+    ]);
     expect(matches).toEqual([]);
   });
 
   it("keeps user preference separate from Aguri opinion", () => {
-    const space = { ...createUserConcept({ surface: "宇宙", category: "abstract" }, item.fetchedAt, "space-opinion"), preference: 2 as const };
+    const space = {
+      ...createUserConcept({ surface: "宇宙", category: "abstract" }, item.fetchedAt, "space-opinion"),
+      preference: 2 as const
+    };
     const plan = buildNewsConversationPlan(item, buildFeedDigest(item, item.fetchedAt), [space]);
     expect(plan.opinions.some((opinion) => opinion.owner === "user" && opinion.polarity === 1)).toBe(true);
-    expect(plan.opinions.some((opinion) => opinion.owner === "aguri" && opinion.id !== plan.opinions[0]?.id)).toBe(true);
+    expect(
+      plan.opinions.some((opinion) => opinion.owner === "aguri" && opinion.id !== plan.opinions[0]?.id)
+    ).toBe(true);
   });
 
   it("uses calm grounded beats and no imagination for sensitive news", () => {
-    const sensitive = { ...item, id: "news_sensitive", title: "地震で交通に被害", summary: "自治体が被害状況を確認している。" };
+    const sensitive = {
+      ...item,
+      id: "news_sensitive",
+      title: "地震で交通に被害",
+      summary: "自治体が被害状況を確認している。"
+    };
     const plan = buildNewsConversationPlan(sensitive, buildFeedDigest(sensitive, item.fetchedAt), []);
     expect(plan.pages.length).toBeGreaterThanOrEqual(3);
     expect(plan.pages.length).toBeLessThanOrEqual(6);

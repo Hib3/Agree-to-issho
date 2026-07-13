@@ -3,18 +3,27 @@ import { checksum } from "./checksum";
 import { BUILD_ID } from "../../app/buildInfo";
 
 export async function createExportData(now = Date.now()) {
-  const [player, character, concepts, relations, memories, conversationSessions, dialogueHistory, diaries, settings] =
-    await Promise.all([
-      db.player.get("local"),
-      db.character.get("aguri"),
-      db.concepts.toArray(),
-      db.relations.toArray(),
-      db.memories.toArray(),
-      db.conversationSessions.toArray(),
-      db.dialogueHistory.toArray(),
-      db.diaries.toArray(),
-      db.settings.get("local")
-    ]);
+  const [
+    player,
+    character,
+    concepts,
+    relations,
+    memories,
+    conversationSessions,
+    dialogueHistory,
+    diaries,
+    settings
+  ] = await Promise.all([
+    db.player.get("local"),
+    db.character.get("aguri"),
+    db.concepts.toArray(),
+    db.relations.toArray(),
+    db.memories.toArray(),
+    db.conversationSessions.toArray(),
+    db.dialogueHistory.toArray(),
+    db.diaries.toArray(),
+    db.settings.get("local")
+  ]);
   const unsigned = {
     appId: "aguri-cleanroom" as const,
     schemaVersion: 3 as const,

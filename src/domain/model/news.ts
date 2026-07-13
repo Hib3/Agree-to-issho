@@ -99,12 +99,35 @@ export type ArticleDigest = {
   confidence: number;
 };
 
-export type NewsGroundingSource = "headline" | "feed_summary" | "feed_content" | "article" | "memory" | "inference" | "aguri_opinion" | "imagination" | "unknown";
-export type NewsConversationLens = "practical_change" | "people_involved" | "numbers_and_scale" | "learned_word" | "aguri_daily_life" | "uncertainty";
+export type NewsGroundingSource =
+  | "headline"
+  | "feed_summary"
+  | "feed_content"
+  | "article"
+  | "memory"
+  | "inference"
+  | "aguri_opinion"
+  | "imagination"
+  | "unknown";
+export type NewsConversationLens =
+  | "practical_change"
+  | "people_involved"
+  | "numbers_and_scale"
+  | "learned_word"
+  | "aguri_daily_life"
+  | "uncertainty";
 
 export type NewsBeat = {
   id: string;
-  kind: "opening" | "understanding" | "memory" | "interpretation" | "opinion" | "uncertainty" | "imagination" | "question";
+  kind:
+    | "opening"
+    | "understanding"
+    | "memory"
+    | "interpretation"
+    | "opinion"
+    | "uncertainty"
+    | "imagination"
+    | "question";
   text: string;
   source: NewsGroundingSource;
   evidenceIds: string[];
@@ -121,7 +144,14 @@ export type CharacterOpinion = {
   polarity: number;
   curiosity: number;
   confidence: number;
-  reason: "past_reaction" | "category_tendency" | "learned_attribute" | "relationship" | "current_emotion" | "news_tone" | "unknown";
+  reason:
+    | "past_reaction"
+    | "category_tendency"
+    | "learned_attribute"
+    | "relationship"
+    | "current_emotion"
+    | "news_tone"
+    | "unknown";
   createdAt: number;
   updatedAt: number;
 };

@@ -13,7 +13,17 @@ import { buildFeedDigest, fetchArticleDigest } from "../../infrastructure/news/a
 import { DialogueBox } from "../../ui/components/DialogueBox";
 import { ScreenHeader } from "../../ui/components/ScreenHeader";
 
-export function NewsScreen({ items, concepts, character, relations, memories, settings, onBack, onOpenSettings, onChanged }: {
+export function NewsScreen({
+  items,
+  concepts,
+  character,
+  relations,
+  memories,
+  settings,
+  onBack,
+  onOpenSettings,
+  onChanged
+}: {
   items: NewsItem[];
   concepts: Concept[];
   character?: CharacterState | undefined;
@@ -30,9 +40,13 @@ export function NewsScreen({ items, concepts, character, relations, memories, se
   const [readingArticle, setReadingArticle] = useState(false);
   const requestRef = useRef<{ id: number; controller: AbortController } | null>(null);
   const selected = items.find((item) => item.id === selectedId);
-  const plan = useMemo(() => selected && digest
-    ? buildNewsConversationPlan(selected, digest, concepts, { character, relations, memories })
-    : null, [character, concepts, digest, memories, relations, selected]);
+  const plan = useMemo(
+    () =>
+      selected && digest
+        ? buildNewsConversationPlan(selected, digest, concepts, { character, relations, memories })
+        : null,
+    [character, concepts, digest, memories, relations, selected]
+  );
   const pages = plan?.pages ?? [];
 
   useEffect(() => () => requestRef.current?.controller.abort(), []);
@@ -86,14 +100,28 @@ export function NewsScreen({ items, concepts, character, relations, memories, se
             hasNext={pageIndex < pages.length - 1}
             onNext={nextPage}
           />
-          <p className="article-read-status" role="status">{readingArticle ? "記事を直接読めるか確認しています…" : `確認範囲: ${contentLevelLabel(plan?.contentLevel ?? "headline_only")}`}</p>
+          <p className="article-read-status" role="status">
+            {readingArticle
+              ? "記事を直接読めるか確認しています…"
+              : `確認範囲: ${contentLevelLabel(plan?.contentLevel ?? "headline_only")}`}
+          </p>
           {plan ? (
             <details className="news-grounding-debug">
               <summary>会話の根拠</summary>
-              <ol>{plan.pages.map((page) => <li key={page.id}>{groundingLabel(page.source)}{page.evidenceIds.length > 0 ? ` (${page.evidenceIds.length}件)` : ""}</li>)}</ol>
+              <ol>
+                {plan.pages.map((page) => (
+                  <li key={page.id}>
+                    {groundingLabel(page.source)}
+                    {page.evidenceIds.length > 0 ? ` (${page.evidenceIds.length}件)` : ""}
+                  </li>
+                ))}
+              </ol>
             </details>
           ) : null}
-          <a className="source-link" href={selected.url} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />元の記事を開く</a>
+          <a className="source-link" href={selected.url} target="_blank" rel="noreferrer">
+            <ExternalLink aria-hidden="true" />
+            元の記事を開く
+          </a>
         </section>
       ) : null}
       <section className="news-list paper-panel" aria-label="保存したニュース">
@@ -103,15 +131,25 @@ export function NewsScreen({ items, concepts, character, relations, memories, se
             <Newspaper aria-hidden="true" />
             <strong>まだ見出しを受け取っていません</strong>
             <p>読みたいRSSを登録し、「今すぐ更新」を押してください。</p>
-            <button className="quiet" type="button" onClick={onOpenSettings}>RSSを設定する</button>
+            <button className="quiet" type="button" onClick={onOpenSettings}>
+              RSSを設定する
+            </button>
           </div>
         ) : (
           <ul>
             {items.slice(0, 30).map((item) => (
               <li key={item.id} className={item.id === selectedId ? "selected" : ""}>
-                <div><span>{item.sourceName}</span><time dateTime={new Date(item.publishedAt).toISOString()}>{new Date(item.publishedAt).toLocaleString("ja-JP")}</time></div>
+                <div>
+                  <span>{item.sourceName}</span>
+                  <time dateTime={new Date(item.publishedAt).toISOString()}>
+                    {new Date(item.publishedAt).toLocaleString("ja-JP")}
+                  </time>
+                </div>
                 <strong>{item.title}</strong>
-                <button className="quiet" type="button" onClick={() => void discuss(item, Date.now())}><MessageCircle aria-hidden="true" />アグリに話してもらう</button>
+                <button className="quiet" type="button" onClick={() => void discuss(item, Date.now())}>
+                  <MessageCircle aria-hidden="true" />
+                  アグリに話してもらう
+                </button>
               </li>
             ))}
           </ul>
@@ -130,7 +168,9 @@ function contentLevelLabel(level: "headline_only" | "feed_summary" | "feed_conte
   }[level];
 }
 
-function groundingLabel(source: NonNullable<ReturnType<typeof buildNewsConversationPlan>["pages"]>[number]["source"]) {
+function groundingLabel(
+  source: NonNullable<ReturnType<typeof buildNewsConversationPlan>["pages"]>[number]["source"]
+) {
   return {
     headline: "見出し",
     feed_summary: "RSSの短い説明",

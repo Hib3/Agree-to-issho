@@ -6,7 +6,16 @@ import { ChoiceButtons } from "../ui/components/ChoiceButtons";
 
 function Harness() {
   const [value, setValue] = useState("food");
-  return <ChoiceButtons options={[{ value: "food", label: "食べ物" }, { value: "place", label: "場所" }]} value={value} onChoose={setValue} />;
+  return (
+    <ChoiceButtons
+      options={[
+        { value: "food", label: "食べ物" },
+        { value: "place", label: "場所" }
+      ]}
+      value={value}
+      onChoose={setValue}
+    />
+  );
 }
 
 describe("ChoiceButtons", () => {

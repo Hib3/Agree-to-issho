@@ -12,13 +12,40 @@ import type { AppScreen } from "../../app/routes";
 import { CharacterStage } from "../../ui/components/CharacterStage";
 import { ChoiceButtons } from "../../ui/components/ChoiceButtons";
 import { DialogueBox } from "../../ui/components/DialogueBox";
-import { ArchiveRestore, BookOpenText, CircleHelp, DoorOpen, MapPinned, MessageCircle, Newspaper, NotebookTabs, Settings, Sparkles } from "lucide-react";
-import { advanceConversation, answerConversation, closeConversation, invalidateConversationSession, startConversation } from "../conversation/conversationService";
+import {
+  ArchiveRestore,
+  BookOpenText,
+  CircleHelp,
+  DoorOpen,
+  MapPinned,
+  MessageCircle,
+  Newspaper,
+  NotebookTabs,
+  Settings,
+  Sparkles
+} from "lucide-react";
+import {
+  advanceConversation,
+  answerConversation,
+  closeConversation,
+  invalidateConversationSession,
+  startConversation
+} from "../conversation/conversationService";
 import { validateConversationSession } from "../../domain/conversation/dialogueValidator";
 import { isCurrentConversationSession } from "../../domain/conversation/sessionMigration";
 import { playGameSound } from "../../infrastructure/audio/gameAudio";
 
-export function MainRoom({ player, character, settings, concepts, sessions, newsItems, saving, onNavigate, onChanged }: {
+export function MainRoom({
+  player,
+  character,
+  settings,
+  concepts,
+  sessions,
+  newsItems,
+  saving,
+  onNavigate,
+  onChanged
+}: {
   player: PlayerProfile;
   character: CharacterState;
   settings: GameSettings;
@@ -54,25 +81,29 @@ export function MainRoom({ player, character, settings, concepts, sessions, news
   const userWordCount = concepts.filter((concept) => concept.source === "user").length;
   const unreadNewsCount = newsItems.filter((item) => !item.discussedAt).length;
   const lastTurn = active?.history.at(-1);
-  const dialogueText = rawActive && activeErrors.length > 0
-    ? "会話メモを整え直しましたっ。もう一度、話しかけてくださいっ！"
-    : active?.phase === "awaiting_answer" && active.pendingQuestion
-    ? active.pendingQuestion.prompt
-    : lastTurn?.page ?? `${player.callName}っ！ 今日はどんな話をしましょうかっ？`;
+  const dialogueText =
+    rawActive && activeErrors.length > 0
+      ? "会話メモを整え直しましたっ。もう一度、話しかけてくださいっ！"
+      : active?.phase === "awaiting_answer" && active.pendingQuestion
+        ? active.pendingQuestion.prompt
+        : (lastTurn?.page ?? `${player.callName}っ！ 今日はどんな話をしましょうかっ？`);
   const hasNext = Boolean(active && active.phase !== "awaiting_answer" && active.phase !== "completed");
 
-  const speak = useCallback(async (initiatedByUser = true) => {
-    if (busy || saving) return;
-    playGameSound(active ? "page" : initiatedByUser ? "talk" : "notice", settings);
-    setBusy(true);
-    try {
-      if (active) await advanceConversation(active.id, Date.now(), initiatedByUser);
-      else await startConversation(Date.now(), initiatedByUser);
-      await onChanged();
-    } finally {
-      setBusy(false);
-    }
-  }, [active, busy, onChanged, saving, settings]);
+  const speak = useCallback(
+    async (initiatedByUser = true) => {
+      if (busy || saving) return;
+      playGameSound(active ? "page" : initiatedByUser ? "talk" : "notice", settings);
+      setBusy(true);
+      try {
+        if (active) await advanceConversation(active.id, Date.now(), initiatedByUser);
+        else await startConversation(Date.now(), initiatedByUser);
+        await onChanged();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [active, busy, onChanged, saving, settings]
+  );
 
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
@@ -113,7 +144,10 @@ export function MainRoom({ player, character, settings, concepts, sessions, news
         timerRef.current = window.setTimeout(schedule, 5000);
         return;
       }
-      timerRef.current = window.setTimeout(() => void speak(false), autonomousDelayMs(location, systemRandom));
+      timerRef.current = window.setTimeout(
+        () => void speak(false),
+        autonomousDelayMs(location, systemRandom)
+      );
     };
     schedule();
     return () => {
@@ -122,7 +156,8 @@ export function MainRoom({ player, character, settings, concepts, sessions, news
   }, [active, busy, character, location, saving, settings.autonomousSpeech, speak]);
 
   async function submitAnswer() {
-    if (!active?.pendingQuestion || selection.questionId !== active.pendingQuestion.id || !selection.value) return;
+    if (!active?.pendingQuestion || selection.questionId !== active.pendingQuestion.id || !selection.value)
+      return;
     const choice = active.pendingQuestion.choices.find((item) => item.id === selection.value);
     if (!choice) return;
     setBusy(true);
@@ -152,19 +187,50 @@ export function MainRoom({ player, character, settings, concepts, sessions, news
     () => active?.pendingQuestion?.choices.map((choice) => ({ value: choice.id, label: choice.label })) ?? [],
     [active?.pendingQuestion]
   );
-  const currentSelection = selection.questionId === active?.pendingQuestion?.id && answerOptions.some((option) => option.value === selection.value)
-    ? selection.value
-    : "";
+  const currentSelection =
+    selection.questionId === active?.pendingQuestion?.id &&
+    answerOptions.some((option) => option.value === selection.value)
+      ? selection.value
+      : "";
 
   return (
     <main className={`room-screen location-shell-${location.id}`}>
       <section className={`room-composition${active?.phase === "awaiting_answer" ? " answering" : ""}`}>
-        <CharacterStage emotion={lastTurn?.emotion ?? character.emotion} locationId={location.id} timeOfDay={timeOfDay} weather={weather} reducedMotion={settings.reducedMotion} isSpeaking={hasNext} />
+        <CharacterStage
+          emotion={lastTurn?.emotion ?? character.emotion}
+          locationId={location.id}
+          timeOfDay={timeOfDay}
+          weather={weather}
+          reducedMotion={settings.reducedMotion}
+          isSpeaking={hasNext}
+        />
         <header className="room-topbar">
-          <div className="place-chip"><strong>{timeLabels[timeOfDay]}</strong><span>{location.name}</span></div>
-          <div className="room-status"><span>{online ? "端末内保存" : "オフライン"}</span><span>言葉 {userWordCount}こ</span><button className="icon-button" type="button" aria-label="設定" title="設定" onClick={() => onNavigate("settings")}><Settings aria-hidden="true" /></button></div>
+          <div className="place-chip">
+            <strong>{timeLabels[timeOfDay]}</strong>
+            <span>{location.name}</span>
+          </div>
+          <div className="room-status">
+            <span>{online ? "端末内保存" : "オフライン"}</span>
+            <span>言葉 {userWordCount}こ</span>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="設定"
+              title="設定"
+              onClick={() => onNavigate("settings")}
+            >
+              <Settings aria-hidden="true" />
+            </button>
+          </div>
         </header>
-        <DialogueBox speaker="アグリちゃん" text={dialogueText} emotion={lastTurn?.emotion ?? character.emotion} textSpeed={settings.textSpeed} hasNext={hasNext} onNext={() => void speak()} />
+        <DialogueBox
+          speaker="アグリちゃん"
+          text={dialogueText}
+          emotion={lastTurn?.emotion ?? character.emotion}
+          textSpeed={settings.textSpeed}
+          hasNext={hasNext}
+          onNext={() => void speak()}
+        />
 
         {active?.phase === "awaiting_answer" && active.pendingQuestion ? (
           <section className="answer-panel">
@@ -175,24 +241,77 @@ export function MainRoom({ player, character, settings, concepts, sessions, news
               onChoose={(value) => setSelection({ questionId: active.pendingQuestion!.id, value })}
               label="返事"
             />
-            <button className="primary" type="button" disabled={!currentSelection || busy} onClick={() => void submitAnswer()}>この返事にする</button>
-            <button className="quiet answer-navigation" type="button" disabled={busy} onClick={() => void closeQuestion()}>答えず話を閉じる</button>
+            <button
+              className="primary"
+              type="button"
+              disabled={!currentSelection || busy}
+              onClick={() => void submitAnswer()}
+            >
+              この返事にする
+            </button>
+            <button
+              className="quiet answer-navigation"
+              type="button"
+              disabled={busy}
+              onClick={() => void closeQuestion()}
+            >
+              答えず話を閉じる
+            </button>
           </section>
         ) : null}
         <div className="main-actions">
-          <button className="primary" type="button" disabled={busy || saving || active?.phase === "awaiting_answer"} onClick={() => void speak()}><MessageCircle aria-hidden="true" />{active ? "会話を続ける" : "話す"}</button>
-          <button className="primary teach" type="button" disabled={busy || saving || Boolean(active)} onClick={() => onNavigate("teach")}><Sparkles aria-hidden="true" />言葉を教える</button>
+          <button
+            className="primary"
+            type="button"
+            disabled={busy || saving || active?.phase === "awaiting_answer"}
+            onClick={() => void speak()}
+          >
+            <MessageCircle aria-hidden="true" />
+            {active ? "会話を続ける" : "話す"}
+          </button>
+          <button
+            className="primary teach"
+            type="button"
+            disabled={busy || saving || Boolean(active)}
+            onClick={() => onNavigate("teach")}
+          >
+            <Sparkles aria-hidden="true" />
+            言葉を教える
+          </button>
         </div>
       </section>
 
       <nav className="sub-actions" aria-label="補助メニュー">
-        <button type="button" onClick={() => onNavigate("wordbook")}><BookOpenText aria-hidden="true" /><span>単語帳</span></button>
-        <button type="button" onClick={() => onNavigate("diary")}><NotebookTabs aria-hidden="true" /><span>日記</span></button>
-        <button type="button" onClick={() => onNavigate("locations")}><MapPinned aria-hidden="true" /><span>移動</span></button>
-        {settings.newsEnabled ? <button type="button" onClick={() => onNavigate("news")}><Newspaper aria-hidden="true" /><span>ニュース{unreadNewsCount > 0 ? ` ${unreadNewsCount}` : ""}</span></button> : null}
-        <button type="button" onClick={() => onNavigate("backup")}><ArchiveRestore aria-hidden="true" /><span>保存</span></button>
-        <button type="button" onClick={() => onNavigate("manual")}><CircleHelp aria-hidden="true" /><span>説明</span></button>
-        <button type="button" onClick={() => onNavigate("title")}><DoorOpen aria-hidden="true" /><span>タイトル</span></button>
+        <button type="button" onClick={() => onNavigate("wordbook")}>
+          <BookOpenText aria-hidden="true" />
+          <span>単語帳</span>
+        </button>
+        <button type="button" onClick={() => onNavigate("diary")}>
+          <NotebookTabs aria-hidden="true" />
+          <span>日記</span>
+        </button>
+        <button type="button" onClick={() => onNavigate("locations")}>
+          <MapPinned aria-hidden="true" />
+          <span>移動</span>
+        </button>
+        {settings.newsEnabled ? (
+          <button type="button" onClick={() => onNavigate("news")}>
+            <Newspaper aria-hidden="true" />
+            <span>ニュース{unreadNewsCount > 0 ? ` ${unreadNewsCount}` : ""}</span>
+          </button>
+        ) : null}
+        <button type="button" onClick={() => onNavigate("backup")}>
+          <ArchiveRestore aria-hidden="true" />
+          <span>保存</span>
+        </button>
+        <button type="button" onClick={() => onNavigate("manual")}>
+          <CircleHelp aria-hidden="true" />
+          <span>説明</span>
+        </button>
+        <button type="button" onClick={() => onNavigate("title")}>
+          <DoorOpen aria-hidden="true" />
+          <span>タイトル</span>
+        </button>
       </nav>
     </main>
   );

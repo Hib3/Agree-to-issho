@@ -26,7 +26,12 @@ describe("article digest service", () => {
 
   it("extracts article paragraphs while excluding navigation and advertisements", async () => {
     const html = `<html><body><nav>メニューの説明がここに長く並んでいます。</nav><article><h1>${item.title}</h1><p>交通局は三つの駅で新しい案内表示を試すと発表しました。</p><p>試験は七月から始まり、利用者の反応を確認します。</p><div class="advertisement"><p>広告の商品説明は根拠にしてはいけません。</p></div></article></body></html>`;
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(html, { status: 200, headers: { "content-type": "text/html" } })));
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(html, { status: 200, headers: { "content-type": "text/html" } }))
+    );
     const digest = await fetchArticleDigest(item, { useArticleHelper: false, now });
     expect(digest.contentLevel).toBe("article_extract");
     expect(digest.keyFacts.map((fact) => fact.text).join(" ")).toContain("七月");
@@ -35,9 +40,15 @@ describe("article digest service", () => {
   });
 
   it("contacts the article helper only after direct failure and explicit consent", async () => {
-    const fetchMock = vi.fn<typeof fetch>()
+    const fetchMock = vi
+      .fn<typeof fetch>()
       .mockRejectedValueOnce(new TypeError("CORS"))
-      .mockResolvedValueOnce(new Response(`Title: 記事\nMarkdown Content:\n## 本文\n交通局は三つの駅で案内表示を試験します。利用者の反応を七月から確認する予定です。\n新しい表示は日本語と英語に対応し、迷いやすい場所から順番に設置されます。`, { status: 200, headers: { "content-type": "text/plain" } }));
+      .mockResolvedValueOnce(
+        new Response(
+          `Title: 記事\nMarkdown Content:\n## 本文\n交通局は三つの駅で案内表示を試験します。利用者の反応を七月から確認する予定です。\n新しい表示は日本語と英語に対応し、迷いやすい場所から順番に設置されます。`,
+          { status: 200, headers: { "content-type": "text/plain" } }
+        )
+      );
     vi.stubGlobal("fetch", fetchMock);
     const digest = await fetchArticleDigest(item, { useArticleHelper: true, now });
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -55,7 +66,12 @@ describe("article digest service", () => {
   });
 
   it("falls back without retaining an oversized article", async () => {
-    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response("large", { status: 200, headers: { "content-length": "1000001" } })));
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response("large", { status: 200, headers: { "content-length": "1000001" } }))
+    );
     const digest = await fetchArticleDigest(item, { useArticleHelper: false, now });
     expect(digest.contentLevel).toBe("feed_summary");
     expect(JSON.stringify(digest).length).toBeLessThan(10_000);

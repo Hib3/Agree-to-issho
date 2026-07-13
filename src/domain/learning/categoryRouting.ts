@@ -4,8 +4,16 @@ import type { LearningContextId } from "./learningMachine";
 export type CategoryGroup = { id: string; label: string; categories: ConceptCategory[] };
 
 export const categoryGroups: CategoryGroup[] = [
-  { id: "people", label: "人", categories: ["famous_person", "person_name", "occupation", "person_descriptor", "robot"] },
-  { id: "actions", label: "行動", categories: ["action", "required_action", "forbidden_action", "sport", "skill"] },
+  {
+    id: "people",
+    label: "人",
+    categories: ["famous_person", "person_name", "occupation", "person_descriptor", "robot"]
+  },
+  {
+    id: "actions",
+    label: "行動",
+    categories: ["action", "required_action", "forbidden_action", "sport", "skill"]
+  },
   { id: "places", label: "場所", categories: ["place"] },
   { id: "food-life", label: "食べ物・生き物", categories: ["food_drink", "living_thing"] },
   { id: "objects", label: "物", categories: ["usable_object", "wearable", "vehicle"] },

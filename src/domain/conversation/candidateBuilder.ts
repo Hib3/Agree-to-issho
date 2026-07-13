@@ -24,7 +24,15 @@ export function buildCandidates(input: {
     const slots = resolveSlots(template, input.concepts, input.relations, input.recentSessions, input.random);
     if (!slots) continue;
     candidates.push(
-      scoreCandidate(template, slots, input.locationId, input.relations, input.recentSessions, input.character, input.intentBias)
+      scoreCandidate(
+        template,
+        slots,
+        input.locationId,
+        input.relations,
+        input.recentSessions,
+        input.character,
+        input.intentBias
+      )
     );
   }
   return candidates.sort((a, b) => b.score - a.score || a.template.id.localeCompare(b.template.id));

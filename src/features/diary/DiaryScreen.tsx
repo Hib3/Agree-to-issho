@@ -5,7 +5,14 @@ import { generateDiary } from "../../domain/diary/diaryGenerator";
 import { db } from "../../infrastructure/db/database";
 import { ScreenHeader } from "../../ui/components/ScreenHeader";
 
-export function DiaryScreen({ concepts, memories, dialogue, diaries, onBack, onChanged }: {
+export function DiaryScreen({
+  concepts,
+  memories,
+  dialogue,
+  diaries,
+  onBack,
+  onChanged
+}: {
   concepts: Concept[];
   memories: MemoryEvent[];
   dialogue: DialogueHistoryEntry[];
@@ -23,9 +30,17 @@ export function DiaryScreen({ concepts, memories, dialogue, diaries, onBack, onC
   return (
     <main className="feature-screen diary-screen">
       <ScreenHeader title="アグリの日記" onBack={onBack} />
-      <button className="primary page-action" type="button" onClick={() => void createToday()}>今日の日記を開く</button>
+      <button className="primary page-action" type="button" onClick={() => void createToday()}>
+        今日の日記を開く
+      </button>
       <div className="diary-list">
-        {[...diaries].reverse().map((diary) => <article key={diary.id} className="diary-page"><time>{diary.date}</time><h2>{diary.title}</h2><p>{diary.body}</p></article>)}
+        {[...diaries].reverse().map((diary) => (
+          <article key={diary.id} className="diary-page">
+            <time>{diary.date}</time>
+            <h2>{diary.title}</h2>
+            <p>{diary.body}</p>
+          </article>
+        ))}
         {diaries.length === 0 ? <p className="empty-note">日記は、今日の会話をしてから開けます。</p> : null}
       </div>
     </main>

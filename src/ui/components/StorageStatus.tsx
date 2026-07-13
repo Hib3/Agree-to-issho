@@ -16,7 +16,9 @@ export function StorageStatus() {
         if (active) setText("この端末の中へ保存します");
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
   return <p className="storage-status">{text}</p>;
 }

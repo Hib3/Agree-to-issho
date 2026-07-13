@@ -1,6 +1,12 @@
 export type ChoiceOption<T extends string> = { value: T; label: string };
 
-export function ChoiceButtons<T extends string>({ options, value, onChoose, disabled = false, label = "選択肢" }: {
+export function ChoiceButtons<T extends string>({
+  options,
+  value,
+  onChoose,
+  disabled = false,
+  label = "選択肢"
+}: {
   options: ChoiceOption<T>[];
   value?: T;
   onChoose: (value: T) => void;

@@ -30,11 +30,18 @@ export function planConversation(input: {
     group.push(candidate);
     byIntent.set(candidate.template.intent, group);
   }
-  const intentHeads = [...byIntent.entries()].map(([intent, group]) => ({ intent, score: group[0]?.score ?? Number.NEGATIVE_INFINITY }));
+  const intentHeads = [...byIntent.entries()].map(([intent, group]) => ({
+    intent,
+    score: group[0]?.score ?? Number.NEGATIVE_INFINITY
+  }));
   const bestIntentScore = Math.max(...intentHeads.map((item) => item.score));
   const eligibleIntents = intentHeads.filter((item) => item.score >= bestIntentScore - 18);
-  const selectedIntent = weightedPick(eligibleIntents, (item) => Math.max(1, item.score - (bestIntentScore - 18) + 1), input.random)?.intent;
-  const intentCandidates = selectedIntent ? byIntent.get(selectedIntent) ?? [] : candidates;
+  const selectedIntent = weightedPick(
+    eligibleIntents,
+    (item) => Math.max(1, item.score - (bestIntentScore - 18) + 1),
+    input.random
+  )?.intent;
+  const intentCandidates = selectedIntent ? (byIntent.get(selectedIntent) ?? []) : candidates;
   const bestFrameScore = intentCandidates[0]?.score ?? candidates[0]?.score ?? 0;
   const topFrames = intentCandidates.filter((candidate) => candidate.score >= bestFrameScore - 8);
   const selected = pickOne(topFrames, input.random) ?? intentCandidates[0] ?? candidates[0];

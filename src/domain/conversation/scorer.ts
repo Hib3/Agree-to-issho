@@ -54,14 +54,31 @@ export function scoreCandidate(
     reasons.push("location");
   }
   score += SCORE.categoryFit + Math.min(8, Math.max(0, template.slots.length - 1) * 4);
-  if (relations.some((relation) => isConfirmedRelation(relation) && ids.includes(relation.fromConceptId) && ids.includes(relation.toConceptId))) {
+  if (
+    relations.some(
+      (relation) =>
+        isConfirmedRelation(relation) &&
+        ids.includes(relation.fromConceptId) &&
+        ids.includes(relation.toConceptId)
+    )
+  ) {
     score += SCORE.relationFit;
     reasons.push("relation");
   }
-  score += Math.min(SCORE.memorySalienceMax, concepts.reduce((sum, concept) => sum + concept.understanding * 4, 0));
-  score += Math.min(SCORE.preferenceIntensityMax, concepts.reduce((sum, concept) => sum + Math.abs(concept.preference ?? 0) * 2, 0));
+  score += Math.min(
+    SCORE.memorySalienceMax,
+    concepts.reduce((sum, concept) => sum + concept.understanding * 4, 0)
+  );
+  score += Math.min(
+    SCORE.preferenceIntensityMax,
+    concepts.reduce((sum, concept) => sum + Math.abs(concept.preference ?? 0) * 2, 0)
+  );
   const answeredAttributes = concepts.reduce(
-    (sum, concept) => sum + Object.values(concept.attributes).filter((value) => value !== null && value !== "" && value !== "unknown").length,
+    (sum, concept) =>
+      sum +
+      Object.values(concept.attributes).filter(
+        (value) => value !== null && value !== "" && value !== "unknown"
+      ).length,
     0
   );
   if (answeredAttributes > 0) {
@@ -74,16 +91,27 @@ export function scoreCandidate(
   }
   if (concepts.some((concept) => concept.usageCount === 0)) score += SCORE.novelty;
   score += Math.round(character.curiosity * SCORE.characterTopicBias);
-  if (recentSessions.slice(-8).some((session) => session.templateIds.includes(template.id))) score += SCORE.recentTemplate;
-  const recentConceptIds = new Set(recentSessions.slice(-3).flatMap((session) => Object.values(session.slotConceptIds)));
+  if (recentSessions.slice(-8).some((session) => session.templateIds.includes(template.id)))
+    score += SCORE.recentTemplate;
+  const recentConceptIds = new Set(
+    recentSessions.slice(-3).flatMap((session) => Object.values(session.slotConceptIds))
+  );
   if (ids.some((id) => recentConceptIds.has(id))) score += SCORE.recentConcept;
-  const recentTuples = recentSessions.slice(-20).map((session) => Object.values(session.slotConceptIds).sort().join("|"));
+  const recentTuples = recentSessions
+    .slice(-20)
+    .map((session) => Object.values(session.slotConceptIds).sort().join("|"));
   if (recentTuples.includes(tupleKey)) score += SCORE.repeatedTuple;
   if (recentSessions.at(-1)?.intent === template.intent) score += SCORE.recentIntent;
-  if (recentSessions.slice(-3).every((session) => session.intent === template.intent) && recentSessions.length >= 3) {
+  if (
+    recentSessions.slice(-3).every((session) => session.intent === template.intent) &&
+    recentSessions.length >= 3
+  ) {
     score += SCORE.repeatedIntent;
   }
-  if (template.intent === "misunderstanding" && recentSessions.slice(-5).some((session) => session.absurdityCount > 0)) {
+  if (
+    template.intent === "misunderstanding" &&
+    recentSessions.slice(-5).some((session) => session.absurdityCount > 0)
+  ) {
     score += SCORE.absurdityCooldown;
   }
   if (concepts.some((concept) => concept.ambiguity > 0.75)) score += SCORE.grammarRisk;

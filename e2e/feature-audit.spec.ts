@@ -178,9 +178,7 @@ test("character remains bright, layered correctly, and large while teaching", as
     )
   }));
   const brightness =
-    lighting.filter === "none"
-      ? 1
-      : Number(lighting.filter.match(/brightness\(([^)]+)\)/u)?.[1] ?? 0);
+    lighting.filter === "none" ? 1 : Number(lighting.filter.match(/brightness\(([^)]+)\)/u)?.[1] ?? 0);
   expect(brightness).toBeGreaterThanOrEqual(1);
   expect(lighting.zIndex).toBeGreaterThan(lighting.overlayZIndex);
   const stageBox = await stage.boundingBox();

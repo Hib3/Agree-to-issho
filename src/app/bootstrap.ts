@@ -20,21 +20,44 @@ export async function bootstrapApp(now = Date.now()) {
 }
 
 export async function loadSnapshot() {
-  const [player, character, settings, concepts, relations, memories, sessions, dialogue, diaries, learningSession, newsItems] =
-    await Promise.all([
-      db.player.get("local"),
-      db.character.get("aguri"),
-      db.settings.get("local"),
-      db.concepts.toArray(),
-      db.relations.toArray(),
-      db.memories.toArray(),
-      db.conversationSessions.orderBy("updatedAt").toArray(),
-      db.dialogueHistory.orderBy("createdAt").toArray(),
-      db.diaries.orderBy("date").toArray(),
-      db.learningSessions.get("active"),
-      db.newsItems.orderBy("publishedAt").reverse().limit(120).toArray()
-    ]);
-  return { player: player ?? null, character: character ?? null, settings: settings ?? null, concepts, relations, memories, sessions, dialogue, diaries, learningSession: learningSession ?? null, newsItems };
+  const [
+    player,
+    character,
+    settings,
+    concepts,
+    relations,
+    memories,
+    sessions,
+    dialogue,
+    diaries,
+    learningSession,
+    newsItems
+  ] = await Promise.all([
+    db.player.get("local"),
+    db.character.get("aguri"),
+    db.settings.get("local"),
+    db.concepts.toArray(),
+    db.relations.toArray(),
+    db.memories.toArray(),
+    db.conversationSessions.orderBy("updatedAt").toArray(),
+    db.dialogueHistory.orderBy("createdAt").toArray(),
+    db.diaries.orderBy("date").toArray(),
+    db.learningSessions.get("active"),
+    db.newsItems.orderBy("publishedAt").reverse().limit(120).toArray()
+  ]);
+  return {
+    player: player ?? null,
+    character: character ?? null,
+    settings: settings ?? null,
+    concepts,
+    relations,
+    memories,
+    sessions,
+    dialogue,
+    diaries,
+    learningSession: learningSession ?? null,
+    newsItems
+  };
 }
 
 export async function resetGameData(now = Date.now()) {

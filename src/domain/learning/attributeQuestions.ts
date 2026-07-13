@@ -226,11 +226,26 @@ export function questionsForCategory(category: ConceptCategory): AttributeQuesti
   }
 
   if (["music", "viewable", "readable"].includes(category)) {
-    const options = category === "music"
-      ? [["listen", "聞く"], ["perform", "演奏する"], ["create", "作る"], ["other", "ほか"]]
-      : category === "viewable"
-        ? [["watch", "見る"], ["create", "作る"], ["other", "ほか"]]
-        : [["read", "読む"], ["write", "書く"], ["reference", "調べる"], ["other", "ほか"]];
+    const options =
+      category === "music"
+        ? [
+            ["listen", "聞く"],
+            ["perform", "演奏する"],
+            ["create", "作る"],
+            ["other", "ほか"]
+          ]
+        : category === "viewable"
+          ? [
+              ["watch", "見る"],
+              ["create", "作る"],
+              ["other", "ほか"]
+            ]
+          : [
+              ["read", "読む"],
+              ["write", "書く"],
+              ["reference", "調べる"],
+              ["other", "ほか"]
+            ];
     return [
       question("experienceMode", "どうやって楽しんだり使ったりする？", "experienceMode", options),
       socialMode,
@@ -284,7 +299,10 @@ export function attributeQuestionsForCategory(category: ConceptCategory) {
   return questionsForCategory(category).filter((item) => item.id !== "preference");
 }
 
-export function answerLabel(questionItem: AttributeQuestion, value: string | number | boolean | null | undefined) {
+export function answerLabel(
+  questionItem: AttributeQuestion,
+  value: string | number | boolean | null | undefined
+) {
   return questionItem.options.find((option) => option.value === String(value))?.label ?? String(value ?? "");
 }
 

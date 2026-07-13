@@ -4,7 +4,14 @@ import { normalizeJapanese } from "../../domain/grammar/japaneseNormalizer";
 import { db } from "./database";
 import { LEGACY_DB_NAME } from "./schema";
 
-type LegacyWord = { id?: string; surface?: string; reading?: string; category?: string; confidence?: number; created_at?: string };
+type LegacyWord = {
+  id?: string;
+  surface?: string;
+  reading?: string;
+  category?: string;
+  confidence?: number;
+  created_at?: string;
+};
 
 export type LegacyPreview = {
   available: boolean;
@@ -20,14 +27,17 @@ export async function detectLegacyDatabase() {
 }
 
 export async function previewLegacyImport(): Promise<LegacyPreview> {
-  if (!(await detectLegacyDatabase())) return { available: false, sourceCounts: {}, concepts: [], warnings: [] };
+  if (!(await detectLegacyDatabase()))
+    return { available: false, sourceCounts: {}, concepts: [], warnings: [] };
   const legacy = await openExistingLegacyDatabase();
   try {
     const sourceCounts: Record<string, number> = {};
     for (const storeName of Array.from(legacy.objectStoreNames)) {
       sourceCounts[storeName] = await countStore(legacy, storeName);
     }
-    const words = legacy.objectStoreNames.contains("words") ? await readStore<LegacyWord>(legacy, "words") : [];
+    const words = legacy.objectStoreNames.contains("words")
+      ? await readStore<LegacyWord>(legacy, "words")
+      : [];
     const warnings: string[] = [];
     const concepts = words.flatMap((word, index): Concept[] => {
       if (!word.surface?.trim()) {

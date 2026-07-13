@@ -3,7 +3,8 @@ import type { ConceptCategory } from "../../domain/model/concept";
 import type { ConversationIntent, ConversationPhase } from "../../domain/model/conversation";
 import type { RelationType } from "../../domain/model/relation";
 
-export type GrammaticalRole = "topic" | "subject" | "object" | "location" | "action" | "container" | "body_part" | "companion";
+export type GrammaticalRole =
+  "topic" | "subject" | "object" | "location" | "action" | "container" | "body_part" | "companion";
 
 export type TemplateSlot = {
   name: string;

@@ -14,17 +14,20 @@ describe("game settings migration", () => {
   });
 
   it("unmutes legacy settings because the old mute control had no audio implementation", () => {
-    const settings = migrateGameSettings({
-      id: "local",
-      textSpeed: "normal",
-      fontScale: "normal",
-      highContrast: false,
-      reducedMotion: false,
-      volume: 0.6,
-      muted: true,
-      autonomousSpeech: true,
-      updatedAt: 10
-    }, 100);
+    const settings = migrateGameSettings(
+      {
+        id: "local",
+        textSpeed: "normal",
+        fontScale: "normal",
+        highContrast: false,
+        reducedMotion: false,
+        volume: 0.6,
+        muted: true,
+        autonomousSpeech: true,
+        updatedAt: 10
+      },
+      100
+    );
     expect(settings.muted).toBe(false);
     expect(settings.audioRevision).toBe(1);
   });

@@ -23,17 +23,22 @@ const speakingCharacterFiles: Partial<Record<CharacterEmotion, string>> = {
 };
 
 export function characterImageFor(emotion: CharacterEmotion, isSpeaking = false, isBlinking = false) {
-  const file = isBlinking && emotion === "calm"
-    ? "aguri_idle_blink.png"
-    : isSpeaking
-      ? speakingCharacterFiles[emotion] ?? restingCharacterFiles[emotion]
-      : restingCharacterFiles[emotion];
+  const file =
+    isBlinking && emotion === "calm"
+      ? "aguri_idle_blink.png"
+      : isSpeaking
+        ? (speakingCharacterFiles[emotion] ?? restingCharacterFiles[emotion])
+        : restingCharacterFiles[emotion];
   return `${base}assets/characters/main/fullbody/approved/${file}`;
 }
 
 export const fallbackCharacterImage = `${base}assets/characters/main/fullbody/approved/aguri_normal.png`;
 
-export function sceneBackgroundFor(location: LocationId, time: TimeOfDay, weather: "clear" | "rain" = "clear") {
+export function sceneBackgroundFor(
+  location: LocationId,
+  time: TimeOfDay,
+  weather: "clear" | "rain" = "clear"
+) {
   if (location === "street") return `${base}assets/backgrounds/aguri_street_day.webp`;
   if (location === "rooftop") return `${base}assets/backgrounds/aguri_rooftop_evening.webp`;
   if (weather === "rain") return `${base}assets/backgrounds/aguri_room_rainy.webp`;

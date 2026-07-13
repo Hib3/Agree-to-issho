@@ -73,7 +73,11 @@ const frames: Frame[] = [
   },
   {
     id: "person_action_place",
-    slots: [slot("person", [...people], "subject"), slot("action", [...actions], "action"), slot("place", ["place"], "location")],
+    slots: [
+      slot("person", [...people], "subject"),
+      slot("action", [...actions], "action"),
+      slot("place", ["place"], "location")
+    ],
     text: "「{person}」が「{place}」で{action:doing}ところを想像しましたっ。",
     intents: ["small_talk", "daydream", "outing_report", "misunderstanding"],
     asksSituationFor: ["daydream", "misunderstanding"]
@@ -178,7 +182,10 @@ const frames: Frame[] = [
   },
   {
     id: "object_container_daydream",
-    slots: [slot("object", [...objects, "food_drink"], "object"), slot("container", ["usable_object", "place"], "container")],
+    slots: [
+      slot("object", [...objects, "food_drink"], "object"),
+      slot("container", ["usable_object", "place"], "container")
+    ],
     text: "「{container}」の中に「{object}」が入っている場面を想像しましたっ。",
     intents: ["daydream", "discovery", "misunderstanding"],
     asksSituationFor: ["daydream", "misunderstanding"]
@@ -187,7 +194,8 @@ const frames: Frame[] = [
 
 export const dialogueTemplates: DialogueTemplate[] = frames.flatMap((frame, frameIndex) =>
   frame.intents.map((intent, intentIndex) => {
-    const asksQuestion = intent.startsWith("ask_") || intent === "misunderstanding" || frame.asksSituationFor?.includes(intent);
+    const asksQuestion =
+      intent.startsWith("ask_") || intent === "misunderstanding" || frame.asksSituationFor?.includes(intent);
     return {
       id: `dialogue_${intent}_${frame.id}`,
       semanticFrame: `${intent}.${frame.id}`,
@@ -195,11 +203,12 @@ export const dialogueTemplates: DialogueTemplate[] = frames.flatMap((frame, fram
       intent,
       phase: "premise" as const,
       locations: rotateLocations(frameIndex + intentIndex),
-      moods: intent === "quiet_moment"
-        ? ["calm" as const, "sleepy" as const]
-        : intent === "misunderstanding"
-          ? ["confused" as const, "curious" as const]
-          : ["curious" as const, "happy" as const],
+      moods:
+        intent === "quiet_moment"
+          ? ["calm" as const, "sleepy" as const]
+          : intent === "misunderstanding"
+            ? ["confused" as const, "curious" as const]
+            : ["curious" as const, "happy" as const],
       slots: frame.slots,
       constraints: { minUserWords: intent.startsWith("ask_") ? 1 : 0, maxRecentUse: 0 },
       variants: [frame.text],
@@ -209,11 +218,17 @@ export const dialogueTemplates: DialogueTemplate[] = frames.flatMap((frame, fram
   })
 );
 
-function slot(name: string, categories: TemplateSlot["categories"], grammaticalRole: TemplateSlot["grammaticalRole"]): TemplateSlot {
+function slot(
+  name: string,
+  categories: TemplateSlot["categories"],
+  grammaticalRole: TemplateSlot["grammaticalRole"]
+): TemplateSlot {
   return { name, categories, grammaticalRole, required: true };
 }
 
 function rotateLocations(index: number) {
   const all = ["room", "street", "rooftop"];
-  return index % 4 === 0 ? all : [all[index % all.length] ?? "room", all[(index + 1) % all.length] ?? "street"];
+  return index % 4 === 0
+    ? all
+    : [all[index % all.length] ?? "room", all[(index + 1) % all.length] ?? "street"];
 }

@@ -1,8 +1,4 @@
-import type {
-  CompositionProposition,
-  ConversationSession,
-  DialogueTurn
-} from "../model/conversation";
+import type { CompositionProposition, ConversationSession, DialogueTurn } from "../model/conversation";
 import { CURRENT_DIALOGUE_REVISION } from "../model/conversation";
 
 type LegacySession = Omit<Partial<ConversationSession>, "dialogueRevision"> & {
@@ -13,7 +9,12 @@ type LegacySession = Omit<Partial<ConversationSession>, "dialogueRevision"> & {
 
 export function isCurrentConversationSession(session: ConversationSession) {
   const candidate = session as LegacySession;
-  return candidate.schemaVersion === 2 && candidate.dialogueRevision === CURRENT_DIALOGUE_REVISION && Boolean(candidate.proposition) && Array.isArray(candidate.topicWordIds);
+  return (
+    candidate.schemaVersion === 2 &&
+    candidate.dialogueRevision === CURRENT_DIALOGUE_REVISION &&
+    Boolean(candidate.proposition) &&
+    Array.isArray(candidate.topicWordIds)
+  );
 }
 
 export function migrateConversationSession(
@@ -23,7 +24,9 @@ export function migrateConversationSession(
 ): ConversationSession {
   if (isCurrentConversationSession(session)) return session;
   const legacy = session as LegacySession;
-  const slotIds = Object.values(legacy.slotConceptIds ?? {}).filter((id): id is string => typeof id === "string");
+  const slotIds = Object.values(legacy.slotConceptIds ?? {}).filter(
+    (id): id is string => typeof id === "string"
+  );
   const focusId = slotIds[0] ?? "legacy_unknown";
   const proposition: CompositionProposition = {
     wordIds: [focusId],

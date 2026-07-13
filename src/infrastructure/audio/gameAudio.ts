@@ -16,7 +16,10 @@ export function playGameSound(sound: GameSound, settings: Pick<GameSettings, "mu
     audioContext ??= new AudioContextClass();
     const play = () => synthesize(audioContext!, sound, settings.volume);
     if (audioContext.state === "suspended") {
-      void audioContext.resume().then(play).catch(() => undefined);
+      void audioContext
+        .resume()
+        .then(play)
+        .catch(() => undefined);
     } else {
       play();
     }
@@ -28,10 +31,19 @@ export function playGameSound(sound: GameSound, settings: Pick<GameSettings, "mu
 
 function synthesize(context: AudioContext, sound: GameSound, volume: number) {
   const notes: Record<GameSound, Array<[number, number, number]>> = {
-    talk: [[523, 0, 0.07], [659, 0.07, 0.09]],
+    talk: [
+      [523, 0, 0.07],
+      [659, 0.07, 0.09]
+    ],
     page: [[440, 0, 0.045]],
-    confirm: [[587, 0, 0.06], [784, 0.065, 0.11]],
-    notice: [[392, 0, 0.07], [523, 0.08, 0.12]]
+    confirm: [
+      [587, 0, 0.06],
+      [784, 0.065, 0.11]
+    ],
+    notice: [
+      [392, 0, 0.07],
+      [523, 0.08, 0.12]
+    ]
   };
   const start = context.currentTime;
   for (const [frequency, delay, duration] of notes[sound]) {

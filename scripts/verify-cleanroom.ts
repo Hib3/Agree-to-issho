@@ -2,15 +2,21 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 
 const root = process.cwd();
-const files = walk(join(root, "src")).filter((path) => [".ts", ".tsx", ".css", ".json"].includes(extname(path)));
+const files = walk(join(root, "src")).filter((path) =>
+  [".ts", ".tsx", ".css", ".json"].includes(extname(path))
+);
 const errors: string[] = [];
 for (const file of files) {
   const text = readFileSync(file, "utf8");
-  if (/\b(?:TODO|FIXME|DUMMY_DATA|PLACEHOLDER_TEXT)\b/i.test(text)) errors.push(`${relative(root, file)} contains unfinished marker`);
-  if (/legacy\/|from\s+["'][^"']*old|from\s+["'][^"']*game\//i.test(text)) errors.push(`${relative(root, file)} imports legacy runtime code`);
+  if (/\b(?:TODO|FIXME|DUMMY_DATA|PLACEHOLDER_TEXT)\b/i.test(text))
+    errors.push(`${relative(root, file)} contains unfinished marker`);
+  if (/legacy\/|from\s+["'][^"']*old|from\s+["'][^"']*game\//i.test(text))
+    errors.push(`${relative(root, file)} imports legacy runtime code`);
 }
 
-const publicFiles = walk(join(root, "public")).map((path) => relative(join(root, "public"), path).replaceAll("\\", "/"));
+const publicFiles = walk(join(root, "public")).map((path) =>
+  relative(join(root, "public"), path).replaceAll("\\", "/")
+);
 const allowedPublic = new Set([
   "assets/characters/main/fullbody/approved/aguri_normal.png",
   "assets/characters/main/fullbody/approved/aguri_talk_happy.png",
@@ -33,13 +39,16 @@ const allowedPublic = new Set([
   "assets/ui/textures/choice-paper.webp",
   "assets/ui/textures/primary-fabric.webp"
 ]);
-for (const file of publicFiles) if (!allowedPublic.has(file)) errors.push(`unapproved public runtime file: ${file}`);
+for (const file of publicFiles)
+  if (!allowedPublic.has(file)) errors.push(`unapproved public runtime file: ${file}`);
 
 if (errors.length > 0) {
   console.error(errors.join("\n"));
   process.exit(1);
 }
-console.log(`clean-room verified: ${files.length} source files, ${publicFiles.length} approved public assets`);
+console.log(
+  `clean-room verified: ${files.length} source files, ${publicFiles.length} approved public assets`
+);
 
 function walk(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {

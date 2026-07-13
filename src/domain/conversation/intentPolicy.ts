@@ -1,7 +1,11 @@
 import type { Location } from "../model/location";
 import type { CharacterState } from "../model/character";
 import type { Concept } from "../model/concept";
-import { conversationIntents, type ConversationIntent, type ConversationSession } from "../model/conversation";
+import {
+  conversationIntents,
+  type ConversationIntent,
+  type ConversationSession
+} from "../model/conversation";
 import { getTimeOfDay } from "../schedule/timeOfDay";
 
 export type IntentBias = Partial<Record<ConversationIntent, number>>;
@@ -13,7 +17,10 @@ export function buildIntentBias(input: {
   location: Location;
   now: number;
 }): IntentBias {
-  const bias = Object.fromEntries(conversationIntents.map((intent) => [intent, 0])) as Record<ConversationIntent, number>;
+  const bias = Object.fromEntries(conversationIntents.map((intent) => [intent, 0])) as Record<
+    ConversationIntent,
+    number
+  >;
   for (const intent of input.location.preferredIntents) bias[intent] += 24;
 
   const learned = input.concepts.filter((concept) => concept.source === "user" && concept.active);

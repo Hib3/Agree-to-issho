@@ -2,12 +2,12 @@
 
 Windows側から実通信し、応答形式とブラウザCORS条件を確認した記録です。記事本文は保存していません。
 
-| 入力 | 直接HTTP | ブラウザ直接取得 | rss2json | Reader | 確認結果 |
-|---|---:|---|---|---|---|
-| Yahoo!ニュース 主要RSS | 200 / XML | CORS許可なし | 422 | 200 / 見出し取得 | 第2補助が必要 |
-| GIGAZINE RSS 2.0 | 200 / XML | CORS許可なし | 200 / 10件 | 未使用 | 第1補助で取得可能 |
-| Lifehacker Japan RSS | 200 / XML | CORS許可なし | 200 / 10件 | 未使用 | 第1補助で取得可能 |
-| berss.com/feed | 200 / HTML | RSSではない | 500 | 対象外 | RSS検索ツールのページ |
+| 入力                   |   直接HTTP | ブラウザ直接取得 | rss2json   | Reader           | 確認結果              |
+| ---------------------- | ---------: | ---------------- | ---------- | ---------------- | --------------------- |
+| Yahoo!ニュース 主要RSS |  200 / XML | CORS許可なし     | 422        | 200 / 見出し取得 | 第2補助が必要         |
+| GIGAZINE RSS 2.0       |  200 / XML | CORS許可なし     | 200 / 10件 | 未使用           | 第1補助で取得可能     |
+| Lifehacker Japan RSS   |  200 / XML | CORS許可なし     | 200 / 10件 | 未使用           | 第1補助で取得可能     |
+| berss.com/feed         | 200 / HTML | RSSではない      | 500        | 対象外           | RSS検索ツールのページ |
 
 production buildをChromiumで操作し、取得補助を有効にして登録した結果は、Yahoo 8件、GIGAZINE 10件、Lifehacker 10件でした。`https://gigazine.net/` のサイトURLから既存のGIGAZINE RSSを検出し、「登録済み」と判定するところまで確認しました。
 

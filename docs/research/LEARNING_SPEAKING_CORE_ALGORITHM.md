@@ -157,7 +157,7 @@ PWAでは、原作機能から外れない最小条件だけ使う。
 
 ```ts
 function pickLearnedWord(slot: TalkSlot, words: LearnedWord[]): LearnedWord | null {
-  const candidates = words.filter(word => word.meaningKind === slot.meaningKind);
+  const candidates = words.filter((word) => word.meaningKind === slot.meaningKind);
   if (candidates.length === 0) return null;
   return leastRecentlyUsed(candidates);
 }

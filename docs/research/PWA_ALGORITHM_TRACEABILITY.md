@@ -6,31 +6,31 @@ PWA実装で、Codexが勝手に作った仕様を原作由来として混ぜな
 
 ## Evidence Summary
 
-| Evidence | Status | Implementation Meaning |
-| --- | --- | --- |
-| User teaches words in the original game | Confirmed from public gameplay | PWA must accept user-provided words. |
-| Additional questions after teaching words | Confirmed from public gameplay | PWA must ask follow-up questions before finalizing a word. |
-| Learned words appear in later conversation | Confirmed from public gameplay | PWA must reuse learned words in speech. |
-| `WORD/QUEST` region referenced 90 times | Confirmed from local structural analysis | Question-related labels/structures are referenced in entry 1. |
-| `ANS` region referenced 34 times | Confirmed from local structural analysis | Answer-related labels/structures are referenced in a separate entry 1 region. |
-| WQ and ANS functions share 0 functions, have 5 direct links and 9 common callees | Confirmed from heuristic call graph | Question and answer responsibilities should be separate but connected. |
-| `%s` markers in entry 1 have 18 code xrefs | Confirmed from local structural analysis | Slot formatting exists. |
-| `%s` inserts learned user words | Unknown | Do not claim; use only as weak support for slot-style rendering. |
-| Original categories, weights, randomness, templates | Unknown | Do not implement as original behavior. |
+| Evidence                                                                         | Status                                   | Implementation Meaning                                                        |
+| -------------------------------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| User teaches words in the original game                                          | Confirmed from public gameplay           | PWA must accept user-provided words.                                          |
+| Additional questions after teaching words                                        | Confirmed from public gameplay           | PWA must ask follow-up questions before finalizing a word.                    |
+| Learned words appear in later conversation                                       | Confirmed from public gameplay           | PWA must reuse learned words in speech.                                       |
+| `WORD/QUEST` region referenced 90 times                                          | Confirmed from local structural analysis | Question-related labels/structures are referenced in entry 1.                 |
+| `ANS` region referenced 34 times                                                 | Confirmed from local structural analysis | Answer-related labels/structures are referenced in a separate entry 1 region. |
+| WQ and ANS functions share 0 functions, have 5 direct links and 9 common callees | Confirmed from heuristic call graph      | Question and answer responsibilities should be separate but connected.        |
+| `%s` markers in entry 1 have 18 code xrefs                                       | Confirmed from local structural analysis | Slot formatting exists.                                                       |
+| `%s` inserts learned user words                                                  | Unknown                                  | Do not claim; use only as weak support for slot-style rendering.              |
+| Original categories, weights, randomness, templates                              | Unknown                                  | Do not implement as original behavior.                                        |
 
 ## Function Contract Mapping
 
-| PWA Function | Evidence Basis | Allowed Behavior | Not Allowed |
-| --- | --- | --- | --- |
-| `learnWord(input)` | Public gameplay: user teaches words | Accept exact user input, normalize for duplicate check, create draft | Invent original category set and call it original |
-| `chooseLearningQuestion(draft, state)` | Public gameplay + `WORD/QUEST` referenced region | Ask one follow-up question about the new word | Use original question text; claim original question order |
-| `applyLearningAnswer(answer, state)` | Public gameplay + separate `ANS` referenced region | Attach answer to pending draft or update existing word | Claim original answer save format |
-| `finalizeLearnedWord(draft)` | Public gameplay: learned words persist | Commit word only after required question answers | Store original dictionaries or extracted text |
-| `chooseSpeechSlot(context)` | `%s` code xrefs show slot formatting exists | Choose one safe original PWA slot | Use original templates or character voice |
-| `pickWordForSpeech(slot, words)` | Public gameplay: learned words reused | Pick one compatible learned word; prefer simple deterministic fallback | Claim original weighting/randomness |
-| `renderSpeech(slot, word)` | `%s` xrefs support slot rendering | Render original PWA sentence with at most one learned word | Reuse original dialogue, original phrasing, or extracted samples |
-| `exportLearningData()` | User requirement for import/export | Export user-created learning JSON only | Export original data, generated scan JSON, or extracted strings |
-| `importLearningData(data)` | User requirement for import/export | Import same clean JSON schema with validation | Import original disc data or copyrighted content |
+| PWA Function                           | Evidence Basis                                     | Allowed Behavior                                                       | Not Allowed                                                      |
+| -------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `learnWord(input)`                     | Public gameplay: user teaches words                | Accept exact user input, normalize for duplicate check, create draft   | Invent original category set and call it original                |
+| `chooseLearningQuestion(draft, state)` | Public gameplay + `WORD/QUEST` referenced region   | Ask one follow-up question about the new word                          | Use original question text; claim original question order        |
+| `applyLearningAnswer(answer, state)`   | Public gameplay + separate `ANS` referenced region | Attach answer to pending draft or update existing word                 | Claim original answer save format                                |
+| `finalizeLearnedWord(draft)`           | Public gameplay: learned words persist             | Commit word only after required question answers                       | Store original dictionaries or extracted text                    |
+| `chooseSpeechSlot(context)`            | `%s` code xrefs show slot formatting exists        | Choose one safe original PWA slot                                      | Use original templates or character voice                        |
+| `pickWordForSpeech(slot, words)`       | Public gameplay: learned words reused              | Pick one compatible learned word; prefer simple deterministic fallback | Claim original weighting/randomness                              |
+| `renderSpeech(slot, word)`             | `%s` xrefs support slot rendering                  | Render original PWA sentence with at most one learned word             | Reuse original dialogue, original phrasing, or extracted samples |
+| `exportLearningData()`                 | User requirement for import/export                 | Export user-created learning JSON only                                 | Export original data, generated scan JSON, or extracted strings  |
+| `importLearningData(data)`             | User requirement for import/export                 | Import same clean JSON schema with validation                          | Import original disc data or copyrighted content                 |
 
 ## Implementation-Level Rules
 

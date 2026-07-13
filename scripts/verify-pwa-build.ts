@@ -16,7 +16,8 @@ if (!existsSync(serviceWorkerPath)) {
   for (const url of urls) {
     if (/^https?:/u.test(url)) continue;
     const relativePath = url.split("?", 1)[0];
-    if (relativePath && !existsSync(join(dist, relativePath))) errors.push(`missing precache file: ${relativePath}`);
+    if (relativePath && !existsSync(join(dist, relativePath)))
+      errors.push(`missing precache file: ${relativePath}`);
   }
   if (urls.filter((url) => url.endsWith("aguri_normal.png")).length !== 1) {
     errors.push("PWA icon must occur exactly once in the precache manifest");

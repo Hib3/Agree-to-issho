@@ -53,13 +53,33 @@ export function App() {
   }, [settings, refresh]);
 
   if (store.loading) return <main className="loading-screen">部屋を開いています…</main>;
-  if (store.error) return <main className="error-screen"><h1>部屋を開けませんでした</h1><p>{store.error}</p><button type="button" onClick={() => location.reload()}>もう一度</button></main>;
+  if (store.error)
+    return (
+      <main className="error-screen">
+        <h1>部屋を開けませんでした</h1>
+        <p>{store.error}</p>
+        <button type="button" onClick={() => location.reload()}>
+          もう一度
+        </button>
+      </main>
+    );
 
   const userWordCount = store.concepts.filter((concept) => concept.source === "user").length;
-  const rootClass = [store.settings?.highContrast ? "high-contrast" : "", store.settings ? `font-${store.settings.fontScale}` : ""].filter(Boolean).join(" ");
+  const rootClass = [
+    store.settings?.highContrast ? "high-contrast" : "",
+    store.settings ? `font-${store.settings.fontScale}` : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   async function startNewGame() {
-    if (store.player && !window.confirm("教えた言葉、会話、日記をこの端末から消して、最初から始めますか？\n必要なら先に保存データを作ってください。")) return;
+    if (
+      store.player &&
+      !window.confirm(
+        "教えた言葉、会話、日記をこの端末から消して、最初から始めますか？\n必要なら先に保存データを作ってください。"
+      )
+    )
+      return;
     await resetGameData();
     await store.initialize();
   }
@@ -71,13 +91,20 @@ export function App() {
           hasSave={Boolean(store.player)}
           userWordCount={userWordCount}
           onContinue={() => store.setScreen("room")}
-          onStart={() => { void startNewGame(); }}
+          onStart={() => {
+            void startNewGame();
+          }}
           onManual={() => store.setScreen("manual")}
           onBackup={() => store.setScreen("backup")}
         />
       ) : null}
       {screen === "onboarding" ? (
-        <FirstStartWizard onComplete={async () => { await store.refresh(); store.setScreen("teach"); }} />
+        <FirstStartWizard
+          onComplete={async () => {
+            await store.refresh();
+            store.setScreen("teach");
+          }}
+        />
       ) : null}
       {screen === "room" && store.player && store.character && store.settings ? (
         <MainRoom
@@ -98,16 +125,65 @@ export function App() {
           initialSession={store.learningSession}
           locationId={store.character?.currentLocationId ?? "room"}
           onChanged={store.refresh}
-          onComplete={() => { void store.refresh(); store.setScreen("room"); }}
+          onComplete={() => {
+            void store.refresh();
+            store.setScreen("room");
+          }}
         />
       ) : null}
-      {screen === "wordbook" ? <WordbookScreen concepts={store.concepts} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
-      {screen === "diary" ? <DiaryScreen concepts={store.concepts} memories={store.memories} dialogue={store.dialogue} diaries={store.diaries} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
-      {screen === "locations" && store.character ? <LocationsScreen character={store.character} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
-      {screen === "settings" && store.settings ? <SettingsScreen settings={store.settings} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
-      {screen === "news" && store.settings ? <NewsScreen items={store.newsItems} concepts={store.concepts} character={store.character ?? undefined} relations={store.relations} memories={store.memories} settings={store.settings} onChanged={store.refresh} onOpenSettings={() => store.setScreen("settings")} onBack={() => store.setScreen("room")} /> : null}
-      {screen === "backup" ? <BackupScreen onChanged={store.refresh} onBack={() => store.setScreen(store.player ? "room" : "title")} /> : null}
-      {screen === "manual" ? <ManualScreen onBack={() => store.setScreen(store.player ? "room" : "title")} /> : null}
+      {screen === "wordbook" ? (
+        <WordbookScreen
+          concepts={store.concepts}
+          onChanged={store.refresh}
+          onBack={() => store.setScreen("room")}
+        />
+      ) : null}
+      {screen === "diary" ? (
+        <DiaryScreen
+          concepts={store.concepts}
+          memories={store.memories}
+          dialogue={store.dialogue}
+          diaries={store.diaries}
+          onChanged={store.refresh}
+          onBack={() => store.setScreen("room")}
+        />
+      ) : null}
+      {screen === "locations" && store.character ? (
+        <LocationsScreen
+          character={store.character}
+          onChanged={store.refresh}
+          onBack={() => store.setScreen("room")}
+        />
+      ) : null}
+      {screen === "settings" && store.settings ? (
+        <SettingsScreen
+          settings={store.settings}
+          onChanged={store.refresh}
+          onBack={() => store.setScreen("room")}
+        />
+      ) : null}
+      {screen === "news" && store.settings ? (
+        <NewsScreen
+          items={store.newsItems}
+          concepts={store.concepts}
+          character={store.character ?? undefined}
+          relations={store.relations}
+          memories={store.memories}
+          settings={store.settings}
+          onChanged={store.refresh}
+          onOpenSettings={() => store.setScreen("settings")}
+          onBack={() => store.setScreen("room")}
+        />
+      ) : null}
+      {screen === "backup" ? (
+        <BackupScreen
+          onChanged={store.refresh}
+          onBack={() => store.setScreen(store.player ? "room" : "title")}
+        />
+      ) : null}
+      {screen === "manual" ? (
+        <ManualScreen onBack={() => store.setScreen(store.player ? "room" : "title")} />
+      ) : null}
     </div>
   );
 }
