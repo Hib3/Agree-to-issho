@@ -100,7 +100,10 @@ function digestFromEvidence(
   now: number,
   uncertainties: string[]
 ): ArticleDigest {
-  const usableFacts = evidence.filter((entry) => entry.source !== "headline").slice(0, 4);
+  const headline = evidence.find((entry) => entry.source === "headline")?.text ?? item.title;
+  const usableFacts = evidence
+    .filter((entry) => entry.source !== "headline" && !isNearDuplicate(entry.text, headline))
+    .slice(0, 4);
   const keyFacts = usableFacts.map((entry, index) => ({
     id: `${item.id}_fact_${index}`,
     text: entry.text,
@@ -147,6 +150,22 @@ function digestFromEvidence(
             ? 0.5
             : 0.25
   };
+}
+
+function isNearDuplicate(candidate: string, reference: string) {
+  const left = comparableText(candidate);
+  const right = comparableText(reference);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
+  return shorter.length >= 12 && longer.includes(shorter) && shorter.length / longer.length >= 0.65;
+}
+
+function comparableText(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]/gu, "");
 }
 
 function extractArticleText(source: string, contentType: string) {

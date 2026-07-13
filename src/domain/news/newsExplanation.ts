@@ -29,7 +29,7 @@ export function buildNewsConversationPlan(
   const sensitive = digest.tone === "sensitive";
   const directMatches = findNewsConcepts(item, digest, concepts);
   const topic = digest.topics[0] ?? { key: "general", label: "世の中の出来事" };
-  const target = selectSpecificTarget(item, digest);
+  const target = selectSpecificTarget(digest);
   const lens = selectLens(digest, directMatches, context.character);
   const baseEmotion: NewsBeat["emotion"] = sensitive
     ? "calm"
@@ -273,12 +273,11 @@ function imaginationText(topicKey: string, target: string) {
   return `ここからはアグリの想像です。${target}の続きが気になって、ノートの余白へ先に予想を書き込みそうです。`;
 }
 
-function selectSpecificTarget(item: NewsItem, digest: ArticleDigest) {
-  return (
-    digest.numericalFacts[0]?.value ??
-    digest.entities[0]?.name ??
-    `「${Array.from(item.title).slice(0, 42).join("")}」という変化`
-  );
+function selectSpecificTarget(digest: ArticleDigest) {
+  const concreteTarget = digest.numericalFacts[0]?.value ?? digest.entities[0]?.name;
+  if (concreteTarget) return concreteTarget;
+  const topic = digest.topics[0];
+  return topic && topic.key !== "general" ? `${topic.label}への影響` : "見出しで示された出来事の内容";
 }
 
 function selectLens(

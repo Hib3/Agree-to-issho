@@ -79,4 +79,22 @@ describe("grounded news explanation", () => {
     expect(plan.pages.map((page) => page.text).join(" ")).not.toMatch(/わくわく|ギャグ|すごい/u);
     expect(plan.emotionCurve).not.toContain("excited");
   });
+
+  it("does not present a truncated headline copy as a separate fact", () => {
+    const technical = {
+      ...item,
+      id: "news_technical",
+      title: "feat: add punchline story arcs and integrate character staging",
+      summary: "feat: add punchline story arcs and integra"
+    };
+    const digest = buildFeedDigest(technical, item.fetchedAt);
+    const plan = buildNewsConversationPlan(technical, digest, []);
+
+    expect(digest.keyFacts).toEqual([]);
+    expect(plan.openingReaction.text).toContain("見出しで示された出来事の内容");
+    expect(plan.openingReaction.text).not.toContain(
+      "「feat: add punchline story arcs and integra」という変化"
+    );
+    expect(plan.understanding[0]?.source).toBe("headline");
+  });
 });
