@@ -1,3 +1,5 @@
+import type { LocationId } from "./location";
+
 export type CharacterEmotion =
   | "calm"
   | "curious"
@@ -18,7 +20,7 @@ export type CharacterState = {
   socialNeed: number;
   trust: number;
   boredom: number;
-  currentLocationId: string;
+  currentLocationId: LocationId;
   lastUserInteractionAt: number;
   lastSpeechAt: number;
   updatedAt: number;

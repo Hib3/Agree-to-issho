@@ -61,7 +61,13 @@ export function App() {
         />
       ) : null}
       {screen === "teach" ? (
-        <TeachWordFlow concepts={store.concepts} initialSession={store.learningSession} onChanged={store.refresh} onComplete={() => { void store.refresh(); store.setScreen("room"); }} />
+        <TeachWordFlow
+          concepts={store.concepts}
+          initialSession={store.learningSession}
+          locationId={store.character?.currentLocationId ?? "room"}
+          onChanged={store.refresh}
+          onComplete={() => { void store.refresh(); store.setScreen("room"); }}
+        />
       ) : null}
       {screen === "wordbook" ? <WordbookScreen concepts={store.concepts} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
       {screen === "diary" ? <DiaryScreen concepts={store.concepts} memories={store.memories} dialogue={store.dialogue} diaries={store.diaries} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}

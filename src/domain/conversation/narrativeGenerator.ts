@@ -2,9 +2,10 @@ import type { CompositionProposition, ConversationIntent } from "../model/conver
 import type { Concept } from "../model/concept";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
-import { displayConcept, doPhrase } from "../grammar/japaneseRealizer";
+import { displayConcept } from "../grammar/japaneseRealizer";
 import { controlledPremise } from "./absurdityController";
 import type { ScoredCandidate } from "./scorer";
+import { attributeMemoryBeat } from "./attributeNarration";
 
 export function buildNarrativePages(input: {
   candidate: ScoredCandidate;
@@ -18,13 +19,15 @@ export function buildNarrativePages(input: {
     .filter((concept): concept is Concept => Boolean(concept));
   const focus = usedConcepts.find((concept) => concept.source === "user") ?? usedConcepts[0];
   if (!focus) return [];
+  const learnedAttributeBeat = attributeMemoryBeat(focus);
 
   if (input.proposition.relationType === "relation_discovery") {
     const names = usedConcepts.slice(0, 2).map(quoted);
     return [
       `${names.join("と")}を、同じページで見つけましたっ。`,
+      learnedAttributeBeat,
       `${names.join("と")}の間には、教わった関係がまだありませんっ。`
-    ];
+    ].filter(Boolean);
   }
 
   if (input.proposition.relationType === "confirmed_relation" && input.candidate.template.grounding === "relation_required") {
@@ -32,10 +35,11 @@ export function buildNarrativePages(input: {
     if (frameId !== "word_pair_relation" && input.candidate.template.intent !== "ask_relation") {
       return [
         openingForIntent(input.candidate.template.intent, focus),
+        learnedAttributeBeat,
         `${input.proposition.relationText}と覚えていますっ。`,
         input.rendered,
         outcomeForFrame(input.candidate, input.random)
-      ];
+      ].filter(Boolean);
     }
     return [
       openingForIntent(input.candidate.template.intent, focus),
@@ -45,7 +49,16 @@ export function buildNarrativePages(input: {
   }
 
   if (input.proposition.relationType === "single_word") {
-    return [openingForIntent(input.candidate.template.intent, focus), memoryBeat(focus)];
+    const frameId = input.candidate.template.semanticFrame.split(".").at(-1) ?? "";
+    if (frameId === "single_topic") {
+      return [openingForIntent(input.candidate.template.intent, focus), learnedAttributeBeat, memoryBeat(focus)].filter(Boolean);
+    }
+    return [
+      openingForIntent(input.candidate.template.intent, focus),
+      learnedAttributeBeat,
+      input.rendered,
+      outcomeForFrame(input.candidate, input.random)
+    ].filter(Boolean);
   }
 
   const opening = openingForIntent(input.candidate.template.intent, focus);
@@ -54,14 +67,15 @@ export function buildNarrativePages(input: {
     const names = usedConcepts.map(quoted).join("・");
     return [
       opening,
+      learnedAttributeBeat,
       premise,
       input.rendered,
       `${names}の使い方は、アグリの想像が飛びすぎたかもしれませんっ。`
-    ];
+    ].filter(Boolean);
   }
 
   const outcome = outcomeForFrame(input.candidate, input.random);
-  return [opening, input.rendered, outcome].filter(Boolean);
+  return [opening, learnedAttributeBeat, input.rendered, outcome].filter(Boolean);
 }
 
 function openingForIntent(intent: ConversationIntent, focus: Concept) {
@@ -101,8 +115,28 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
     const concept = candidate.slots[name];
     return concept ? quoted(concept) : "";
   };
-  const action = candidate.slots.action;
   const outcomes: Record<string, string[]> = {
+    person_daily_encounter: [
+      `${value("person")}へ挨拶したあと、どんな話をするか少し迷いそうですっ。`,
+      `${value("person")}に気づいたら、まず落ち着いて声をかけたいですっ。`
+    ],
+    food_small_ritual: [
+      `${value("food")}を置く場所が決まったら、いつもの時間が少し楽しみになりそうですっ。`,
+      `${value("food")}を楽しんだあとは、次の日の分があるか確かめたくなりそうですっ。`
+    ],
+    place_short_visit: [
+      `${value("place")}へ着いたら、急がず一つだけ気になる物を探したいですっ。`,
+      `${value("place")}を出る前に、また来たいかノートへ書いておきますっ。`
+    ],
+    object_missing_plan: objectMissingOutcome(candidate),
+    action_small_goal: [
+      `${value("action")}を始める時間を短く決めたら、取りかかりやすそうですっ。`,
+      `できた所まで印をつければ、${value("action")}の続きも忘れませんっ。`
+    ],
+    living_quiet_observation: [
+      `${value("living")}が驚かない距離から、しばらく静かに見ていたいですっ。`,
+      `${value("living")}の様子が変わったら、あとでノートに描いておきたいですっ。`
+    ],
     person_action_place: [
       `ところがっ、${value("person")}は終わったはずの${value("action")}を、${value("place")}の端でもう一度始めたんですっ！`,
       `${value("person")}が${value("action")}を終えるころ、${value("place")}は最初より少しにぎやかになっていそうですっ！`
@@ -120,8 +154,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("vehicle")}が動き出す前に、${value("container")}を確かめたいですっ。`
     ],
     action_body_warning: [
-      `${value("body")}が疲れる前に、${action ? doPhrase(action) : "その行動をする"}のをいったん休みますっ。`,
-      `${action ? doPhrase(action) : "その行動をする"}なら、${value("body")}の様子も見ておきたいですっ。`
+      `${value("body")}が疲れる前に、${value("action")}をいったん休みますっ。`,
+      `${value("action")}を続けるなら、${value("body")}の様子も見ておきたいですっ。`
     ],
     person_object_rumor: [
       `${value("person")}が${value("object")}を大事にする理由まで、アグリはまだ知りませんっ。`,
@@ -136,8 +170,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("place")}へ着いたら、まず${value("food")}を探したくなりそうですっ！`
     ],
     object_action_plan: [
-      `${value("object")}が見つからなかったら、${action ? doPhrase(action) : "その行動をする"}前に少し困りそうですっ。`,
-      `${action ? doPhrase(action) : "その行動をする"}準備として、${value("object")}を見える所へ置きますっ。`
+      `${value("object")}が見つからなかったら、${value("action")}を始める前に少し困りそうですっ。`,
+      `${value("action")}の準備として、${value("object")}を見える所へ置きますっ。`
     ],
     wearable_person_comparison: [
       `${value("person")}が${value("wearable")}を選んだ理由も、ちょっと聞いてみたいですっ。`,
@@ -156,8 +190,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("person")}の話をすると、今度は${value("music")}を聞きたくなりそうですっ。`
     ],
     body_action_discovery: [
-      `${action ? doPhrase(action) : "その行動をする"}たび、${value("body")}の新しい使い方に気づきそうですっ。`,
-      `${value("body")}がびっくりしないように、${action ? doPhrase(action) : "その行動をする"}のはゆっくり始めますっ。`
+      `${value("action")}を続けるたび、${value("body")}の新しい使い方に気づきそうですっ。`,
+      `${value("body")}がびっくりしないように、${value("action")}はゆっくり始めますっ。`
     ],
     vehicle_place_outing: [
       `${value("place")}へ着いたら、帰りの${value("vehicle")}も忘れずに確かめますっ。`,
@@ -189,4 +223,21 @@ function containerOutcome(candidate: ScoredCandidate) {
     `${containerName}を開けて${objectName}が出てきたら、アグリは二度見しますっ！`,
     `${objectName}を戻す入れ物は、本当に${containerName}でいいのか迷いそうですっ。`
   ];
+}
+
+function objectMissingOutcome(candidate: ScoredCandidate) {
+  const object = candidate.slots.object;
+  if (!object) return ["見つからない物のことは、順番に思い出しますっ。"];
+  const word = quoted(object);
+  const importance = String(object.attributes.importanceWhenMissing ?? "unknown");
+  if (importance === "essential") {
+    return [`${word}がないととても困ると教わったから、出かける前に必ず確かめますっ。`];
+  }
+  if (importance === "troublesome") {
+    return [`${word}がないと少し困るから、代わりを探す時間も考えておきますっ。`];
+  }
+  if (importance === "replaceable") {
+    return [`${word}が見つからない日は、教わった通り代わりの物を使いますっ。`];
+  }
+  return [`${word}が見つからない時にどのくらい困るか、まだアグリは知りませんっ。`];
 }

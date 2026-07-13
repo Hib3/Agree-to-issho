@@ -28,11 +28,13 @@ export function realize(template: string, slots: Record<string, Concept>) {
 }
 
 export function doingPhrase(concept: Concept) {
-  return `「${displayConcept(concept)}」という行動をしている`;
+  if (concept.grammar.teForm) return `「${displayConcept(concept)}」をして、${concept.grammar.teForm}いる`;
+  return `「${displayConcept(concept)}」を続けている`;
 }
 
 export function doPhrase(concept: Concept) {
-  return `「${displayConcept(concept)}」という行動をする`;
+  if (concept.grammar.verbDictionaryForm) return `「${displayConcept(concept)}」として、${concept.grammar.verbDictionaryForm}`;
+  return `「${displayConcept(concept)}」を始める`;
 }
 
 export function splitJapanesePages(text: string, limit = 45) {

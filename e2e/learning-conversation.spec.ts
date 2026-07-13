@@ -11,13 +11,26 @@ test("初回設定から学習語を使う会話まで進める", async ({ page 
   await page.getByRole("button", { name: "この言葉を教える" }).click();
   await page.getByRole("button", { name: "食べ物・生き物" }).click();
   await page.getByRole("button", { name: "食べ物・飲み物" }).click();
+
+  const eat = page.getByRole("button", { name: "食べる", exact: true });
+  const drink = page.getByRole("button", { name: "飲む", exact: true });
   await page.getByRole("button", { name: "食べる" }).click();
+  await expect(eat).toHaveAttribute("aria-pressed", "true");
+  await drink.click();
+  await expect(drink).toHaveAttribute("aria-pressed", "true");
+  await expect(eat).toHaveAttribute("aria-pressed", "false");
+  await eat.click();
+  await page.getByRole("button", { name: "次の質問へ" }).click();
+
+  await page.getByRole("button", { name: "おやつ" }).click();
+  await page.getByRole("button", { name: "好みの質問へ" }).click();
   await page.getByRole("button", { name: "大好き" }).click();
   await page.getByRole("button", { name: "この覚え方で保存" }).click();
   await page.getByRole("button", { name: "覚えた言葉を持って部屋へ戻る" }).click();
 
   await expect(page.getByRole("button", { name: "話す" })).toBeVisible();
   await expect(page.getByRole("button", { name: "言葉を教える" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("button", { name: "話す" }).click();
   const reveal = page.getByRole("button", { name: "全文を表示" });
   if (await reveal.isVisible()) await reveal.click();

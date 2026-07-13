@@ -1,14 +1,15 @@
-import type { ConceptCategory } from "../../domain/model/concept";
+import type { ConceptAttributeValue, ConceptAttributes, ConceptCategory } from "../../domain/model/concept";
+import type { LocationId } from "../../domain/model/location";
 import { createUserConcept } from "../../domain/learning/conceptFactory";
 import { findDuplicate } from "../../domain/learning/duplicateResolver";
 import { createLearningSession, transitionLearning, type LearningContextId, type LearningSession } from "../../domain/learning/learningMachine";
 import { createMemory } from "../../domain/memory/memoryService";
 import { db } from "../../infrastructure/db/database";
 
-export async function beginLearning(contextId: LearningContextId, now = Date.now()) {
+export async function beginLearning(contextId: LearningContextId, locationId: LocationId = "room", now = Date.now()) {
   const existing = await db.learningSessions.get("active");
   if (existing && existing.state !== "completed") return existing;
-  const session = createLearningSession(contextId, now);
+  const session = createLearningSession(contextId, now, locationId);
   await db.learningSessions.put(session);
   return session;
 }
@@ -29,8 +30,32 @@ export async function chooseLearningCategory(session: LearningSession, category:
   return next;
 }
 
-export async function setLearningAttributes(session: LearningSession, attributes: Record<string, string | number | boolean | null>, now = Date.now()) {
+export async function answerLearningAttribute(
+  session: LearningSession,
+  key: string,
+  value: ConceptAttributeValue,
+  isLast: boolean,
+  now = Date.now()
+) {
+  const next = transitionLearning(session, { type: "ANSWER_ATTRIBUTE", key, value, isLast }, now);
+  await db.learningSessions.put(next);
+  return next;
+}
+
+export async function completeLearningAttributes(session: LearningSession, now = Date.now()) {
+  const next = transitionLearning(session, { type: "SKIP_ATTRIBUTES" }, now);
+  await db.learningSessions.put(next);
+  return next;
+}
+
+export async function setLearningAttributes(session: LearningSession, attributes: ConceptAttributes, now = Date.now()) {
   const next = transitionLearning(session, { type: "SET_ATTRIBUTES", attributes }, now);
+  await db.learningSessions.put(next);
+  return next;
+}
+
+export async function setLearningReading(session: LearningSession, reading: string, now = Date.now()) {
+  const next = transitionLearning(session, { type: "SET_READING", reading }, now);
   await db.learningSessions.put(next);
   return next;
 }
@@ -50,8 +75,21 @@ export async function commitLearning(session: LearningSession, now = Date.now())
   if (["famous_person", "person_name", "occupation", "person_descriptor"].includes(category)) {
     attributes.displayName = confirmed.normalizedInput;
   }
-  const concept = createUserConcept({ surface: confirmed.normalizedInput, category, ...(confirmed.preference !== undefined ? { preference: confirmed.preference } : {}), attributes }, now);
-  const memory = createMemory({ type: "word_learned", conceptIds: [concept.id], locationId: "room", emotion: "excited", importance: 0.8, now });
+  const concept = createUserConcept({
+    surface: confirmed.normalizedInput,
+    category,
+    ...(confirmed.preference !== undefined ? { preference: confirmed.preference } : {}),
+    ...(confirmed.reading ? { reading: confirmed.reading } : {}),
+    attributes
+  }, now);
+  const memory = createMemory({
+    type: "word_learned",
+    conceptIds: [concept.id],
+    locationId: confirmed.locationId ?? "room",
+    emotion: "excited",
+    importance: 0.8,
+    now
+  });
   let completed = transitionLearning(confirmed, { type: "COMMITTED" }, now);
   completed = transitionLearning(completed, { type: "CELEBRATED" }, now);
   await db.transaction("rw", db.concepts, db.memories, db.learningSessions, async () => {

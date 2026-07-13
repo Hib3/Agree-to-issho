@@ -19,13 +19,26 @@ export function buildIntentBias(input: {
   const learned = input.concepts.filter((concept) => concept.source === "user" && concept.active);
   const uncertain = learned.filter((concept) => concept.understanding < 0.58 || concept.ambiguity > 0.52);
   const stronglyFelt = learned.filter((concept) => Math.abs(concept.preference ?? 0) >= 2);
+  const preferenceUnknown = learned.filter((concept) => concept.preference === undefined);
+  const newlyLearned = learned.filter((concept) => input.now - concept.learnedAt < 15 * 60_000);
   if (learned.length === 0) bias.small_talk += 55;
   if (uncertain.length > 0) {
-    bias.ask_meaning += 28;
+    bias.ask_meaning += 38;
     bias.ask_relation += 16;
     bias.misunderstanding += 8;
   }
-  if (stronglyFelt.length > 0) bias.ask_preference += 24;
+  if (preferenceUnknown.length > 0) bias.ask_preference += 32;
+  if (stronglyFelt.length > 0) {
+    bias.small_talk += 8;
+    bias.recall_memory += 6;
+  }
+  if (newlyLearned.length > 0) {
+    bias.small_talk += 28;
+    bias.observation += 14;
+    bias.daydream += 10;
+    bias.ask_preference -= 12;
+    if (uncertain.length === 0) bias.ask_meaning -= 12;
+  }
   if (input.recentSessions.length >= 2) bias.recall_memory += 20;
   if (input.character.boredom >= 55) {
     bias.discovery += 25;

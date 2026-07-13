@@ -39,6 +39,12 @@ export function validateConversationSession(session: ConversationSession) {
   if (session.questionIntent === "relation_confirmation" && !session.proposition.relationText) {
     errors.push("relation_confirmation_without_text");
   }
+  if (session.questionIntent === "attribute_confirmation") {
+    if (!session.proposition.attributeClaim) errors.push("attribute_confirmation_without_claim");
+    if (session.proposition.attributeClaim && !session.topicWordIds.includes(session.proposition.attributeClaim.conceptId)) {
+      errors.push("attribute_claim_outside_topic");
+    }
+  }
   if (session.pendingQuestion) {
     if (session.pendingQuestion.questionIntent !== session.questionIntent) errors.push("pending_question_intent_mismatch");
     if (bareReferences.test(session.pendingQuestion.prompt) && !/「[^」]+」/u.test(session.pendingQuestion.prompt)) {
@@ -66,6 +72,7 @@ export function validateAnswerSchema(questionIntent: QuestionIntent, choices: Di
     relation_discovery: new Set(["confirm", "reject", "unknown"]),
     relation_confirmation: new Set(["confirm", "reject", "unknown"]),
     category_confirmation: new Set(["confirm", "reject", "unknown"]),
+    attribute_confirmation: new Set(["confirm", "reject", "unknown"]),
     situation_question: new Set(["confirm", "reject", "unknown"]),
     preference_question: new Set(["preference_like", "preference_neutral", "preference_dislike"]),
     correction_request: new Set(["confirm", "reject", "unknown"]),
@@ -76,6 +83,7 @@ export function validateAnswerSchema(questionIntent: QuestionIntent, choices: Di
     relation_discovery: new Set(["link_words", "none"]),
     relation_confirmation: new Set(["link_words", "unlink_words", "none"]),
     category_confirmation: new Set(["update_category", "none"]),
+    attribute_confirmation: new Set(["update_attribute", "none"]),
     situation_question: new Set(["none"]),
     preference_question: new Set(["update_preference"]),
     correction_request: new Set(["unlink_words", "none"]),

@@ -12,6 +12,7 @@ export const SCORE = {
   relationFit: 24,
   memorySalienceMax: 20,
   preferenceIntensityMax: 10,
+  attributeGroundingMax: 14,
   novelty: 15,
   characterTopicBias: 8,
   learnedWord: 90,
@@ -59,6 +60,14 @@ export function scoreCandidate(
   }
   score += Math.min(SCORE.memorySalienceMax, concepts.reduce((sum, concept) => sum + concept.understanding * 4, 0));
   score += Math.min(SCORE.preferenceIntensityMax, concepts.reduce((sum, concept) => sum + Math.abs(concept.preference ?? 0) * 2, 0));
+  const answeredAttributes = concepts.reduce(
+    (sum, concept) => sum + Object.values(concept.attributes).filter((value) => value !== null && value !== "" && value !== "unknown").length,
+    0
+  );
+  if (answeredAttributes > 0) {
+    score += Math.min(SCORE.attributeGroundingMax, answeredAttributes * 2);
+    reasons.push("typed-attributes");
+  }
   if (concepts.some((concept) => concept.source === "user")) {
     score += SCORE.learnedWord;
     reasons.push("learned-word");

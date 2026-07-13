@@ -34,6 +34,7 @@ export type QuestionIntent =
   | "relation_discovery"
   | "relation_confirmation"
   | "category_confirmation"
+  | "attribute_confirmation"
   | "situation_question"
   | "preference_question"
   | "correction_request"
@@ -48,12 +49,19 @@ export type CompositionProposition = {
   evidence: "confirmed_relation" | "scene_frame" | "category_only" | "none";
   confidence: number;
   questionIntent: QuestionIntent;
+  attributeClaim?: {
+    conceptId: string;
+    key: string;
+    value: string | number | boolean | null;
+    prompt: string;
+    answerLabel: string;
+  };
 };
 
 export type DialogueAnswerEffect = {
   semanticEffect: "confirm" | "reject" | "unknown" | "preference_like" | "preference_neutral" | "preference_dislike" | "none";
   navigationEffect: "continue" | "close" | "stay" | "none";
-  memoryEffect: "link_words" | "unlink_words" | "update_preference" | "update_category" | "none";
+  memoryEffect: "link_words" | "unlink_words" | "update_preference" | "update_category" | "update_attribute" | "none";
   relationType?: RelationType;
   relationDirection?: "forward" | "reverse";
 };

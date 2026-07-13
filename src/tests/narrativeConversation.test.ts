@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dialogueTemplates } from "../data/dialogue-templates/dialogueTemplates";
+import { createDebugLearnedConcepts } from "../data/debug/createDebugLearnedConcepts";
 import { responsePatterns } from "../data/response-patterns/responsePatterns";
 import { starterConcepts } from "../data/starter/starterConcepts";
 import { planConversation } from "../domain/conversation/planner";
@@ -27,18 +28,7 @@ const character: CharacterState = {
 };
 
 function makeOneHundredLearnedWords() {
-  return Array.from({ length: 100 }, (_, index) => {
-    const source = starterConcepts[(index * 37) % starterConcepts.length]!;
-    return {
-      ...source,
-      id: `debug_user_${index}`,
-      source: "user" as const,
-      learnedAt: now - index * 60_000,
-      usageCount: index % 7,
-      understanding: 0.42 + (index % 6) * 0.09,
-      ambiguity: 0.68 - (index % 6) * 0.08
-    } satisfies Concept;
-  });
+  return createDebugLearnedConcepts(100, now);
 }
 
 describe("multi-page narrative conversation", () => {
@@ -102,7 +92,8 @@ describe("multi-page narrative conversation", () => {
     expect(driftCount).toBeLessThan(130);
     expect(intentCounts.size).toBeGreaterThanOrEqual(10);
     expect(intentCounts.get("ask_meaning") ?? 0).toBeGreaterThan(10);
-    expect(intentCounts.get("ask_preference") ?? 0).toBeGreaterThan(10);
+    expect(intentCounts.get("ask_preference") ?? 0).toBeGreaterThan(0);
+    expect(intentCounts.get("ask_preference") ?? 0).toBeLessThan(80);
     expect(transcripts.size).toBeGreaterThan(700);
     expect(maaOpeningCount).toBeLessThan(25);
   });

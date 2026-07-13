@@ -277,7 +277,7 @@ describe("semantic composition regression", () => {
     });
     const transcript = session.queuedTurns.map((turn) => turn.page).join("\n");
 
-    expect(transcript).toContain("「運転手」が「庭」で「水やり」という行動をしている");
+    expect(transcript).toContain("「運転手」が「庭」で「水やり」を続けている");
     expect(transcript).not.toContain("二つを比べてみたら");
     expect(session.proposition.relationType).toBe("scene_hypothesis");
     expect(session.proposition.evidence).toBe("category_only");

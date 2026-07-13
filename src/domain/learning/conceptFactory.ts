@@ -1,11 +1,11 @@
 import { duplicateKey, normalizeJapanese } from "../grammar/japaneseNormalizer";
-import type { Concept, ConceptCategory, ConceptGrammar } from "../model/concept";
+import type { Concept, ConceptAttributes, ConceptCategory, ConceptGrammar } from "../model/concept";
 
 export type ConceptDraft = {
   surface: string;
   category: ConceptCategory;
   preference?: -2 | -1 | 0 | 1 | 2;
-  attributes?: Record<string, string | number | boolean | null>;
+  attributes?: ConceptAttributes;
   reading?: string;
 };
 
@@ -29,7 +29,9 @@ export function grammarForCategory(category: ConceptCategory): ConceptGrammar {
 export function createUserConcept(draft: ConceptDraft, now: number, id: string = crypto.randomUUID()): Concept {
   const surface = normalizeJapanese(draft.surface);
   const grammar = grammarForCategory(draft.category);
-  if (draft.attributes?.usageMode === "contain") grammar.canBeContainer = true;
+  if (draft.attributes?.usageMode === "contain" || draft.attributes?.objectKind === "container") {
+    grammar.canBeContainer = true;
+  }
   const concept: Concept = {
     id: `concept_${id}`,
     source: "user",

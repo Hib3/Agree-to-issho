@@ -24,6 +24,47 @@ const frames: Frame[] = [
     intents: ["small_talk", "ask_meaning", "ask_preference", "recall_memory", "quiet_moment"]
   },
   {
+    id: "person_daily_encounter",
+    slots: [slot("person", [...people], "subject")],
+    text: "「{person}」と偶然会った日のことを想像しましたっ。",
+    intents: ["small_talk", "observation", "daydream", "ask_meaning", "ask_preference"],
+    asksSituationFor: ["daydream"]
+  },
+  {
+    id: "food_small_ritual",
+    slots: [slot("food", ["food_drink"], "object")],
+    text: "「{food}」を楽しむ前に、机の上を少し整える場面を考えましたっ。",
+    intents: ["small_talk", "observation", "daydream", "ask_meaning", "ask_preference"],
+    asksSituationFor: ["daydream"]
+  },
+  {
+    id: "place_short_visit",
+    slots: [slot("place", ["place"], "location")],
+    text: "少し時間が空いた日に、「{place}」へ寄る場面を考えましたっ。",
+    intents: ["invitation", "quiet_moment", "daydream", "ask_meaning", "ask_preference"],
+    asksSituationFor: ["invitation", "daydream"]
+  },
+  {
+    id: "object_missing_plan",
+    slots: [slot("object", [...objects, "wearable", "vehicle"], "object")],
+    text: "出かける前に「{object}」が見つからず、置いた場所を順番に思い出す場面ですっ。",
+    intents: ["warning", "small_talk", "daydream", "ask_meaning", "ask_preference"],
+    asksSituationFor: ["warning", "daydream"]
+  },
+  {
+    id: "action_small_goal",
+    slots: [slot("action", [...actions], "action")],
+    text: "今日は少しだけ{action:do}、という小さな目標を考えましたっ。",
+    intents: ["small_talk", "discovery", "daydream", "ask_meaning", "ask_preference"],
+    asksSituationFor: ["daydream"]
+  },
+  {
+    id: "living_quiet_observation",
+    slots: [slot("living", ["living_thing"], "subject")],
+    text: "静かな時間に「{living}」の様子をそっと見る場面を思い浮かべましたっ。",
+    intents: ["observation", "quiet_moment", "discovery", "ask_meaning", "ask_preference"]
+  },
+  {
     id: "word_pair_relation",
     slots: [slot("first", allCategories, "topic"), slot("second", allCategories, "topic")],
     text: "「{first}」と「{second}」の関係を、ノートで確かめていますっ。",
@@ -91,6 +132,7 @@ const frames: Frame[] = [
     slots: [slot("object", [...objects], "object"), slot("action", [...actions], "action")],
     text: "「{object}」を用意して、{action:do}計画を考えましたっ。",
     intents: ["small_talk", "warning", "daydream"],
+    grounding: "relation_required",
     asksSituationFor: ["daydream"]
   },
   {

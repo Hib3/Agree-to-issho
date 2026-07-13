@@ -15,7 +15,7 @@ function roleFits(concept: Concept, slot: TemplateSlot) {
     object: grammar.canBeObject,
     location: grammar.canBeLocation,
     action: grammar.suruAction || Boolean(grammar.verbDictionaryForm),
-    container: concept.userCategory === "place" || concept.attributes.usageMode === "contain",
+    container: concept.userCategory === "place" || concept.attributes.usageMode === "contain" || concept.attributes.objectKind === "container",
     body_part: concept.userCategory === "body_part",
     companion: grammar.canBeCompanion
   };

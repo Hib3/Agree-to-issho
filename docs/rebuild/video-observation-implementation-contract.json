@@ -1,0 +1,173 @@
+{
+  "schema_version": "1.0.0",
+  "contract_type": "clean_room_observation_to_implementation",
+  "created_at": "2026-07-13",
+  "evidence_boundary": {
+    "confirmed_means": "添付プレイ動画または公開PWAの画面上で入出力を確認したもの",
+    "inferred_means": "確認した出力を説明できるように本PWA向けに設計した推測モデル",
+    "unknown_means": "動画の出力だけでは特定できない原作内部仕様",
+    "forbidden": [
+      "原作の台詞、辞書、イベント名、画像、音声、UI文言の転記",
+      "原作内部アルゴリズムを確認済みと断定すること",
+      "抽出フレーム、文字起こし全文、原作データをリポジトリへ保存すること"
+    ]
+  },
+  "evidence": [
+    {
+      "id": "local_video_1",
+      "kind": "local_playthrough_video",
+      "review_scope": "全編を2秒間隔のフレームで確認",
+      "duration_seconds": 946.027,
+      "stored_in_repository": false
+    },
+    {
+      "id": "local_video_2",
+      "kind": "local_playthrough_video",
+      "review_scope": "全編を2秒間隔のフレームで確認",
+      "duration_seconds": 954.944,
+      "stored_in_repository": false
+    },
+    {
+      "id": "public_pwa_round2",
+      "kind": "interactive_browser_test",
+      "url": "https://hib3.github.io/Agree-to-issho/",
+      "tested_build_commit": "1db4d2f",
+      "tested_flow": [
+        "初回設定",
+        "言葉入力",
+        "カテゴリ選択",
+        "属性回答",
+        "好み回答",
+        "保存",
+        "複数ページ会話",
+        "返事の選び直し",
+        "返事による記憶更新"
+      ]
+    }
+  ],
+  "confirmed_observations": [
+    {
+      "id": "category_specific_learning",
+      "input": "ユーザーが言葉とカテゴリを入力する",
+      "output": "カテゴリに応じて呼び方、人物種別、関係、用途、機能など異なる質問が続く"
+    },
+    {
+      "id": "typed_memory_reuse",
+      "input": "過去に教えた言葉と回答済み属性がある",
+      "output": "後の会話で、言葉が人物、物、場所、行動などの役割に沿って使われる"
+    },
+    {
+      "id": "multi_page_story",
+      "input": "一つ以上の学習語と日常場面が選ばれる",
+      "output": "導入、展開、問い、返事への反応からなる複数ページの小話が表示される"
+    },
+    {
+      "id": "controlled_semantic_drift",
+      "input": "複数の学習語が一つの場面へ差し込まれる",
+      "output": "文法上の役割は保ちつつ、時々だけ連想のずれた組み合わせが現れ、確認質問へつながる"
+    },
+    {
+      "id": "autonomous_conversation",
+      "input": "プレイヤーが部屋や外出先で操作せずに待つ",
+      "output": "キャラクターが動き、適切な間隔で自分から話題を始める"
+    },
+    {
+      "id": "location_independent_learning",
+      "input": "部屋以外の場所で会話する",
+      "output": "場所に合った話題や言葉学習が開始できる"
+    },
+    {
+      "id": "branch_reaction",
+      "input": "少数の選択肢からプレイヤーが返事をする",
+      "output": "返事に対応した短い反応が表示され、好み、属性、関係の記憶が更新される"
+    }
+  ],
+  "public_pwa_gaps_confirmed": [
+    "学習は大分類、詳細分類、属性1問、好み、保存に固定され、カテゴリ固有の複数属性を保持できない",
+    "一語だけの状態では記憶の読み上げと同じ内容の確認質問に寄り、小話の幅が狭い",
+    "返事の選び直し不具合は今回の公開版では再現しなかった",
+    "自発会話設定は存在するが、会話終了後の連続した話題遷移は弱い"
+  ],
+  "inferred_clean_room_model": {
+    "status": "推測",
+    "pipeline": [
+      "会話意図と小話フレームを選ぶ",
+      "各スロットへカテゴリと属性が適合する学習語を割り当てる",
+      "確認済み関係を優先し、未確認の関係は事実として断定しない",
+      "低確率で一つだけ制御されたずれを許可する",
+      "導入、前提、展開、問いの2から5ページを生成する",
+      "返事を意味効果、画面遷移効果、記憶効果へ分けて適用する",
+      "反応を表示し、終了または次の話題へ移る"
+    ],
+    "required_typed_attributes": {
+      "person": ["honorific", "personKind", "relativeStatus", "familiarity"],
+      "object": ["objectKind", "usageMode", "affordance", "importanceWhenMissing"],
+      "place": ["environment", "visitMode", "familiarity"],
+      "action": ["suruAction", "actionContext", "socialMode"],
+      "food": ["consumeMode", "mealTime"],
+      "living_thing": ["livingRelation", "habitat"],
+      "media": ["experienceMode", "socialMode"]
+    }
+  },
+  "implementation_requirements": [
+    "LearningSessionは回答済み属性と現在の質問位置を保存し、再読込後も続きから回答できる",
+    "カテゴリごとに2から4問の属性質問を行い、選択肢は次へ進む前に選び直せる",
+    "Concept.attributesを発話スロット適合判定と小話本文の両方で使う",
+    "小話は必ず構造化スロットから作り、裸の指示語や根拠のない関係断定を生成しない",
+    "ずれは一会話に最大一つ、訂正可能な質問を伴い、通常会話の少数に限定する",
+    "自発会話は入力中、非表示、未回答質問、保存中には開始しない",
+    "口調変換は意味スロット、否定、疑問対象、関係を変更しない",
+    "IndexedDBの会話セッション保存復元後も命題と属性参照を保持する"
+  ],
+  "implementation_verification": {
+    "status": "確認済み",
+    "verified_at": "2026-07-13",
+    "local_browser_flow": {
+      "word": "記録ペン",
+      "category": "usable_object",
+      "attributes": {
+        "objectKind": "tool",
+        "usageMode": "use",
+        "affordance": "record",
+        "importanceWhenMissing": "essential"
+      },
+      "choice_reselection": "道具からほかの物へ変更後、道具へ戻せた。未選択ボタンは無効化されなかった",
+      "conversation_pages": 5,
+      "conversation_result": "入力した属性を前提、展開、結末へ分けて再利用できた",
+      "outdoor_learning": "並木道から開始した学習画面がlocation-streetを保持した"
+    },
+    "deterministic_simulation": {
+      "learned_words": 100,
+      "sessions": 1000,
+      "unique_transcripts": 735,
+      "multi_page_sessions": 992,
+      "narrative_sessions": 532,
+      "controlled_drift_sessions": 65,
+      "attribute_grounded_sessions": 738,
+      "validation_failures": 0
+    },
+    "automated_checks": {
+      "dialogue_tests": "34 passed",
+      "unit_tests": "38 passed",
+      "mobile_e2e": "320px and 390px passed",
+      "typecheck": "passed",
+      "build": "passed"
+    }
+  },
+  "unknowns": [
+    "原作の候補選択確率と乱数方式",
+    "原作辞書の内部構造と品詞解析方式",
+    "原作が質問回答から属性を更新する正確な数値",
+    "原作イベント選択の正確な条件とクールダウン",
+    "原作のキャラクター動作状態機械の正確な遷移"
+  ],
+  "acceptance_tests": [
+    "人物カテゴリで呼び方、人物種別、相対関係、親しさを順に記録できる",
+    "物カテゴリで種類、使い方、目的、なくした時の重要さを記録できる",
+    "選択肢を別の候補へ選び直してから次へ進める",
+    "100語、固定乱数1000会話で未解決スロット、裸の指示語、未確認関係の断定がない",
+    "複数ページ小話が十分な割合で生成され、同一発話への偏りがない",
+    "低確率のずれは一会話最大一つで、訂正質問を伴う",
+    "npm run test:dialogue、npm run test、npm run typecheck、npm run buildが通る"
+  ]
+}

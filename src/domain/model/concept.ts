@@ -28,6 +28,34 @@ export const conceptCategories = [
 export type ConceptCategory = (typeof conceptCategories)[number];
 export type ConceptSource = "starter" | "user";
 
+export type ConceptAttributeValue = string | number | boolean | null;
+
+export type ConceptAttributes = Record<string, ConceptAttributeValue> & {
+  honorific?: "none" | "san" | "chan" | "kun" | "sama" | "sensei" | "custom";
+  customHonorific?: string;
+  personKind?: "known_person" | "public_person" | "fictional_person" | "role_or_title" | "unknown";
+  relativeStatus?: "very_above" | "above" | "peer" | "below" | "unknown";
+  familiarity?: "close" | "known" | "distant" | "fictional" | "unknown";
+  objectKind?: "tool" | "electric" | "container" | "decoration" | "other";
+  usageMode?: "use" | "electric" | "wear" | "ride" | "contain" | "display" | "other";
+  affordance?: "work" | "play" | "record" | "carry" | "care" | "eat_drink" | "cook" | "rest" | "other";
+  importanceWhenMissing?: "essential" | "troublesome" | "replaceable" | "unknown";
+  environment?: "inside" | "outside" | "both" | "unknown";
+  visitMode?: "often" | "sometimes" | "want_to_go" | "rarely" | "unknown";
+  actionContext?: "home" | "outside" | "either" | "unknown";
+  socialMode?: "alone" | "together" | "either" | "unknown";
+  consumeMode?: "eat" | "drink" | "both";
+  mealTime?: "morning" | "day" | "evening" | "snack" | "anytime";
+  livingRelation?: "home" | "wild" | "plant" | "imaginary" | "unknown";
+  habitat?: "indoors" | "land" | "water" | "sky" | "unknown";
+  experienceMode?: "listen" | "perform" | "watch" | "create" | "read" | "write" | "reference" | "other";
+  wearArea?: "head" | "body" | "hands" | "feet" | "accessory";
+  useContext?: "daily" | "outside" | "formal" | "special" | "unknown";
+  powerMode?: "human" | "public" | "motor" | "water_or_air" | "other";
+  tripContext?: "daily" | "outing" | "long_trip" | "play" | "other";
+  feelingTone?: "positive" | "negative" | "mixed" | "neutral" | "unknown";
+};
+
 export type ConceptGrammar = {
   nounLike: boolean;
   suruAction: boolean;
@@ -65,7 +93,7 @@ export type Concept = {
   categoryConfidence: number;
   preference?: -2 | -1 | 0 | 1 | 2;
   grammar: ConceptGrammar;
-  attributes: Record<string, string | number | boolean | null>;
+  attributes: ConceptAttributes;
   learnedAt: number;
   lastReviewedAt?: number;
   lastUsedAt?: number;

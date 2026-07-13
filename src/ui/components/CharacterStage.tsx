@@ -14,6 +14,7 @@ export function CharacterStage({ emotion, locationId, timeOfDay = "day", weather
   compact?: boolean;
 }) {
   const [isBlinking, setIsBlinking] = useState(false);
+  const [idlePosition, setIdlePosition] = useState<"center" | "left" | "right">("center");
   const blinkEnabled = !reducedMotion && !isSpeaking && emotion === "calm";
   const image = characterImageFor(emotion, isSpeaking, blinkEnabled && isBlinking);
   const style = { "--scene-background": `url("${sceneBackgroundFor(locationId, timeOfDay, weather)}")` } as CSSProperties;
@@ -32,8 +33,23 @@ export function CharacterStage({ emotion, locationId, timeOfDay = "day", weather
       window.clearTimeout(resetTimer);
     };
   }, [blinkEnabled]);
+
+  useEffect(() => {
+    if (reducedMotion || isSpeaking || compact) {
+      const resetTimer = window.setTimeout(() => setIdlePosition("center"), 0);
+      return () => window.clearTimeout(resetTimer);
+    }
+    const positions = ["center", "left", "center", "right"] as const;
+    let index = 0;
+    const movementTimer = window.setInterval(() => {
+      index = (index + 1) % positions.length;
+      setIdlePosition(positions[index] ?? "center");
+    }, 7_200);
+    return () => window.clearInterval(movementTimer);
+  }, [compact, isSpeaking, reducedMotion]);
+
   return (
-    <div className={`character-stage location-${locationId} mood-${emotion}${compact ? " compact" : ""}${isSpeaking ? " speaking" : ""}`} style={style} aria-label="アグリちゃんのいる場所">
+    <div className={`character-stage location-${locationId} mood-${emotion} idle-${idlePosition}${compact ? " compact" : ""}${isSpeaking ? " speaking" : ""}`} style={style} aria-label="アグリちゃんのいる場所">
       <div className="scene-light" aria-hidden="true" />
       <img
         key={image}

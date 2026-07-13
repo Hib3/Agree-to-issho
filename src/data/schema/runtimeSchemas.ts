@@ -24,6 +24,7 @@ const questionIntentSchema = z.enum([
   "relation_discovery",
   "relation_confirmation",
   "category_confirmation",
+  "attribute_confirmation",
   "situation_question",
   "preference_question",
   "correction_request",
@@ -33,7 +34,7 @@ const questionIntentSchema = z.enum([
 const answerEffectSchema = z.object({
   semanticEffect: z.enum(["confirm", "reject", "unknown", "preference_like", "preference_neutral", "preference_dislike", "none"]),
   navigationEffect: z.enum(["continue", "close", "stay", "none"]),
-  memoryEffect: z.enum(["link_words", "unlink_words", "update_preference", "update_category", "none"]),
+  memoryEffect: z.enum(["link_words", "unlink_words", "update_preference", "update_category", "update_attribute", "none"]),
   relationType: z.enum(relationTypes).optional(),
   relationDirection: z.enum(["forward", "reverse"]).optional()
 });
@@ -70,7 +71,14 @@ const propositionSchema = z.object({
   relationText: z.string(),
   evidence: z.enum(["confirmed_relation", "scene_frame", "category_only", "none"]),
   confidence: z.number(),
-  questionIntent: questionIntentSchema
+  questionIntent: questionIntentSchema,
+  attributeClaim: z.object({
+    conceptId: z.string().min(1),
+    key: z.string().min(1),
+    value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+    prompt: z.string().min(1),
+    answerLabel: z.string().min(1)
+  }).optional()
 });
 
 const pendingQuestionSchema = z.object({
@@ -140,7 +148,7 @@ const characterSchema = z.object({
   socialNeed: z.number(),
   trust: z.number(),
   boredom: z.number(),
-  currentLocationId: z.string().min(1),
+  currentLocationId: z.enum(["room", "street", "rooftop"]),
   lastUserInteractionAt: z.number(),
   lastSpeechAt: z.number(),
   updatedAt: z.number()

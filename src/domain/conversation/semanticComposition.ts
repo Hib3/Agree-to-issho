@@ -3,6 +3,7 @@ import { isPersonCategory, type Concept } from "../model/concept";
 import type { CompositionProposition, DialogueAnswerEffect, DialogueChoice, QuestionIntent } from "../model/conversation";
 import type { ConceptRelation, RelationType } from "../model/relation";
 import { displayConcept } from "../grammar/japaneseRealizer";
+import { answerLabel, attributeQuestionsForCategory } from "../learning/attributeQuestions";
 
 export function isConfirmedRelation(relation: ConceptRelation) {
   return relation.confidence >= 0.6 && ["explicit", "answer"].includes(relation.source);
@@ -77,6 +78,18 @@ export function composeProposition(input: {
     };
   }
 
+  const singleConcept = concepts[0];
+  const attributeClaim = input.hasResponse && input.template.intent === "ask_meaning" && singleConcept
+    ? attributeClaimFor(singleConcept)
+    : undefined;
+  const singleQuestionIntent = attributeClaim
+    ? "attribute_confirmation" as const
+    : input.hasResponse
+      ? questionIntentFor(
+          input.template.intent,
+          input.template.semanticFrame.endsWith(".single_topic") ? "category_confirmation" : "situation_question"
+        )
+      : "none" as const;
   return {
     wordIds: wordIds.slice(0, 1),
     frameId: input.template.semanticFrame,
@@ -84,8 +97,25 @@ export function composeProposition(input: {
     relationText: "",
     evidence: "none",
     confidence: concepts[0]?.understanding ?? 0,
-    questionIntent: input.hasResponse ? questionIntentFor(input.template.intent, "category_confirmation") : "none"
+    questionIntent: singleQuestionIntent,
+    ...(attributeClaim ? { attributeClaim } : {})
   };
+}
+
+function attributeClaimFor(concept: Concept): NonNullable<CompositionProposition["attributeClaim"]> | undefined {
+  const claims = attributeQuestionsForCategory(concept.userCategory)
+    .filter((question) => {
+      const value = concept.attributes[question.key];
+      return value !== undefined && value !== null && value !== "" && value !== "unknown";
+    })
+    .map((question) => ({
+      conceptId: concept.id,
+      key: question.key,
+      value: concept.attributes[question.key] ?? null,
+      prompt: question.prompt,
+      answerLabel: answerLabel(question, concept.attributes[question.key])
+    }));
+  return claims[concept.reviewCount % Math.max(1, claims.length)];
 }
 
 export function questionForProposition(proposition: CompositionProposition, concepts: Concept[]) {
@@ -108,6 +138,10 @@ export function questionForProposition(proposition: CompositionProposition, conc
       return word + "のこと、好きですか？";
     case "category_confirmation":
       return word + "の種類は、今の覚え方で近いですか？";
+    case "attribute_confirmation":
+      return proposition.attributeClaim
+        ? `${word}のメモを確かめます。「${proposition.attributeClaim.prompt}」には「${proposition.attributeClaim.answerLabel}」と答えてくれました。今も合っていますか？`
+        : `${word}の覚え方を、もう一度教えてもらえますか？`;
     case "situation_question":
       return namedTopics + "を使った場面として、今の想像は近いですか？";
     default:
@@ -169,6 +203,12 @@ export function answerSchemaFor(proposition: CompositionProposition, concepts: C
         choice("category_no", "種類が違う", "deny", "reject", "update_category"),
         choice("category_unknown", "まだ分からない", "curious", "unknown")
       ];
+    case "attribute_confirmation":
+      return [
+        choice("attribute_yes", "今も合ってる", "affirm", "confirm"),
+        choice("attribute_no", "今は違う", "deny", "reject", "update_attribute"),
+        choice("attribute_unknown", "まだ分からない", "curious", "unknown")
+      ];
     default:
       return [];
   }
@@ -204,7 +244,9 @@ function relationChoicesFor(proposition: CompositionProposition, concepts: Conce
     }
     if (actionLike(left) && objectLike(right)) add("それを使う", "uses", left, right);
     if (left.userCategory === "place" && objectLike(right)) add("そこにある", "located_at", right, left);
-    if (left.attributes.usageMode === "contain" && objectLike(right)) add("中に入っている", "contains", left, right);
+    if ((left.attributes.usageMode === "contain" || left.attributes.objectKind === "container") && objectLike(right)) {
+      add("中に入っている", "contains", left, right);
+    }
   }
   if ([first.userCategory, second.userCategory].every((category) => ["abstract", "word_expression", "other"].includes(category))) {
     add("少し似ている", "similar_to", first, second);

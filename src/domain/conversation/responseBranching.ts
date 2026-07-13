@@ -93,6 +93,21 @@ export function applyResponse(
   const pair = names.length >= 2 ? "「" + names[0] + "」と「" + names[1] + "」" : names[0] ? "「" + names[0] + "」" : "今の話";
   const updatedConcepts = concepts.map((concept) => {
     if (!answerTargetIds.includes(concept.id) || answer.semanticEffect === "none") return concept;
+    const rejectedAttribute =
+      session.questionIntent === "attribute_confirmation" &&
+      answer.semanticEffect === "reject" &&
+      answer.memoryEffect === "update_attribute" &&
+      session.proposition.attributeClaim?.conceptId === concept.id;
+    if (rejectedAttribute && session.proposition.attributeClaim) {
+      return {
+        ...concept,
+        attributes: { ...concept.attributes, [session.proposition.attributeClaim.key]: "unknown" },
+        understanding: Math.max(0.2, concept.understanding - 0.08),
+        ambiguity: Math.min(1, concept.ambiguity + 0.18),
+        reviewCount: concept.reviewCount + 1,
+        lastReviewedAt: now
+      };
+    }
     const preference =
       answer.semanticEffect === "preference_like"
         ? 2
@@ -185,6 +200,12 @@ function semanticReaction(session: ConversationSession, answer: DialogueAnswerEf
       ? pair + "の種類は、その覚え方で合っているんですねっ！"
       : pair + "の種類は違うんですねっ！ あとで聞き直しますっ！";
   }
+  if (session.questionIntent === "attribute_confirmation") {
+    const label = session.proposition.attributeClaim?.answerLabel ?? "その答え";
+    return answer.semanticEffect === "confirm"
+      ? pair + "は「" + label + "」のままで合っているんですねっ！"
+      : pair + "の「" + label + "」というメモは、いったん外して聞き直しますっ！";
+  }
   if (session.questionIntent === "situation_question") {
     return answer.semanticEffect === "confirm"
       ? pair + "の場面はありそうなんですねっ！"
@@ -228,5 +249,5 @@ function clamp(value: number) {
 }
 
 function singleWordQuestion(questionIntent: ConversationSession["questionIntent"]) {
-  return questionIntent === "preference_question" || questionIntent === "category_confirmation";
+  return ["preference_question", "category_confirmation", "attribute_confirmation"].includes(questionIntent);
 }
