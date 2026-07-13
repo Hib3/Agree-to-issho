@@ -53,7 +53,9 @@ const settings: GameSettings = {
   autonomousSpeech: false,
   newsEnabled: false,
   newsRefreshMinutes: 30,
-  newsUseRss2Json: false,
+  newsUseFeedDiscoveryHelper: false,
+  newsUseFeedFetchHelper: false,
+  newsUseArticleHelper: false,
   newsFeeds: [],
   updatedAt: now
 };

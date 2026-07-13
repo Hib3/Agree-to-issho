@@ -20,7 +20,9 @@ export type GameSettings = {
   autonomousSpeech: boolean;
   newsEnabled: boolean;
   newsRefreshMinutes: 15 | 30 | 60 | 180;
-  newsUseRss2Json: boolean;
+  newsUseFeedDiscoveryHelper: boolean;
+  newsUseFeedFetchHelper: boolean;
+  newsUseArticleHelper: boolean;
   newsFeeds: NewsFeedConfig[];
   updatedAt: number;
 };

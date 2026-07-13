@@ -176,6 +176,11 @@ h2 { font-size: 1.06rem; }
 .rss-feed-list span { display: grid; gap: 3px; min-width: 0; }
 .rss-feed-list strong, .rss-feed-list small { overflow-wrap: anywhere; }
 .rss-feed-list small { color: var(--muted); font-weight: 500; }
+.rss-candidate-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rss-candidate-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid #b7ad86; border-radius: 7px; background: #f8f5dc; }
+.rss-candidate-list span { display: grid; gap: 2px; min-width: 0; }
+.rss-candidate-list strong, .rss-candidate-list small { overflow-wrap: anywhere; }
+.rss-candidate-list small { color: var(--muted); }
 .settings-status { margin: 0; padding: 10px; border-left: 4px solid var(--green); background: #f2f5e8; line-height: 1.6; }
 .toggle-row { grid-template-columns: 32px 1fr; align-items: center; }
 .toggle-row input { width: 24px; min-height: 24px; }
@@ -225,6 +230,8 @@ h2 { font-size: 1.06rem; }
   .choice-grid { grid-template-columns: 1fr 1fr; }
   .rss-add-row { grid-template-columns: 1fr; }
   .rss-add-row button { width: 100%; }
+  .rss-candidate-list li { grid-template-columns: 1fr; }
+  .rss-candidate-list button { width: 100%; }
 }
 
 @media (min-width: 521px) {

@@ -8,6 +8,9 @@ describe("game settings migration", () => {
     expect(settings.audioRevision).toBe(1);
     expect(settings.newsEnabled).toBe(false);
     expect(settings.newsFeeds).toEqual([]);
+    expect(settings.newsUseFeedDiscoveryHelper).toBe(false);
+    expect(settings.newsUseFeedFetchHelper).toBe(false);
+    expect(settings.newsUseArticleHelper).toBe(false);
   });
 
   it("unmutes legacy settings because the old mute control had no audio implementation", () => {

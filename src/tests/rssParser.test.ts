@@ -19,6 +19,24 @@ describe("RSS parsing", () => {
     expect(parsed.items[0]?.summary).toBe("新しい観測結果を公開した。");
   });
 
+  it("reads RDF, namespaced content and xml:base without duplicating URLs", () => {
+    const parsed = parseRssXml(`<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xml:base="https://example.com/news/"><channel><title>町のRDF</title></channel><item><title>一つ目</title><link>one</link><content:encoded><![CDATA[<p>詳しい配信内容</p>]]></content:encoded></item><item><title>重複</title><link>one#fragment</link></item></rdf:RDF>`, "feed_rdf", "https://example.com/feed.rdf", now);
+    expect(parsed.format).toBe("rdf");
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({ url: "https://example.com/news/one", feedContent: "詳しい配信内容" });
+  });
+
+  it("marks missing, invalid and future dates instead of presenting them as feed dates", () => {
+    const parsed = parseRssXml(`<?xml version="1.0"?><rss version="2.0"><channel><title>日時</title><item><title>なし</title><link>https://example.com/none</link></item><item><title>不正</title><link>https://example.com/bad</link><pubDate>not-a-date</pubDate></item><item><title>未来</title><link>https://example.com/future</link><pubDate>2099-01-01T00:00:00Z</pubDate></item></channel></rss>`, "feed_dates", "https://example.com/feed.xml", now);
+    expect(parsed.items.map((item) => item.dateStatus)).toEqual(["missing", "invalid", "future"]);
+    expect(parsed.items.every((item) => item.publishedAt === now)).toBe(true);
+  });
+
+  it("rejects HTML and JSON responses as unsupported feed formats", () => {
+    expect(() => parseRssXml("<html><body>error</body></html>", "feed_html", "https://example.com/feed", now)).toThrow("いずれでもありません");
+    expect(() => parseRssXml('{"version":"https://jsonfeed.org/version/1.1"}', "feed_json", "https://example.com/feed", now)).toThrow("XML形式");
+  });
+
   it("accepts the documented RSS-to-JSON response shape", () => {
     const parsed = parseRss2Json({ status: "ok", feed: { title: "交通情報" }, items: [{ guid: "x", title: "列車の運行情報", link: "https://example.com/train", description: "一部区間の運行を確認中。", pubDate: "2026-07-13 09:00:00" }] }, "feed_json", "https://example.com/feed", now);
     expect(parsed.items[0]?.sourceName).toBe("交通情報");

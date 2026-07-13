@@ -64,7 +64,7 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
       json: JSON.stringify(current)
     });
     if (mode === "replace") {
-      for (const table of [db.player, db.character, db.concepts, db.relations, db.memories, db.conversationSessions, db.dialogueHistory, db.diaries, db.settings, db.newsItems]) {
+      for (const table of [db.player, db.character, db.concepts, db.relations, db.memories, db.conversationSessions, db.dialogueHistory, db.diaries, db.settings, db.learningSessions, db.newsItems]) {
         await table.clear();
       }
     }
@@ -80,7 +80,13 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
     await db.diaries.bulkPut(data.diaries);
     if (data.settings) {
       if (mode === "merge") await db.newsItems.clear();
-      await db.settings.put(migrateGameSettings(data.settings, now));
+      const importedSettings = migrateGameSettings(data.settings, now);
+      await db.settings.put({
+        ...importedSettings,
+        newsUseFeedDiscoveryHelper: false,
+        newsUseFeedFetchHelper: false,
+        newsUseArticleHelper: false
+      });
     }
   });
 }

@@ -388,6 +388,10 @@ const settingsSchema = z.object({
   autonomousSpeech: z.boolean(),
   newsEnabled: z.boolean().optional(),
   newsRefreshMinutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(180)]).optional(),
+  newsUseFeedDiscoveryHelper: z.boolean().optional(),
+  newsUseFeedFetchHelper: z.boolean().optional(),
+  newsUseArticleHelper: z.boolean().optional(),
+  // Kept only so version-one backups can be migrated without broadening consent.
   newsUseRss2Json: z.boolean().optional(),
   newsFeeds: z
     .array(
