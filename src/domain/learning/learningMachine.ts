@@ -44,6 +44,7 @@ export type LearningSession = {
   attributeQuestionIndex: number;
   reading?: string;
   preference?: -2 | -1 | 0 | 1 | 2;
+  committedConceptId?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -66,7 +67,11 @@ export type LearningEvent =
   | { type: "CELEBRATED" }
   | { type: "RESET" };
 
-export function createLearningSession(contextId: LearningContextId, now: number, locationId: LocationId = "room"): LearningSession {
+export function createLearningSession(
+  contextId: LearningContextId,
+  now: number,
+  locationId: LocationId = "room"
+): LearningSession {
   return {
     id: "active",
     state: "contextual_prompt",
@@ -81,14 +86,22 @@ export function createLearningSession(contextId: LearningContextId, now: number,
   };
 }
 
-export function transitionLearning(session: LearningSession, event: LearningEvent, now: number): LearningSession {
+export function transitionLearning(
+  session: LearningSession,
+  event: LearningEvent,
+  now: number
+): LearningSession {
   const update = (patch: Partial<LearningSession>) => ({ ...session, ...patch, updatedAt: now });
   switch (event.type) {
     case "START":
       return createLearningSession(event.contextId, now, event.locationId ?? session.locationId ?? "room");
     case "ENTER_TEXT":
       if (!["contextual_prompt", "text_input"].includes(session.state)) return session;
-      return update({ state: "normalize", rawInput: event.value, normalizedInput: normalizeJapanese(event.value) });
+      return update({
+        state: "normalize",
+        rawInput: event.value,
+        normalizedInput: normalizeJapanese(event.value)
+      });
     case "NORMALIZED":
       return session.state === "normalize" ? update({ state: "duplicate_check" }) : session;
     case "DUPLICATE_FOUND":
@@ -117,7 +130,9 @@ export function transitionLearning(session: LearningSession, event: LearningEven
         ? update({
             state: event.isLast ? "preference_question" : "category_attributes",
             attributes: { ...session.attributes, [event.key]: event.value },
-            attributeQuestionIndex: event.isLast ? session.attributeQuestionIndex : (session.attributeQuestionIndex ?? 0) + 1
+            attributeQuestionIndex: event.isLast
+              ? session.attributeQuestionIndex
+              : (session.attributeQuestionIndex ?? 0) + 1
           })
         : session;
     case "SKIP_ATTRIBUTES":

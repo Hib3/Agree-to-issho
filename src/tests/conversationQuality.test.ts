@@ -360,13 +360,17 @@ describe("clean-room conversation composition", () => {
     await db.concepts.bulkPut([food, place]);
     await db.conversationSessions.put(session);
 
-    await answerConversation(session.id, answer, now + 1);
+    await Promise.all([
+      answerConversation(session.id, answer, now + 1),
+      answerConversation(session.id, answer, now + 1)
+    ]);
     const choiceMemory = await db.memories.where("type").equals("player_choice").first();
     const storedFood = await db.concepts.get(food.id);
     const storedPlace = await db.concepts.get(place.id);
 
     expect(choiceMemory?.conceptIds).toEqual([food.id]);
     expect(choiceMemory?.payload.questionIntent).toBe("preference_question");
+    expect(await db.memories.where("type").equals("player_choice").count()).toBe(1);
     expect(storedFood?.preference).toBe(0);
     expect(storedPlace?.preference).toBeUndefined();
   });

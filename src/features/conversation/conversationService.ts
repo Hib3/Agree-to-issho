@@ -17,8 +17,15 @@ import {
   migrateConversationSession
 } from "../../domain/conversation/sessionMigration";
 import { validateConversationSession } from "../../domain/conversation/dialogueValidator";
+import { withExclusiveLock, withSingleFlight } from "../../infrastructure/concurrency/exclusiveLock";
 
 export async function startConversation(now = Date.now(), initiatedByUser = true) {
+  return withSingleFlight("conversation-start-flight", () =>
+    withExclusiveLock("conversation-start", () => startConversationUnlocked(now, initiatedByUser))
+  );
+}
+
+async function startConversationUnlocked(now: number, initiatedByUser: boolean) {
   const [concepts, relations, activeSessions, newestCompletedSessions, character] = await Promise.all([
     db.concepts.toArray(),
     db.relations.toArray(),
@@ -57,10 +64,18 @@ export async function startConversation(now = Date.now(), initiatedByUser = true
     intentBias: buildIntentBias({ concepts, recentSessions: completedSessions, character, location, now })
   });
   await db.conversationSessions.put(session);
-  return advanceConversation(session.id, now, initiatedByUser);
+  return advanceConversationUnlocked(session.id, now, initiatedByUser);
 }
 
 export async function advanceConversation(sessionId: string, now = Date.now(), initiatedByUser = true) {
+  return withSingleFlight(`conversation-advance-flight:${sessionId}`, () =>
+    withExclusiveLock(`conversation:${sessionId}`, () =>
+      advanceConversationUnlocked(sessionId, now, initiatedByUser)
+    )
+  );
+}
+
+async function advanceConversationUnlocked(sessionId: string, now: number, initiatedByUser: boolean) {
   const session = await db.conversationSessions.get(sessionId);
   if (!session) throw new Error("会話を再開できませんでした。");
   const validationErrors = isCurrentConversationSession(session)
@@ -136,14 +151,21 @@ export async function advanceConversation(sessionId: string, now = Date.now(), i
 }
 
 export async function answerConversation(sessionId: string, choice: DialogueChoice, now = Date.now()) {
+  return withExclusiveLock(`conversation:${sessionId}`, () =>
+    answerConversationUnlocked(sessionId, choice, now)
+  );
+}
+
+async function answerConversationUnlocked(sessionId: string, choice: DialogueChoice, now: number) {
   const [session, character, relations, concepts] = await Promise.all([
     db.conversationSessions.get(sessionId),
     db.character.get("aguri"),
     db.relations.toArray(),
     db.concepts.toArray()
   ]);
-  if (!session || !character || session.phase !== "awaiting_answer")
-    throw new Error("この質問には今は答えられません。");
+  if (!session || !character) throw new Error("この質問には今は答えられません。");
+  // A repeated submit must not apply semantic effects twice.
+  if (session.phase !== "awaiting_answer") return session;
   const storedChoice = session.pendingQuestion?.answerSchema.find((option) => option.id === choice.id);
   if (!storedChoice) {
     throw new Error("この質問の選択肢ではありません。");
@@ -183,10 +205,14 @@ export async function answerConversation(sessionId: string, choice: DialogueChoi
     }
   );
   // A submitted answer is itself an advance action, so show Aguri's reaction immediately.
-  return advanceConversation(result.session.id, now, true);
+  return advanceConversationUnlocked(result.session.id, now, true);
 }
 
 export async function closeConversation(sessionId: string, now = Date.now()) {
+  return withExclusiveLock(`conversation:${sessionId}`, () => closeConversationUnlocked(sessionId, now));
+}
+
+async function closeConversationUnlocked(sessionId: string, now: number) {
   const session = await db.conversationSessions.get(sessionId);
   if (!session) return;
   const { pendingQuestion, ...sessionWithoutQuestion } = session;
@@ -203,6 +229,12 @@ export async function closeConversation(sessionId: string, now = Date.now()) {
 }
 
 export async function invalidateConversationSession(sessionId: string, errors: string[], now = Date.now()) {
+  return withExclusiveLock(`conversation:${sessionId}`, () =>
+    invalidateConversationSessionUnlocked(sessionId, errors, now)
+  );
+}
+
+async function invalidateConversationSessionUnlocked(sessionId: string, errors: string[], now: number) {
   const session = await db.conversationSessions.get(sessionId);
   if (!session) return;
   await db.conversationSessions.put(migrateConversationSession(session, now, errors));

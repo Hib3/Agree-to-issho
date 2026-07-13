@@ -37,6 +37,15 @@ const empty: Snapshot = {
   newsItems: [] as NewsItem[]
 };
 
+let bootstrapPromise: Promise<Snapshot> | null = null;
+
+function initializeOnce() {
+  bootstrapPromise ??= bootstrapApp().finally(() => {
+    bootstrapPromise = null;
+  });
+  return bootstrapPromise;
+}
+
 export const useGameStore = create<GameStore>((set) => ({
   ...empty,
   screen: "title",
@@ -48,7 +57,7 @@ export const useGameStore = create<GameStore>((set) => ({
   refresh: async () => set(await loadSnapshot()),
   initialize: async () => {
     try {
-      const snapshot = await bootstrapApp();
+      const snapshot = await initializeOnce();
       set({ ...snapshot, loading: false, screen: snapshot.player ? "title" : "onboarding" });
     } catch (error) {
       set({ loading: false, error: error instanceof Error ? error.message : "保存場所を開けませんでした。" });
