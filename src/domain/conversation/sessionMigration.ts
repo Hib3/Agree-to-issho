@@ -11,7 +11,7 @@ type LegacySession = Partial<ConversationSession> & {
 
 export function isCurrentConversationSession(session: ConversationSession) {
   const candidate = session as LegacySession;
-  return candidate.schemaVersion === 2 && Boolean(candidate.proposition) && Array.isArray(candidate.topicWordIds);
+  return candidate.schemaVersion === 2 && candidate.dialogueRevision === 2 && Boolean(candidate.proposition) && Array.isArray(candidate.topicWordIds);
 }
 
 export function migrateConversationSession(
@@ -56,6 +56,7 @@ export function migrateConversationSession(
 
   return {
     schemaVersion: 2,
+    dialogueRevision: 2,
     id: legacy.id ?? "legacy_session_" + crypto.randomUUID(),
     phase: "completed",
     intent: legacy.intent ?? "small_talk",

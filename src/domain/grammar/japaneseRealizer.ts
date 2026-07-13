@@ -19,9 +19,20 @@ export function displayConcept(concept: Concept) {
 
 export function realize(template: string, slots: Record<string, Concept>) {
   return Object.entries(slots).reduce(
-    (text, [name, concept]) => text.replaceAll(`{${name}}`, displayConcept(concept)),
+    (text, [name, concept]) => text
+      .replaceAll(`{${name}:doing}`, doingPhrase(concept))
+      .replaceAll(`{${name}:do}`, doPhrase(concept))
+      .replaceAll(`{${name}}`, displayConcept(concept)),
     template
   );
+}
+
+export function doingPhrase(concept: Concept) {
+  return `「${displayConcept(concept)}」という行動をしている`;
+}
+
+export function doPhrase(concept: Concept) {
+  return `「${displayConcept(concept)}」という行動をする`;
 }
 
 export function splitJapanesePages(text: string, limit = 45) {

@@ -14,19 +14,19 @@ export function buildIntentBias(input: {
   now: number;
 }): IntentBias {
   const bias = Object.fromEntries(conversationIntents.map((intent) => [intent, 0])) as Record<ConversationIntent, number>;
-  for (const intent of input.location.preferredIntents) bias[intent] += 32;
+  for (const intent of input.location.preferredIntents) bias[intent] += 24;
 
   const learned = input.concepts.filter((concept) => concept.source === "user" && concept.active);
   const uncertain = learned.filter((concept) => concept.understanding < 0.58 || concept.ambiguity > 0.52);
   const stronglyFelt = learned.filter((concept) => Math.abs(concept.preference ?? 0) >= 2);
   if (learned.length === 0) bias.small_talk += 55;
   if (uncertain.length > 0) {
-    bias.ask_meaning += 55;
-    bias.ask_relation += 24;
-    bias.misunderstanding += 14;
+    bias.ask_meaning += 28;
+    bias.ask_relation += 16;
+    bias.misunderstanding += 8;
   }
-  if (stronglyFelt.length > 0) bias.ask_preference += 44;
-  if (input.recentSessions.length >= 2) bias.recall_memory += 30;
+  if (stronglyFelt.length > 0) bias.ask_preference += 24;
+  if (input.recentSessions.length >= 2) bias.recall_memory += 20;
   if (input.character.boredom >= 55) {
     bias.discovery += 25;
     bias.daydream += 20;

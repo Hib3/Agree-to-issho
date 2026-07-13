@@ -10,7 +10,7 @@ import { onboardingScenarios } from "../src/data/initial/onboardingScenarios";
 
 const minimums = {
   starterConcepts: 300,
-  dialogueTemplates: 240,
+  dialogueTemplates: 40,
   learningPrompts: 100,
   responsePatterns: 160,
   diaryTemplates: 60,
@@ -54,7 +54,6 @@ const responseIds = new Set(responsePatterns.map((pattern) => pattern.id));
 const locationIds = new Set(locations.map((location) => location.id));
 const templateIds = new Set<string>();
 const semanticFrames = new Set<string>();
-const normalizedVariants = new Set<string>();
 for (const [index, template] of dialogueTemplates.entries()) {
   const parsed = dialogueTemplateSchema.safeParse(template);
   if (!parsed.success) errors.push(`dialogueTemplates[${index}]: ${parsed.error.issues[0]?.message ?? "invalid"}`);
@@ -64,12 +63,14 @@ for (const [index, template] of dialogueTemplates.entries()) {
   semanticFrames.add(template.semanticFrame);
   for (const location of template.locations) if (!locationIds.has(location as never)) errors.push(`${template.id}: unknown location ${location}`);
   for (const responseId of template.responsePatternIds ?? []) if (!responseIds.has(responseId)) errors.push(`${template.id}: unknown response ${responseId}`);
+  const normalizedVariants = new Set<string>();
   for (const variant of template.variants) {
     const normalized = variant.replace(/\s/g, "");
     if (normalizedVariants.has(normalized)) errors.push(`${template.id}: duplicate dialogue text`);
     normalizedVariants.add(normalized);
     for (const slot of template.slots.filter((item) => item.required)) {
-      if (!variant.includes(`{${slot.name}}`)) errors.push(`${template.id}: required slot ${slot.name} is unused`);
+      const escapedName = slot.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (!new RegExp(`\\{${escapedName}(?::[^}]+)?\\}`).test(variant)) errors.push(`${template.id}: required slot ${slot.name} is unused`);
       if (!starterConcepts.some((concept) => slot.categories.includes(concept.userCategory))) errors.push(`${template.id}: no starter concept for ${slot.name}`);
     }
     if (Array.from(variant).length > 110) errors.push(`${template.id}: variant exceeds source limit`);

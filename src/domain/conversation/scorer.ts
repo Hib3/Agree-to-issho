@@ -18,7 +18,9 @@ export const SCORE = {
   recentTemplate: -100,
   recentConcept: -45,
   repeatedTuple: -100,
-  repeatedIntent: -60,
+  recentIntent: -18,
+  repeatedIntent: -45,
+  absurdityCooldown: -80,
   grammarRisk: -25
 } as const;
 
@@ -50,7 +52,7 @@ export function scoreCandidate(
     score += SCORE.contextMatch;
     reasons.push("location");
   }
-  score += template.slots.length * SCORE.categoryFit;
+  score += SCORE.categoryFit + Math.min(8, Math.max(0, template.slots.length - 1) * 4);
   if (relations.some((relation) => isConfirmedRelation(relation) && ids.includes(relation.fromConceptId) && ids.includes(relation.toConceptId))) {
     score += SCORE.relationFit;
     reasons.push("relation");
@@ -68,8 +70,12 @@ export function scoreCandidate(
   if (ids.some((id) => recentConceptIds.has(id))) score += SCORE.recentConcept;
   const recentTuples = recentSessions.slice(-20).map((session) => Object.values(session.slotConceptIds).sort().join("|"));
   if (recentTuples.includes(tupleKey)) score += SCORE.repeatedTuple;
+  if (recentSessions.at(-1)?.intent === template.intent) score += SCORE.recentIntent;
   if (recentSessions.slice(-3).every((session) => session.intent === template.intent) && recentSessions.length >= 3) {
     score += SCORE.repeatedIntent;
+  }
+  if (template.intent === "misunderstanding" && recentSessions.slice(-5).some((session) => session.absurdityCount > 0)) {
+    score += SCORE.absurdityCooldown;
   }
   if (concepts.some((concept) => concept.ambiguity > 0.75)) score += SCORE.grammarRisk;
   return { template, slots, score, tupleKey, reasons };

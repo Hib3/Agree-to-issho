@@ -54,7 +54,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     ? "会話メモを整え直しましたっ。もう一度、話しかけてくださいっ！"
     : active?.phase === "awaiting_answer" && active.pendingQuestion
     ? active.pendingQuestion.prompt
-    : lastTurn?.page ?? `まァっ、${player.callName}っ！ 今日はどんな話をしましょうかっ？`;
+    : lastTurn?.page ?? `${player.callName}っ！ 今日はどんな話をしましょうかっ？`;
   const hasNext = Boolean(active && active.phase !== "awaiting_answer" && active.phase !== "completed");
 
   const speak = useCallback(async (initiatedByUser = true) => {

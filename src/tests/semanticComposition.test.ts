@@ -91,11 +91,15 @@ describe("semantic composition regression", () => {
 
   it("offers only semantic relation answers for relation discovery", () => {
     const { session } = planUnrelatedPair();
-    const effects = session.pendingQuestion?.choices.map((choice) => choice.effect) ?? [];
+    const choices = session.pendingQuestion?.choices ?? [];
+    const relationChoices = choices.filter((choice) => choice.effect === "affirm");
 
-    expect(effects).toEqual(["affirm", "deny", "curious"]);
-    expect(session.pendingQuestion?.choices.map((choice) => choice.label)).not.toContain("続きを聞きたい");
-    expect(session.pendingQuestion?.choices.map((choice) => choice.label)).not.toContain("あとで考える");
+    expect(relationChoices.length).toBeGreaterThan(0);
+    expect(relationChoices.every((choice) => choice.answerEffect?.relationType && choice.answerEffect.memoryEffect === "link_words")).toBe(true);
+    expect(choices.at(-2)?.effect).toBe("deny");
+    expect(choices.at(-1)?.effect).toBe("curious");
+    expect(choices.map((choice) => choice.label)).not.toContain("続きを聞きたい");
+    expect(choices.map((choice) => choice.label)).not.toContain("あとで考える");
   });
 
   it("does not mutate word memory for a navigation-only answer", () => {
@@ -162,6 +166,22 @@ describe("semantic composition regression", () => {
     expect(result.answer.memoryEffect).toBe("none");
   });
 
+  it("stores the relation type selected by the player", () => {
+    const { concepts, session } = planUnrelatedPair();
+    const eats = session.pendingQuestion?.answerSchema.find((choice) => choice.answerEffect?.relationType === "eats_drinks");
+    expect(eats).toBeDefined();
+    const result = applyResponse({ ...session, phase: "awaiting_answer" }, eats!, character, [], concepts, now + 1);
+
+    expect(result.relations).toHaveLength(1);
+    expect(result.relations[0]).toMatchObject({
+      fromConceptId: concepts[0]!.id,
+      toConceptId: concepts[1]!.id,
+      type: "eats_drinks",
+      source: "answer"
+    });
+    expect(result.session.queuedTurns.at(-1)?.page).toContain("食べたり飲んだりする");
+  });
+
   it("updates and names only the asked word in a preference answer", () => {
     const { concepts, session } = planUnrelatedPair();
     const preferenceProposition = {
@@ -219,6 +239,79 @@ describe("semantic composition regression", () => {
     expect(validateStylePreservation(base, styled, ["おとな", "かつお節"], "relation_confirmation")).toEqual([]);
     expect(styled).toContain("関係がない");
     expect(styled).toMatch(/[？?]/u);
+  });
+
+  it("only combines conversation intents with compatible semantic frames", () => {
+    const comparisons = dialogueTemplates.filter((template) => template.intent === "comparison");
+    const preferences = dialogueTemplates.filter((template) => template.intent === "ask_preference");
+    const meaningChecks = dialogueTemplates.filter((template) => template.intent === "ask_meaning");
+    const relationChecks = dialogueTemplates.filter((template) => template.intent === "ask_relation");
+
+    expect(comparisons.map((template) => template.semanticFrame)).toEqual([
+      "comparison.wearable_person_comparison",
+      "comparison.idea_comparison"
+    ]);
+    expect(preferences.every((template) => template.slots.length === 1)).toBe(true);
+    expect(meaningChecks.every((template) => template.slots.length === 1)).toBe(true);
+    expect(relationChecks.every((template) => template.grounding === "relation_required" && template.slots.length === 2)).toBe(true);
+  });
+
+  it("realizes a typed person-place-action scene with explicit grammatical roles", () => {
+    const sceneTemplate = dialogueTemplates.find((template) => template.id === "dialogue_daydream_person_action_place")!;
+    const concepts = [
+      createUserConcept({ surface: "運転手", category: "occupation" }, now, "driver"),
+      createUserConcept({ surface: "水やり", category: "action" }, now, "watering"),
+      createUserConcept({ surface: "庭", category: "place" }, now, "garden")
+    ];
+    const session = planConversation({
+      templates: [sceneTemplate],
+      responsePatterns,
+      concepts,
+      relations: [],
+      recentSessions: [],
+      character,
+      locationId: "room",
+      now,
+      random: new SeededRandom(4),
+      randomSeed: 4
+    });
+    const transcript = session.queuedTurns.map((turn) => turn.page).join("\n");
+
+    expect(transcript).toContain("「運転手」が「庭」で「水やり」という行動をしている");
+    expect(transcript).not.toContain("二つを比べてみたら");
+    expect(session.proposition.relationType).toBe("scene_hypothesis");
+    expect(session.proposition.evidence).toBe("category_only");
+    expect(session.pendingQuestion?.prompt).toContain("「運転手」・「水やり」・「庭」");
+    expect(session.pendingQuestion?.questionIntent).toBe("situation_question");
+  });
+
+  it("marks a deliberate category-based mismatch as one correctable hypothesis", () => {
+    const mismatchTemplate = dialogueTemplates.find((template) => template.id === "dialogue_misunderstanding_person_action_place")!;
+    const concepts = [
+      createUserConcept({ surface: "運転手", category: "occupation" }, now, "driver-mismatch"),
+      createUserConcept({ surface: "水やり", category: "action" }, now, "watering-mismatch"),
+      createUserConcept({ surface: "庭", category: "place" }, now, "garden-mismatch")
+    ];
+    const session = planConversation({
+      templates: [mismatchTemplate],
+      responsePatterns,
+      concepts,
+      relations: [],
+      recentSessions: [],
+      character,
+      locationId: "room",
+      now,
+      random: new SeededRandom(5),
+      randomSeed: 5
+    });
+
+    expect(session.proposition.relationType).toBe("drift_hypothesis");
+    expect(session.proposition.evidence).toBe("category_only");
+    expect(session.absurdityCount).toBe(1);
+    expect(session.pendingQuestion?.questionIntent).toBe("correction_request");
+    expect(session.pendingQuestion?.prompt).toContain("運転手");
+    expect(session.pendingQuestion?.prompt).toContain("水やり");
+    expect(session.pendingQuestion?.prompt).toContain("庭");
   });
 
   it("rejects an awaiting session whose question record is missing", () => {

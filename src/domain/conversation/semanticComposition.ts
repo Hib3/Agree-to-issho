@@ -1,6 +1,6 @@
 import type { DialogueTemplate } from "../../data/schema/dialogue";
-import type { Concept } from "../model/concept";
-import type { CompositionProposition, DialogueChoice, QuestionIntent } from "../model/conversation";
+import { isPersonCategory, type Concept } from "../model/concept";
+import type { CompositionProposition, DialogueAnswerEffect, DialogueChoice, QuestionIntent } from "../model/conversation";
 import type { ConceptRelation, RelationType } from "../model/relation";
 import { displayConcept } from "../grammar/japaneseRealizer";
 
@@ -24,18 +24,40 @@ export function composeProposition(input: {
       wordIds.includes(item.toConceptId)
   );
 
+  if (concepts.length >= 2 && input.template.intent === "misunderstanding") {
+    return {
+      wordIds,
+      frameId: input.template.semanticFrame,
+      relationType: "drift_hypothesis",
+      relationText: input.renderedText,
+      evidence: relation ? "confirmed_relation" : "category_only",
+      confidence: relation ? Math.min(0.65, relation.confidence) : 0.35,
+      questionIntent: input.hasResponse ? "correction_request" : "none"
+    };
+  }
+
+  if (concepts.length >= 2 && input.template.grounding === "scene_frame") {
+    return {
+      wordIds,
+      frameId: input.template.semanticFrame,
+      relationType: "scene_hypothesis",
+      relationText: input.renderedText,
+      evidence: relation ? "confirmed_relation" : "category_only",
+      confidence: relation ? Math.min(0.75, relation.confidence) : 0.45,
+      questionIntent: input.hasResponse ? questionIntentFor(input.template.intent, "situation_question") : "none"
+    };
+  }
+
   if (relation) {
     return {
       wordIds,
       frameId: input.template.semanticFrame,
-      relationType: input.template.intent === "misunderstanding" ? "drift_hypothesis" : "confirmed_relation",
+      relationType: "confirmed_relation",
       relationText: describeRelation(relation, concepts),
       evidence: "confirmed_relation",
       confidence: relation.confidence,
       questionIntent: input.hasResponse
-        ? input.template.intent === "misunderstanding"
-          ? "correction_request"
-          : "relation_confirmation"
+        ? "relation_confirmation"
         : "none"
     };
   }
@@ -52,18 +74,6 @@ export function composeProposition(input: {
       evidence: "none",
       confidence: 0,
       questionIntent: "relation_discovery"
-    };
-  }
-
-  if (concepts.length >= 2) {
-    return {
-      wordIds,
-      frameId: input.template.semanticFrame,
-      relationType: "scene_hypothesis",
-      relationText: input.renderedText,
-      evidence: "scene_frame",
-      confidence: 0.55,
-      questionIntent: input.hasResponse ? questionIntentFor(input.template.intent, "situation_question") : "none"
     };
   }
 
@@ -85,6 +95,7 @@ export function questionForProposition(proposition: CompositionProposition, conc
     .map((concept) => "「" + displayConcept(concept) + "」");
   const pair = words.slice(0, 2).join("と");
   const word = words[0] ?? "その言葉";
+  const namedTopics = words.join("・");
 
   switch (proposition.questionIntent) {
     case "relation_discovery":
@@ -92,36 +103,39 @@ export function questionForProposition(proposition: CompositionProposition, conc
     case "relation_confirmation":
       return proposition.relationText + "として覚えていいですか？";
     case "correction_request":
-      return proposition.relationText + "という覚え方に、違う所がありますか？";
+      return namedTopics + "を使った今の覚え方に、違う所がありますか？";
     case "preference_question":
       return word + "のこと、好きですか？";
     case "category_confirmation":
       return word + "の種類は、今の覚え方で近いですか？";
     case "situation_question":
-      return proposition.relationText + "という場面は、ありそうですか？";
+      return namedTopics + "を使った場面として、今の想像は近いですか？";
     default:
       return "";
   }
 }
 
-export function answerSchemaFor(proposition: CompositionProposition): DialogueChoice[] {
+export function answerSchemaFor(proposition: CompositionProposition, concepts: Concept[] = []): DialogueChoice[] {
   const choice = (
     id: string,
     label: string,
     effect: DialogueChoice["effect"],
     semanticEffect: NonNullable<DialogueChoice["answerEffect"]>["semanticEffect"],
-    memoryEffect: NonNullable<DialogueChoice["answerEffect"]>["memoryEffect"] = "none"
+    memoryEffect: NonNullable<DialogueChoice["answerEffect"]>["memoryEffect"] = "none",
+    relation?: Pick<DialogueAnswerEffect, "relationType" | "relationDirection">
   ): DialogueChoice => ({
     id,
     label,
     effect,
-    answerEffect: { semanticEffect, navigationEffect: "none", memoryEffect }
+    answerEffect: { semanticEffect, navigationEffect: "none", memoryEffect, ...relation }
   });
 
   switch (proposition.questionIntent) {
     case "relation_discovery":
       return [
-        choice("relation_yes", "関係がある", "affirm", "confirm", "link_words"),
+        ...relationChoicesFor(proposition, concepts).map((item, index) =>
+          choice(`relation_type_${index}`, item.label, "affirm", "confirm", "link_words", item)
+        ),
         choice("relation_no", "関係はない", "deny", "reject"),
         choice("relation_unknown", "まだ分からない", "curious", "unknown")
       ];
@@ -158,6 +172,46 @@ export function answerSchemaFor(proposition: CompositionProposition): DialogueCh
     default:
       return [];
   }
+}
+
+function relationChoicesFor(proposition: CompositionProposition, concepts: Concept[]) {
+  const pair = proposition.wordIds.slice(0, 2).map((id) => concepts.find((concept) => concept.id === id));
+  const first = pair[0];
+  const second = pair[1];
+  const choices: Array<{ label: string; relationType: RelationType; relationDirection: "forward" | "reverse" }> = [];
+  if (!first || !second) return [{ label: "関係がある", relationType: "associated_with" as const, relationDirection: "forward" as const }];
+
+  const add = (label: string, relationType: RelationType, from: Concept, to: Concept) => {
+    const relationDirection = from.id === first.id && to.id === second.id ? "forward" as const : "reverse" as const;
+    if (!choices.some((item) => item.relationType === relationType && item.relationDirection === relationDirection)) {
+      choices.push({ label, relationType, relationDirection });
+    }
+  };
+  const actionLike = (concept: Concept) => ["action", "required_action", "forbidden_action", "sport", "skill"].includes(concept.userCategory);
+  const personLike = (concept: Concept) => isPersonCategory(concept.userCategory) || ["robot", "living_thing"].includes(concept.userCategory);
+  const objectLike = (concept: Concept) => ["food_drink", "usable_object", "wearable", "vehicle", "readable", "viewable"].includes(concept.userCategory);
+
+  for (const [left, right] of [[first, second], [second, first]] as const) {
+    if (actionLike(left) && right.userCategory === "place") add("そこで行う", "done_at", left, right);
+    if (personLike(left) && right.userCategory === "place") add("そこで過ごす", "lives_at", left, right);
+    if (personLike(left) && right.userCategory === "food_drink") {
+      add("食べたり飲んだりする", "eats_drinks", left, right);
+      add("好きなもの", "likes", left, right);
+    }
+    if (personLike(left) && right.userCategory === "wearable") add("身につける", "wears", left, right);
+    if (personLike(left) && objectLike(right) && right.userCategory !== "wearable" && right.userCategory !== "food_drink") {
+      add("それを使う", "uses", left, right);
+    }
+    if (actionLike(left) && objectLike(right)) add("それを使う", "uses", left, right);
+    if (left.userCategory === "place" && objectLike(right)) add("そこにある", "located_at", right, left);
+    if (left.attributes.usageMode === "contain" && objectLike(right)) add("中に入っている", "contains", left, right);
+  }
+  if ([first.userCategory, second.userCategory].every((category) => ["abstract", "word_expression", "other"].includes(category))) {
+    add("少し似ている", "similar_to", first, second);
+    add("反対に近い", "opposite_of", first, second);
+  }
+  if (choices.length < 3) add("ほかの関係", "associated_with", first, second);
+  return choices.slice(0, 3);
 }
 
 function questionIntentFor(intent: DialogueTemplate["intent"], fallback: QuestionIntent): QuestionIntent {

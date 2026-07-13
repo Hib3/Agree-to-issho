@@ -1,39 +1,52 @@
 import type { CharacterEmotion } from "../model/character";
 
+const existingOpener = /^(?:まァっ|なんかっ|あのっそのっ|あのっ|えェっ|あっ|あれっ|ねえっ)[、！！？]?/u;
+const uncertaintyCue = /(かもしれ|気がし|まだ|分から|わから|迷|想像|考え|気にな|ふわふわ|たぶん|ひょっと)/u;
+
 export function applyAguriVoice(text: string, emotion: CharacterEmotion = "curious") {
   const clean = text.trim();
   if (!clean) return clean;
-  const energetic = clean
-    .replace(/でしょう。/g, "でしょうねェっ！")
-    .replace(/ですね。/g, "ですねェっ！")
-    .replace(/です。/g, "でェっすっ！")
-    .replace(/ます。/g, "まァっすっ！")
-    .replace(/ません。/g, "ませんねェっ！")
-    .replace(/ですか(?:っ)?[？?]?/g, "ですかっ！？")
-    .replace(/ますか(?:っ)?[？?]?/g, "ますかっ！？")
-    .replace(/かな。/g, "かなァっ！")
-    .replace(/よね。/g, "よなァっ！")
-    .replace(/っ。/g, "っ！");
-  const prefix = prefixFor(emotion, energetic);
-  const ending = /[。！？!?]$/u.test(energetic) ? "" : endingFor(energetic, emotion);
-  return `${prefix}${energetic}${ending}`;
+
+  const energetic = applySentenceRhythm(clean, emotion);
+  return `${softenerFor(clean, emotion)}${energetic}`;
 }
 
-function prefixFor(emotion: CharacterEmotion, text: string) {
-  if (/^(まァっ|なんかっ|あのっ|えェっ)/.test(text)) return "";
-  if (emotion === "confused" || emotion === "embarrassed") return "なんかっ、";
-  if (emotion === "excited" || emotion === "happy") return "まァっ、";
-  if (emotion === "sleepy" || emotion === "calm") return "あのっ、";
-  return hash(text) % 2 === 0 ? "まァっ、" : "なんかっ、";
+function applySentenceRhythm(text: string, emotion: CharacterEmotion) {
+  let result = text
+    .replace(/ですか(?:っ)?[？?]/gu, "ですかっ！？")
+    .replace(/ますか(?:っ)?[？?]/gu, "ますかっ！？")
+    .replace(/しょうか(?:っ)?[？?]/gu, "しょうかっ！？")
+    .replace(/でしょう。/gu, "でしょうねェっ！")
+    .replace(/ですね。/gu, "ですねェっ！")
+    .replace(/ません。/gu, "ませんっ！")
+    .replace(/です。/gu, "ですっ！")
+    .replace(/ます。/gu, "ますっ！")
+    .replace(/かな。/gu, "かなァっ！")
+    .replace(/よね。/gu, "よなァっ！")
+    .replace(/っ。/gu, "っ！");
+
+  if (!["calm", "sleepy"].includes(emotion)) result = result.replace(/。/gu, "っ！");
+  if (!["。", "！", "？", "!", "?"].some((ending) => result.endsWith(ending)) && ["happy", "excited"].includes(emotion)) {
+    result += "っ！";
+  }
+  return result;
 }
 
-function endingFor(text: string, emotion: CharacterEmotion) {
-  const endings = emotion === "confused"
-    ? [" かもしれませんねェっ！", " ちょっと気になりますなァっ！"]
-    : emotion === "happy" || emotion === "excited"
-      ? [" めっちゃいいなァっ！", " うれしいよォっ！"]
-      : [" ですねェっ！", " だよなァっ！", " もっと知りたいよォっ！"];
-  return endings[hash(text) % endings.length] ?? " ですねェっ！";
+function softenerFor(text: string, emotion: CharacterEmotion) {
+  if (existingOpener.test(text) || /「[^」]+」/u.test(text) || !uncertaintyCue.test(text)) return "";
+  const bucket = hash(`${emotion}:${text}`) % 100;
+
+  if (emotion === "confused" || emotion === "embarrassed") {
+    if (bucket < 8) return "まァっ、";
+    if (bucket < 28) return "なんかっ、";
+    if (bucket < 36) return "あのっそのっ、";
+    return "";
+  }
+  if (emotion === "curious") {
+    if (bucket < 4) return "まァっ、";
+    if (bucket < 12) return "なんかっ、";
+  }
+  return "";
 }
 
 function hash(text: string) {

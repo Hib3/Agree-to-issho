@@ -7,7 +7,7 @@ import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
 import { realize, splitJapanesePages, displayConcept } from "../grammar/japaneseRealizer";
 import { applyAguriVoice } from "../voice/aguriVoice";
-import { controlledPremise } from "./absurdityController";
+import { buildNarrativePages } from "./narrativeGenerator";
 import type { ScoredCandidate } from "./scorer";
 import { answerSchemaFor, composeProposition, questionForProposition } from "./semanticComposition";
 import { validateConversationSession, validateStylePreservation } from "./dialogueValidator";
@@ -42,11 +42,8 @@ export function realizeCandidate(
   const focus = usedConcepts.find((concept) => concept.source === "user") ?? usedConcepts[0];
   if (!focus) throw new Error("会話に使える言葉がありません: " + candidate.template.id);
 
-  const topicIntroduction = focus.source === "user"
-    ? "この前教えてもらった「" + displayConcept(focus) + "」、ノートでまた見つけましたっ。"
-    : "今日は「" + displayConcept(focus) + "」のことを考えていたんです。";
-  const bodyPages = pagesForProposition(proposition, rendered, candidate);
-  const pages = [topicIntroduction, ...bodyPages].flatMap((page) => splitJapanesePages(page)).filter(Boolean).slice(0, 5);
+  const storyPages = buildNarrativePages({ candidate, proposition, rendered, random });
+  const pages = storyPages.flatMap((page) => splitJapanesePages(page)).filter(Boolean).slice(0, 5);
   const emotion = emotionForIntent(candidate.template.intent, character);
   const wordSurfaces = usedConcepts.map(displayConcept);
   const queuedTurns = pages.map((page, index) =>
@@ -61,7 +58,7 @@ export function realizeCandidate(
     })
   );
 
-  const answerSchema = answerSchemaFor(proposition);
+  const answerSchema = answerSchemaFor(proposition, allConcepts);
   const questionPrompt = questionForProposition(proposition, allConcepts);
   const questionStyleErrors = questionPrompt
     ? validateStylePreservation(
@@ -94,6 +91,7 @@ export function realizeCandidate(
 
   const session: ConversationSession = {
     schemaVersion: 2,
+    dialogueRevision: 2,
     id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: candidate.template.intent,
@@ -120,24 +118,6 @@ export function realizeCandidate(
     ]);
   }
   return session;
-}
-
-function pagesForProposition(proposition: CompositionProposition, rendered: string, candidate: ScoredCandidate) {
-  const concepts = proposition.wordIds
-    .map((id) => Object.values(candidate.slots).find((concept) => concept.id === id))
-    .filter((concept): concept is Concept => Boolean(concept));
-  if (proposition.relationType === "relation_discovery") {
-    const words = concepts.slice(0, 2).map((concept) => "「" + displayConcept(concept) + "」").join("と");
-    return [words + "の間には、まだ教わったつながりがありませんっ。"];
-  }
-  if (proposition.relationType === "confirmed_relation" && candidate.template.grounding === "relation_required") {
-    return [proposition.relationText + "と覚えていますっ。"];
-  }
-  if (proposition.relationType === "drift_hypothesis") {
-    const absurdity = controlledPremise(candidate);
-    return [absurdity.premise, rendered].filter(Boolean);
-  }
-  return [rendered];
 }
 
 function createTurn(input: {
@@ -204,6 +184,7 @@ function safeFallbackSession(
   });
   return {
     schemaVersion: 2,
+    dialogueRevision: 2,
     id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: "small_talk",

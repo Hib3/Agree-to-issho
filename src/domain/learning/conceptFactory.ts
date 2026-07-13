@@ -20,7 +20,7 @@ export function grammarForCategory(category: ConceptCategory): ConceptGrammar {
     canBeSubject: person || actionLike || category === "abstract",
     canBeObject: object || actionLike || category === "word_expression",
     canBeLocation: location,
-    canBeContainer: location || category === "usable_object",
+    canBeContainer: location,
     canBeCompanion: person,
     canBePossessed: object || person || category === "body_part"
   };
@@ -28,6 +28,8 @@ export function grammarForCategory(category: ConceptCategory): ConceptGrammar {
 
 export function createUserConcept(draft: ConceptDraft, now: number, id: string = crypto.randomUUID()): Concept {
   const surface = normalizeJapanese(draft.surface);
+  const grammar = grammarForCategory(draft.category);
+  if (draft.attributes?.usageMode === "contain") grammar.canBeContainer = true;
   const concept: Concept = {
     id: `concept_${id}`,
     source: "user",
@@ -36,7 +38,7 @@ export function createUserConcept(draft: ConceptDraft, now: number, id: string =
     aliases: [duplicateKey(surface)],
     userCategory: draft.category,
     categoryConfidence: 1,
-    grammar: grammarForCategory(draft.category),
+    grammar,
     attributes: draft.attributes ?? {},
     learnedAt: now,
     usageCount: 0,

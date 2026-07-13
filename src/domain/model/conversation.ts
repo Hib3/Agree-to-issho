@@ -1,4 +1,5 @@
 import type { CharacterEmotion } from "./character";
+import type { RelationType } from "./relation";
 
 export const conversationIntents = [
   "small_talk",
@@ -53,6 +54,8 @@ export type DialogueAnswerEffect = {
   semanticEffect: "confirm" | "reject" | "unknown" | "preference_like" | "preference_neutral" | "preference_dislike" | "none";
   navigationEffect: "continue" | "close" | "stay" | "none";
   memoryEffect: "link_words" | "unlink_words" | "update_preference" | "update_category" | "none";
+  relationType?: RelationType;
+  relationDirection?: "forward" | "reverse";
 };
 
 export type DialogueChoice = {
@@ -91,6 +94,7 @@ export type PendingQuestion = {
 
 export type ConversationSession = {
   schemaVersion: 2;
+  dialogueRevision: 2;
   id: string;
   phase: ConversationPhase;
   intent: ConversationIntent;

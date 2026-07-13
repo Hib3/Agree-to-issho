@@ -33,7 +33,9 @@ const questionIntentSchema = z.enum([
 const answerEffectSchema = z.object({
   semanticEffect: z.enum(["confirm", "reject", "unknown", "preference_like", "preference_neutral", "preference_dislike", "none"]),
   navigationEffect: z.enum(["continue", "close", "stay", "none"]),
-  memoryEffect: z.enum(["link_words", "unlink_words", "update_preference", "update_category", "none"])
+  memoryEffect: z.enum(["link_words", "unlink_words", "update_preference", "update_category", "none"]),
+  relationType: z.enum(relationTypes).optional(),
+  relationDirection: z.enum(["forward", "reverse"]).optional()
 });
 
 const dialogueChoiceSchema = z.object({
@@ -161,6 +163,7 @@ const memorySchema = z.object({
 
 const conversationSessionSchema = z.object({
   schemaVersion: z.literal(2).optional(),
+  dialogueRevision: z.literal(2).optional(),
   id: z.string().min(1),
   phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
   intent: z.enum(conversationIntents),
@@ -217,7 +220,7 @@ export const dialogueTemplateSchema = z.object({
   phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
   locations: z.array(z.string()).min(1),
   moods: z.array(z.string()).min(1),
-  slots: z.array(z.object({ name: z.string(), categories: z.array(z.enum(conceptCategories)).min(1), grammaticalRole: z.enum(["subject", "object", "location", "action", "container", "body_part", "companion"]), required: z.boolean() })).min(1),
+  slots: z.array(z.object({ name: z.string(), categories: z.array(z.enum(conceptCategories)).min(1), grammaticalRole: z.enum(["topic", "subject", "object", "location", "action", "container", "body_part", "companion"]), required: z.boolean() })).min(1),
   constraints: z.object({ minUserWords: z.number().optional(), maxRecentUse: z.number().optional(), requiredRelations: z.array(z.enum(relationTypes)).optional(), forbiddenSameConcept: z.array(z.array(z.string())).optional() }),
   variants: z.array(z.string().min(1)).min(1),
   responsePatternIds: z.array(z.string()).optional(),

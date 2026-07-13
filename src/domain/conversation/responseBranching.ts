@@ -69,11 +69,14 @@ export function applyResponse(
     return relation;
   });
   if (answer.memoryEffect === "link_words" && involvedIds.length >= 2 && involvedRelations.length === 0) {
+    const [firstId, secondId] = answer.relationDirection === "reverse"
+      ? [involvedIds[1]!, involvedIds[0]!]
+      : [involvedIds[0]!, involvedIds[1]!];
     updatedRelations = [...updatedRelations, {
       id: "relation_" + crypto.randomUUID(),
-      fromConceptId: involvedIds[0]!,
-      toConceptId: involvedIds[1]!,
-      type: "associated_with",
+      fromConceptId: firstId,
+      toConceptId: secondId,
+      type: answer.relationType ?? "associated_with",
       source: "answer",
       strength: 0.45,
       confidence: 0.7,
@@ -174,6 +177,9 @@ function createReaction(
 }
 
 function semanticReaction(session: ConversationSession, answer: DialogueAnswerEffect, pair: string) {
+  if (session.questionIntent === "relation_discovery" && answer.semanticEffect === "confirm" && answer.relationType) {
+    return pair + "は、" + relationLabel(answer.relationType) + "つながりとして覚えますっ！";
+  }
   if (session.questionIntent === "category_confirmation") {
     return answer.semanticEffect === "confirm"
       ? pair + "の種類は、その覚え方で合っているんですねっ！"
@@ -192,6 +198,29 @@ function semanticReaction(session: ConversationSession, answer: DialogueAnswerEf
   return answer.semanticEffect === "confirm"
     ? pair + "には関係があるんですねっ！ ノートに線を足しますっ！"
     : pair + "は関係がないんですねっ！ 勝手に線を結ばないようにしますっ！";
+}
+
+function relationLabel(type: NonNullable<DialogueAnswerEffect["relationType"]>) {
+  const labels = {
+    does_with: "一緒にする",
+    done_at: "その場所で行う",
+    uses: "使う",
+    contains: "中に入っている",
+    located_at: "その場所にある",
+    lives_at: "その場所で過ごす",
+    likes: "好きなものの",
+    dislikes: "苦手なものの",
+    wears: "身につける",
+    eats_drinks: "食べたり飲んだりする",
+    travels_by: "それに乗って移動する",
+    associated_with: "関係がある",
+    part_of: "一部になっている",
+    causes: "きっかけになる",
+    prevents: "防ぐ",
+    similar_to: "似ている",
+    opposite_of: "反対に近い"
+  } satisfies Record<NonNullable<DialogueAnswerEffect["relationType"]>, string>;
+  return labels[type];
 }
 
 function clamp(value: number) {

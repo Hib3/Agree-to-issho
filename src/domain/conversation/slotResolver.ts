@@ -10,11 +10,12 @@ function roleFits(concept: Concept, slot: TemplateSlot) {
   if (!slot.categories.includes(concept.userCategory)) return false;
   const grammar = concept.grammar;
   const roleChecks = {
+    topic: true,
     subject: grammar.canBeSubject,
     object: grammar.canBeObject,
     location: grammar.canBeLocation,
     action: grammar.suruAction || Boolean(grammar.verbDictionaryForm),
-    container: grammar.canBeContainer,
+    container: concept.userCategory === "place" || concept.attributes.usageMode === "contain",
     body_part: concept.userCategory === "body_part",
     companion: grammar.canBeCompanion
   };
@@ -34,6 +35,7 @@ export function resolveSlots(
   const used = new Set<string>();
   const userCount = active.filter((concept) => concept.source === "user").length;
   let userIncluded = false;
+  let confirmedPairIncluded = false;
   let startIndex = 0;
   const firstSlot = template.slots[0];
   const secondSlot = template.slots[1];
@@ -54,9 +56,19 @@ export function resolveSlots(
       used.add(first.id);
       used.add(second.id);
       userIncluded = first.source === "user" || second.source === "user";
+      confirmedPairIncluded = true;
       startIndex = 2;
       break;
     }
+  }
+
+  if (
+    template.grounding === "relation_required" &&
+    !confirmedPairIncluded &&
+    template.intent !== "ask_relation" &&
+    template.intent !== "misunderstanding"
+  ) {
+    return undefined;
   }
 
   for (const slot of template.slots.slice(startIndex)) {

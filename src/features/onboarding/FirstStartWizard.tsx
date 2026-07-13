@@ -9,7 +9,7 @@ export function FirstStartWizard({ onComplete }: { onComplete: () => Promise<voi
   const [name, setName] = useState("");
   const [callName, setCallName] = useState("");
   const [busy, setBusy] = useState(false);
-  const prompt = step === "hello" ? "まァっ、来てくれたんですね！ アグリですっ！" : step === "name" ? "あなたの名前を教えてくださいっ。" : "アグリは、あなたを何て呼べばいいですかっ？";
+  const prompt = step === "hello" ? "来てくれたんですねェっ！ アグリですっ！" : step === "name" ? "あなたの名前を教えてくださいっ。" : "アグリは、あなたを何て呼べばいいですかっ？";
 
   async function finish() {
     const safeName = safePlayerText(name, 16);

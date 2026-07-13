@@ -9,7 +9,7 @@ export function controlledPremise(candidate: ScoredCandidate): AbsurdityResult {
   const [first, second] = entries;
   if (!first || !second) return { premise: "", count: 0 };
   return {
-    premise: `なんかっ、アグリは「${first[1].surface}」と「${second[1].surface}」を、うっかり同じ線で結んじゃいましたっ。`,
+    premise: `「${first[1].surface}」と「${second[1].surface}」を、覚えた種類だけで組み合わせてみましたっ。`,
     count: 1
   };
 }

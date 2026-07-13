@@ -1,6 +1,8 @@
 import type { Concept, ConceptCategory } from "../../domain/model/concept";
 import { grammarForCategory } from "../../domain/learning/conceptFactory";
 
+const containerWords = new Set(["かばん", "財布", "箱", "びん", "水筒", "お皿", "茶わん", "コップ", "鍋", "やかん", "植木鉢"]);
+
 const groups: Array<{ category: ConceptCategory; words: string[] }> = [
   {
     category: "person_descriptor",
@@ -63,22 +65,27 @@ const groups: Array<{ category: ConceptCategory; words: string[] }> = [
 ];
 
 export const starterConcepts: Concept[] = groups.flatMap(({ category, words }) =>
-  words.map((surface, index) => ({
-    id: `starter_${category}_${index + 1}`,
-    source: "starter" as const,
-    surface,
-    normalized: surface.normalize("NFKC"),
-    aliases: [],
-    userCategory: category,
-    systemHintCategory: category,
-    categoryConfidence: 1,
-    grammar: grammarForCategory(category),
-    attributes: {},
-    learnedAt: 0,
-    usageCount: 0,
-    reviewCount: 0,
-    understanding: 1,
-    ambiguity: 0,
-    active: true
-  }))
+  words.map((surface, index) => {
+    const isContainer = category === "usable_object" && containerWords.has(surface);
+    const grammar = grammarForCategory(category);
+    if (isContainer) grammar.canBeContainer = true;
+    return {
+      id: `starter_${category}_${index + 1}`,
+      source: "starter" as const,
+      surface,
+      normalized: surface.normalize("NFKC"),
+      aliases: [],
+      userCategory: category,
+      systemHintCategory: category,
+      categoryConfidence: 1,
+      grammar,
+      attributes: isContainer ? { usageMode: "contain" } : {},
+      learnedAt: 0,
+      usageCount: 0,
+      reviewCount: 0,
+      understanding: 1,
+      ambiguity: 0,
+      active: true
+    };
+  })
 );

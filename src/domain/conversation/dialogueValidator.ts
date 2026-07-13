@@ -24,6 +24,7 @@ export function validateDialogueTurn(turn: DialogueTurn, proposition: Compositio
 export function validateConversationSession(session: ConversationSession) {
   const errors: string[] = [];
   if (session.schemaVersion !== 2) errors.push("legacy_schema");
+  if (session.dialogueRevision !== 2) errors.push("legacy_dialogue_revision");
   if (!session.proposition) errors.push("missing_proposition");
   if (session.topicWordIds.join("|") !== session.proposition.wordIds.join("|")) errors.push("topic_words_mismatch");
   if (session.questionIntent !== session.proposition.questionIntent) errors.push("question_intent_mismatch");
