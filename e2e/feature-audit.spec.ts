@@ -170,6 +170,9 @@ test("character remains bright, layered correctly, and large while teaching", as
 
   const stage = page.locator(".character-stage").first();
   const character = stage.locator(".character");
+  await expect
+    .poll(() => character.evaluate((element) => getComputedStyle(element).filter))
+    .toMatch(/^(?:none|.*brightness\()/u);
   const lighting = await character.evaluate((element) => ({
     filter: getComputedStyle(element).filter,
     zIndex: Number(getComputedStyle(element).zIndex),
