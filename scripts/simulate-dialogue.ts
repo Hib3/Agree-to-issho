@@ -11,6 +11,7 @@ import { SeededRandom } from "../src/infrastructure/random/random";
 
 const now = 1_700_000_000_000;
 const concepts = createDebugLearnedConcepts(100, now);
+const sessionCount = Math.max(1, Number(process.env.SIMULATION_SESSIONS ?? 10_000));
 const recentSessions: ConversationSession[] = [];
 const transcripts = new Set<string>();
 const samples: Array<{
@@ -29,6 +30,10 @@ let questions = 0;
 let attributeGrounded = 0;
 let punchlineStories = 0;
 let compactConversations = 0;
+const lensCounts: Record<string, number> = {};
+const mechanismCounts: Record<string, number> = {};
+let callbackMismatch = 0;
+let missingNarrativeBeat = 0;
 
 const character: CharacterState = {
   id: "aguri",
@@ -46,7 +51,7 @@ const character: CharacterState = {
   updatedAt: now
 };
 
-for (let seed = 1; seed <= 1000; seed += 1) {
+for (let seed = 1; seed <= sessionCount; seed += 1) {
   const location = locations[seed % locations.length] ?? locations[0]!;
   const sessionNow = now + seed * 60_000;
   const session = planConversation({
@@ -79,6 +84,27 @@ for (let seed = 1; seed <= 1000; seed += 1) {
     punchlineStories += 1;
   }
   if (session.queuedTurns.length >= 2 && session.queuedTurns.length <= 4) compactConversations += 1;
+  if (session.narrativePlan) {
+    lensCounts[session.narrativePlan.lens] = (lensCounts[session.narrativePlan.lens] ?? 0) + 1;
+    mechanismCounts[session.narrativePlan.mechanism] =
+      (mechanismCounts[session.narrativePlan.mechanism] ?? 0) + 1;
+    if (
+      session.narrativePlan.beats.map((beat) => beat.kind).join("|") !==
+      "premise|setup|development|turn|payoff"
+    ) {
+      missingNarrativeBeat += 1;
+    }
+    const callbackIds = session.narrativePlan.callbackConceptIds;
+    if (
+      callbackIds.some(
+        (id) =>
+          !session.narrativePlan!.beats[3].conceptIds.includes(id) ||
+          !session.narrativePlan!.beats[4].conceptIds.includes(id)
+      )
+    ) {
+      callbackMismatch += 1;
+    }
+  }
   if (samples.length < 5 && session.queuedTurns.length >= 3) {
     samples.push({
       seed,
@@ -92,13 +118,16 @@ for (let seed = 1; seed <= 1000; seed += 1) {
   if (recentSessions.length > 24) recentSessions.shift();
 }
 
+if (missingNarrativeBeat > 0 || callbackMismatch > 0) {
+  failures.push(`narrative-structure:${missingNarrativeBeat}:${callbackMismatch}`);
+}
 if (failures.length > 0) throw new Error(`dialogue simulation failed: ${failures.slice(0, 10).join(" | ")}`);
 
 console.log(
   JSON.stringify(
     {
       learnedWords: concepts.length,
-      sessions: 1000,
+      sessions: sessionCount,
       uniqueTranscripts: transcripts.size,
       multiPage,
       narrative,
@@ -108,6 +137,10 @@ console.log(
       punchlineStories,
       compactConversations,
       intentCounts,
+      lensCounts,
+      mechanismCounts,
+      missingNarrativeBeat,
+      callbackMismatch,
       samples
     },
     null,

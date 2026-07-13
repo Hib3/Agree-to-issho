@@ -14,7 +14,7 @@ import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
 import { realize, splitJapanesePages, displayConcept } from "../grammar/japaneseRealizer";
 import { applyAguriVoice } from "../voice/aguriVoice";
-import { buildNarrativePages } from "./narrativeGenerator";
+import { buildNarrative } from "./narrativeGenerator";
 import type { ScoredCandidate } from "./scorer";
 import { answerSchemaFor, composeProposition, questionForProposition } from "./semanticComposition";
 import { validateConversationSession, validateStylePreservation } from "./dialogueValidator";
@@ -51,9 +51,15 @@ export function realizeCandidate(
   const focus = usedConcepts.find((concept) => concept.source === "user") ?? usedConcepts[0];
   if (!focus) throw new Error("会話に使える言葉がありません: " + candidate.template.id);
 
-  const storyPages = buildNarrativePages({ candidate, proposition, rendered, random });
+  const narrative = buildNarrative({ candidate, proposition, rendered, random, character });
+  const storyPages = narrative.pages;
   const splitPages = storyPages.flatMap((page) => splitJapanesePages(page)).filter(Boolean);
-  const pages = splitPages.length <= 6 ? splitPages : [...splitPages.slice(0, 5), splitPages.at(-1)!];
+  const pages =
+    splitPages.length <= 6
+      ? splitPages
+      : storyPages.length <= 6
+        ? storyPages
+        : [...storyPages.slice(0, 5), storyPages.at(-1)!];
   const emotion = emotionForIntent(candidate.template.intent, character);
   const wordSurfaces = usedConcepts.map(displayConcept);
   const queuedTurns = pages.map((page, index) =>
@@ -112,6 +118,7 @@ export function realizeCandidate(
     ),
     topicWordIds: proposition.wordIds,
     proposition,
+    ...(narrative.plan ? { narrativePlan: narrative.plan } : {}),
     questionIntent: proposition.questionIntent,
     history: [],
     queuedTurns,

@@ -6,7 +6,7 @@ export type StoryArcVariant = {
 };
 
 export const storyArcCadences = [
-  "その場面をもう少し考えて、",
+  "覚えた場面をもう少し考えて、",
   "念のため順番を整えて、",
   "うまくいくところまで想像して、",
   "ノートの端に続きを足して、",
@@ -26,24 +26,25 @@ export const storyArcTurnIds = [
 
 export const storyArcPunchlineIds = [
   "reversal",
-  "overprepared",
-  "wrong_target",
-  "back_to_start",
-  "tiny_result",
-  "oversized_note",
-  "lost_track_of_time",
-  "visible_clue",
-  "remembered_only_word",
-  "already_done"
+  "expectation_violation",
+  "literal_interpretation",
+  "scale_mismatch",
+  "mistaken_target",
+  "circular_return",
+  "overpreparation",
+  "delayed_realization",
+  "character_flaw_callback",
+  "word_attribute_callback",
+  "relation_callback"
 ] as const;
 
 export const storyArcVariants: StoryArcVariant[] = storyArcCadences.flatMap((_, cadenceIndex) =>
   storyArcTurnIds.flatMap((__, turnIndex) =>
-    storyArcPunchlineIds.map((___, punchlineIndex) => ({
-      id: `story_arc_${cadenceIndex + 1}_${turnIndex + 1}_${punchlineIndex + 1}`,
+    Array.from({ length: 10 }, (___, punchlineOffset) => ({
+      id: `story_arc_${cadenceIndex + 1}_${turnIndex + 1}_${punchlineOffset + 1}`,
       cadenceIndex,
       turnIndex,
-      punchlineIndex
+      punchlineIndex: (punchlineOffset + cadenceIndex) % storyArcPunchlineIds.length
     }))
   )
 );

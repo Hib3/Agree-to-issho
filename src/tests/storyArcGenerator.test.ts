@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { storyArcVariantCount, storyArcVariants } from "../data/story-arcs/storyArcCatalog";
+import {
+  storyArcPunchlineIds,
+  storyArcVariantCount,
+  storyArcVariants
+} from "../data/story-arcs/storyArcCatalog";
 import { createDebugLearnedConcepts } from "../data/debug/createDebugLearnedConcepts";
 import { renderStoryArc } from "../domain/conversation/storyArcGenerator";
 
@@ -20,6 +24,10 @@ describe("story arc catalog", () => {
     );
 
     expect(new Set(rendered.map((arc) => arc.id)).size).toBe(400);
+    expect(new Set(rendered.map((arc) => arc.mechanism))).toEqual(new Set(storyArcPunchlineIds));
+    expect(rendered.every((arc) => arc.callbackConceptIds.includes(focus.id))).toBe(true);
+    expect(rendered.every((arc) => arc.turn.includes(`「${focus.surface}」`))).toBe(true);
+    expect(rendered.every((arc) => arc.punchline.includes(`「${focus.surface}」`))).toBe(true);
     expect(new Set(rendered.map((arc) => `${arc.turn}\n${arc.punchline}`)).size).toBe(400);
     expect(rendered.every((arc) => arc.turn.length > 0 && arc.punchline.length > 0)).toBe(true);
     expect(rendered.every((arc) => /[。！]$/u.test(arc.turn) && /！$/u.test(arc.punchline))).toBe(true);

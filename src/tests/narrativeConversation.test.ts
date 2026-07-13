@@ -42,6 +42,8 @@ describe("multi-page narrative conversation", () => {
     let driftCount = 0;
     let maaOpeningCount = 0;
     const intentCounts = new Map<string, number>();
+    const lenses = new Set<string>();
+    const mechanisms = new Set<string>();
     const failures: string[] = [];
 
     for (let seed = 1; seed <= 1000; seed += 1) {
@@ -74,6 +76,23 @@ describe("multi-page narrative conversation", () => {
         if (session.queuedTurns.length < 3) failures.push(`${seed}:short-story`);
       }
       if (session.queuedTurns.length >= 5) punchlineStoryCount += 1;
+      if (session.narrativePlan) {
+        lenses.add(session.narrativePlan.lens);
+        mechanisms.add(session.narrativePlan.mechanism);
+        const beatKinds = session.narrativePlan.beats.map((beat) => beat.kind).join("|");
+        if (beatKinds !== "premise|setup|development|turn|payoff") {
+          failures.push(`${seed}:narrative-beat-order`);
+        }
+        if (
+          session.narrativePlan.callbackConceptIds.some(
+            (id) =>
+              !session.narrativePlan!.beats[3].conceptIds.includes(id) ||
+              !session.narrativePlan!.beats[4].conceptIds.includes(id)
+          )
+        ) {
+          failures.push(`${seed}:narrative-callback-mismatch`);
+        }
+      }
       if (session.queuedTurns.length >= 2 && session.queuedTurns.length <= 4) compactConversationCount += 1;
       if (session.proposition.relationType === "drift_hypothesis") {
         driftCount += 1;
@@ -103,6 +122,8 @@ describe("multi-page narrative conversation", () => {
     expect(intentCounts.get("ask_meaning") ?? 0).toBeGreaterThan(10);
     expect(intentCounts.get("ask_preference") ?? 0).toBeGreaterThan(0);
     expect(intentCounts.get("ask_preference") ?? 0).toBeLessThan(80);
+    expect(lenses.size).toBeGreaterThanOrEqual(4);
+    expect(mechanisms.size).toBe(11);
     expect(transcripts.size).toBeGreaterThan(700);
     expect(maaOpeningCount).toBeLessThan(25);
   });

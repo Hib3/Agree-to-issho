@@ -15,8 +15,7 @@ export function validateDialogueTurn(turn: DialogueTurn, proposition: Compositio
   const errors: string[] = [];
   if (!turn.page.trim()) errors.push("empty_text");
   if (exposedValues.test(turn.page)) errors.push("exposed_runtime_value");
-  if (turn.requiresAnswer && bareReferences.test(turn.page) && !/「[^」]+」/u.test(turn.page))
-    errors.push("bare_reference");
+  if (bareReferences.test(turn.page) && !/「[^」]+」/u.test(turn.page)) errors.push("bare_reference");
   if (turn.requiresAnswer && proposition.questionIntent === "none")
     errors.push("answer_without_question_intent");
   if (turn.requiresAnswer && turn.answerSchema.length === 0) errors.push("missing_answer_schema");
@@ -36,6 +35,28 @@ export function validateConversationSession(session: ConversationSession) {
   if (session.questionIntent !== session.proposition.questionIntent) errors.push("question_intent_mismatch");
   if (session.proposition.evidence === "none" && session.proposition.relationType === "scene_hypothesis")
     errors.push("ungrounded_scene");
+  if (session.narrativePlan) {
+    const expectedKinds = ["premise", "setup", "development", "turn", "payoff"];
+    if (session.narrativePlan.beats.length !== expectedKinds.length) errors.push("narrative_beat_count");
+    session.narrativePlan.beats.forEach((beat, index) => {
+      if (beat.kind !== expectedKinds[index]) errors.push("narrative_beat_order");
+      if (!beat.text.trim()) errors.push("empty_narrative_beat");
+    });
+    if (!session.topicWordIds.includes(session.narrativePlan.focusConceptId)) {
+      errors.push("narrative_focus_outside_topic");
+    }
+    if (
+      session.narrativePlan.callbackConceptIds.some((conceptId) => !session.topicWordIds.includes(conceptId))
+    ) {
+      errors.push("narrative_callback_outside_topic");
+    }
+    const turnAndPayoffIds = session.narrativePlan.beats
+      .filter((beat) => beat.kind === "turn" || beat.kind === "payoff")
+      .flatMap((beat) => beat.conceptIds);
+    if (session.narrativePlan.callbackConceptIds.some((conceptId) => !turnAndPayoffIds.includes(conceptId))) {
+      errors.push("narrative_callback_mismatch");
+    }
+  }
   if (session.phase === "awaiting_answer") {
     if (!session.pendingQuestion) errors.push("missing_pending_question");
     if (session.questionIntent === "none") errors.push("awaiting_without_question_intent");

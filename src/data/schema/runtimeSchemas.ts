@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { conceptCategories } from "../../domain/model/concept";
-import { conversationIntents } from "../../domain/model/conversation";
+import {
+  conversationIntents,
+  conversationLenses,
+  punchlineMechanisms
+} from "../../domain/model/conversation";
 import { relationTypes } from "../../domain/model/relation";
 
 const grammarSchema = z.object({
@@ -145,6 +149,32 @@ const propositionSchema = z.object({
     .optional()
 });
 
+const narrativeBeatSchema = z.object({
+  kind: z.enum(["premise", "setup", "development", "turn", "payoff"]),
+  text: z.string().min(1),
+  conceptIds: z.array(z.string()),
+  grounding: z.enum(["confirmed_memory", "user_attribute", "scene_hypothesis", "imagination"])
+});
+
+const narrativePlanSchema = z.object({
+  id: z.string().min(1),
+  lens: z.enum(conversationLenses),
+  mechanism: z.enum(punchlineMechanisms),
+  focusConceptId: z.string().min(1),
+  callbackConceptIds: z.array(z.string().min(1)).min(1),
+  beats: z.tuple([
+    narrativeBeatSchema,
+    narrativeBeatSchema,
+    narrativeBeatSchema,
+    narrativeBeatSchema,
+    narrativeBeatSchema
+  ]),
+  emotionalCurve: z.array(characterEmotionSchema).min(1),
+  evidenceBoundary: z.enum(["memory", "typed_attribute", "hypothesis", "imagination"]),
+  confidence: z.number().min(0).max(1),
+  signature: z.string().min(1)
+});
+
 const pendingQuestionSchema = z.object({
   id: z.string().min(1),
   prompt: z.string().min(1),
@@ -152,6 +182,7 @@ const pendingQuestionSchema = z.object({
   questionIntent: questionIntentSchema.optional(),
   answerSchema: z.array(dialogueChoiceSchema).optional(),
   proposition: propositionSchema.optional(),
+  narrativePlan: narrativePlanSchema.optional(),
   relationDraft: z
     .object({
       fromConceptId: z.string().min(1),

@@ -1,5 +1,12 @@
-import type { CompositionProposition, ConversationIntent } from "../model/conversation";
+import type {
+  CompositionProposition,
+  ConversationIntent,
+  ConversationLens,
+  NarrativeBeat,
+  NarrativePlan
+} from "../model/conversation";
 import type { Concept } from "../model/concept";
+import type { CharacterState } from "../model/character";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
 import { displayConcept } from "../grammar/japaneseRealizer";
@@ -8,27 +15,41 @@ import type { ScoredCandidate } from "./scorer";
 import { attributeMemoryBeat } from "./attributeNarration";
 import { renderStoryArc } from "./storyArcGenerator";
 
-export function buildNarrativePages(input: {
+type NarrativeInput = {
   candidate: ScoredCandidate;
   proposition: CompositionProposition;
   rendered: string;
   random: RandomSource;
-}) {
+  character?: CharacterState;
+};
+
+export type NarrativeBuildResult = {
+  pages: string[];
+  plan?: NarrativePlan;
+};
+
+export function buildNarrativePages(input: NarrativeInput) {
+  return buildNarrative(input).pages;
+}
+
+export function buildNarrative(input: NarrativeInput): NarrativeBuildResult {
   const concepts = Object.values(input.candidate.slots);
   const usedConcepts = input.proposition.wordIds
     .map((id) => concepts.find((concept) => concept.id === id))
     .filter((concept): concept is Concept => Boolean(concept));
   const focus = usedConcepts.find((concept) => concept.source === "user") ?? usedConcepts[0];
-  if (!focus) return [];
+  if (!focus) return { pages: [] };
   const learnedAttributeBeat = attributeMemoryBeat(focus);
 
   if (input.proposition.relationType === "relation_discovery") {
     const names = usedConcepts.slice(0, 2).map(quoted);
-    return [
-      `${names.join("と")}を、同じページで見つけましたっ。`,
-      learnedAttributeBeat,
-      `${names.join("と")}の間には、確かな関係をまだ覚えていませんっ。`
-    ].filter(isText);
+    return {
+      pages: [
+        `${names.join("と")}を、同じページで見つけましたっ。`,
+        learnedAttributeBeat,
+        `${names.join("と")}の間には、確かな関係をまだ覚えていませんっ。`
+      ].filter(isText)
+    };
   }
 
   if (
@@ -37,19 +58,23 @@ export function buildNarrativePages(input: {
   ) {
     const frameId = input.candidate.template.semanticFrame.split(".").at(-1) ?? "";
     if (frameId !== "word_pair_relation" && input.candidate.template.intent !== "ask_relation") {
-      return [
-        openingForIntent(input.candidate.template.intent, focus),
-        learnedAttributeBeat,
-        `${input.proposition.relationText}と覚えていますっ。`,
-        input.rendered,
-        outcomeForFrame(input.candidate, input.random)
-      ].filter(isText);
+      return {
+        pages: [
+          openingForIntent(input.candidate.template.intent, focus),
+          learnedAttributeBeat,
+          `${input.proposition.relationText}と覚えていますっ。`,
+          input.rendered,
+          outcomeForFrame(input.candidate, input.random)
+        ].filter(isText)
+      };
     }
-    return [
-      openingForIntent(input.candidate.template.intent, focus),
-      `${input.proposition.relationText}と覚えていますっ。`,
-      `${usedConcepts.slice(0, 2).map(quoted).join("と")}なら、同じ小話に出しても迷いにくそうですっ。`
-    ];
+    return {
+      pages: [
+        openingForIntent(input.candidate.template.intent, focus),
+        `${input.proposition.relationText}と覚えていますっ。`,
+        `${usedConcepts.slice(0, 2).map(quoted).join("と")}なら、同じ小話に出しても迷いにくそうですっ。`
+      ]
+    };
   }
 
   if (input.proposition.relationType === "single_word") {
@@ -57,43 +82,146 @@ export function buildNarrativePages(input: {
     const storyArc = usesStoryArc(input.candidate.template.intent)
       ? renderStoryArc({ focus, random: input.random })
       : null;
+    if (storyArc) {
+      const premise = openingForIntent(input.candidate.template.intent, focus);
+      const setup = learnedAttributeBeat || memoryBeat(focus);
+      const development =
+        frameId === "single_topic"
+          ? input.rendered
+          : `${input.rendered}${outcomeForFrame(input.candidate, input.random)}`;
+      const plan = createNarrativePlan({ input, focus, storyArc, premise, setup, development });
+      return { pages: plan.beats.map((beat) => beat.text), plan };
+    }
     if (frameId === "single_topic") {
-      return [
+      return {
+        pages: [
+          openingForIntent(input.candidate.template.intent, focus),
+          learnedAttributeBeat,
+          memoryBeat(focus)
+        ].filter(isText)
+      };
+    }
+    return {
+      pages: [
         openingForIntent(input.candidate.template.intent, focus),
         learnedAttributeBeat,
-        memoryBeat(focus),
-        storyArc?.turn,
-        storyArc?.punchline
-      ].filter(isText);
-    }
-    return [
-      openingForIntent(input.candidate.template.intent, focus),
-      learnedAttributeBeat,
-      input.rendered,
-      outcomeForFrame(input.candidate, input.random),
-      storyArc?.turn,
-      storyArc?.punchline
-    ].filter(isText);
+        input.rendered,
+        outcomeForFrame(input.candidate, input.random)
+      ].filter(isText)
+    };
   }
 
   const opening = openingForIntent(input.candidate.template.intent, focus);
   if (input.proposition.relationType === "drift_hypothesis") {
     const premise = controlledPremise(input.candidate).premise;
     const names = usedConcepts.map(quoted).join("・");
-    return [
-      opening,
-      learnedAttributeBeat,
-      premise,
-      input.rendered,
-      `${names}の使い方は、アグリの想像が飛びすぎたかもしれませんっ。`
-    ].filter(isText);
+    return {
+      pages: [
+        opening,
+        learnedAttributeBeat,
+        premise,
+        input.rendered,
+        `${names}の使い方は、アグリの想像が飛びすぎたかもしれませんっ。`
+      ].filter(isText)
+    };
   }
 
   const outcome = outcomeForFrame(input.candidate, input.random);
   const storyArc = usesStoryArc(input.candidate.template.intent)
     ? renderStoryArc({ focus, random: input.random })
     : null;
-  return [opening, learnedAttributeBeat, input.rendered, outcome, storyArc?.turn, storyArc?.punchline].filter(isText);
+  if (storyArc) {
+    const setup = learnedAttributeBeat || memoryBeat(focus);
+    const development = `${input.rendered}${outcome}`;
+    const plan = createNarrativePlan({ input, focus, storyArc, premise: opening, setup, development });
+    return { pages: plan.beats.map((beat) => beat.text), plan };
+  }
+  return { pages: [opening, learnedAttributeBeat, input.rendered, outcome].filter(isText) };
+}
+
+function createNarrativePlan(input: {
+  input: NarrativeInput;
+  focus: Concept;
+  storyArc: ReturnType<typeof renderStoryArc>;
+  premise: string;
+  setup: string;
+  development: string;
+}): NarrativePlan {
+  const conceptIds = input.input.proposition.wordIds;
+  const setupGrounding: NarrativeBeat["grounding"] = input.setup.includes("教わ")
+    ? "user_attribute"
+    : input.focus.source === "user"
+      ? "confirmed_memory"
+      : "imagination";
+  const developmentGrounding: NarrativeBeat["grounding"] =
+    input.input.proposition.relationType === "confirmed_relation" ? "confirmed_memory" : "scene_hypothesis";
+  const beats: NarrativePlan["beats"] = [
+    { kind: "premise", text: input.premise, conceptIds, grounding: "imagination" },
+    { kind: "setup", text: input.setup, conceptIds: [input.focus.id], grounding: setupGrounding },
+    { kind: "development", text: input.development, conceptIds, grounding: developmentGrounding },
+    {
+      kind: "turn",
+      text: input.storyArc.turn,
+      conceptIds: input.storyArc.callbackConceptIds,
+      grounding: "imagination"
+    },
+    {
+      kind: "payoff",
+      text: input.storyArc.punchline,
+      conceptIds: input.storyArc.callbackConceptIds,
+      grounding: "imagination"
+    }
+  ];
+  const lens = chooseLens(input.input.candidate.template.intent, input.input.character, input.input.random);
+  return {
+    id: `narrative_${input.storyArc.id}_${input.focus.id}`,
+    lens,
+    mechanism: input.storyArc.mechanism,
+    focusConceptId: input.focus.id,
+    callbackConceptIds: input.storyArc.callbackConceptIds,
+    beats,
+    emotionalCurve: ["curious", "curious", "excited", "confused", "happy"],
+    evidenceBoundary:
+      setupGrounding === "user_attribute"
+        ? "typed_attribute"
+        : input.focus.source === "user"
+          ? "memory"
+          : "imagination",
+    confidence: input.input.proposition.confidence,
+    signature: `${lens}:${input.storyArc.mechanism}:${input.focus.id}:${input.input.proposition.frameId}`
+  };
+}
+
+function chooseLens(
+  intent: ConversationIntent,
+  character: CharacterState | undefined,
+  random: RandomSource
+): ConversationLens {
+  const base: Record<ConversationIntent, ConversationLens> = {
+    small_talk: "retrospective",
+    ask_meaning: "memory",
+    ask_preference: "social",
+    ask_relation: "social",
+    recall_memory: "memory",
+    rumor: "social",
+    observation: "observation",
+    warning: "planning",
+    invitation: "planning",
+    discovery: "observation",
+    comparison: "retrospective",
+    daydream: "daydream",
+    misunderstanding: "daydream",
+    outing_report: "retrospective",
+    quiet_moment: "memory"
+  };
+  const candidates = new Set<ConversationLens>([base[intent]]);
+  if (character) {
+    if (character.boredom >= 60) candidates.add("daydream");
+    if (character.socialNeed >= 60) candidates.add("social");
+    if (character.energy <= 35) candidates.add("retrospective");
+    if (character.curiosity >= 0.7) candidates.add("observation");
+  }
+  return pickOne([...candidates], random) ?? base[intent];
 }
 
 function isText(value: string | undefined): value is string {
@@ -107,9 +235,10 @@ function openingForIntent(intent: ConversationIntent, focus: Concept) {
     ask_meaning: `${word}の覚え方を、もう一度確かめたいですっ。`,
     ask_preference: `${word}のこと、もっと知りたいですっ。`,
     ask_relation: `${word}から伸びるノートの線を見直していますっ。`,
-    recall_memory: focus.source === "user"
-      ? `前に教えてもらった${word}を、ノートで見つけましたっ。`
-      : `前から知っている${word}を、ノートで見つけましたっ。`,
+    recall_memory:
+      focus.source === "user"
+        ? `前に教えてもらった${word}を、ノートで見つけましたっ。`
+        : `前から知っている${word}を、ノートで見つけましたっ。`,
     rumor: `${word}が出てくる、ちょっとした噂の小話を考えましたっ。`,
     observation: `${word}を見ていたら、一つ気づきましたっ。`,
     warning: `${word}のことで、気をつけたい場面がありますっ。`,

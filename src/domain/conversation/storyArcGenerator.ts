@@ -1,5 +1,6 @@
 import {
   storyArcCadences,
+  storyArcPunchlineIds,
   storyArcVariants,
   type StoryArcVariant
 } from "../../data/story-arcs/storyArcCatalog";
@@ -7,12 +8,16 @@ import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
 import { displayConcept } from "../grammar/japaneseRealizer";
 import { isPersonCategory, type Concept, type ConceptCategory } from "../model/concept";
+import type { PunchlineMechanism } from "../model/conversation";
 
 type PunchlineGroup = "person" | "food" | "place" | "action" | "living" | "thing" | "idea";
 type PunchlineRenderer = (word: string) => string;
 
 export type RenderedStoryArc = {
   id: string;
+  mechanism: PunchlineMechanism;
+  focusConceptId: string;
+  callbackConceptIds: string[];
   turn: string;
   punchline: string;
 };
@@ -20,11 +25,23 @@ export type RenderedStoryArc = {
 export function renderStoryArc(input: { focus: Concept; random: RandomSource }): RenderedStoryArc {
   const variant = pickOne(storyArcVariants, input.random) ?? storyArcVariants[0]!;
   const word = `「${displayConcept(input.focus)}」`;
+  const turn = ensureCallback(renderTurn(variant, word), word);
+  const punchline = ensureCallback(
+    renderPunchline(input.focus.userCategory, variant.punchlineIndex, word),
+    word
+  );
   return {
     id: variant.id,
-    turn: renderTurn(variant, word),
-    punchline: renderPunchline(input.focus.userCategory, variant.punchlineIndex, word)
+    mechanism: storyArcPunchlineIds[variant.punchlineIndex]!,
+    focusConceptId: input.focus.id,
+    callbackConceptIds: [input.focus.id],
+    turn,
+    punchline
   };
+}
+
+function ensureCallback(text: string, word: string) {
+  return text.includes(word) ? text : `${word}のことを考えながら、${text}`;
 }
 
 function renderTurn(variant: StoryArcVariant, word: string) {
@@ -43,6 +60,9 @@ function renderTurn(variant: StoryArcVariant, word: string) {
 }
 
 function renderPunchline(category: ConceptCategory, index: number, word: string) {
+  if (index === 10) {
+    return `${word}の話へ戻ってノートの線をたどったら、出発点にも同じ印をつけていましたっ！`;
+  }
   const group = punchlineGroupFor(category);
   const renderers = punchlines[group];
   const renderer = renderers[index] ?? renderers[0];

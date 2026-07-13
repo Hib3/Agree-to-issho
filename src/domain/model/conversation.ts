@@ -24,6 +24,51 @@ export type ConversationIntent = (typeof conversationIntents)[number];
 export type ConversationPhase =
   "opening" | "premise" | "question" | "awaiting_answer" | "reaction" | "twist" | "closing" | "completed";
 
+export const conversationLenses = [
+  "memory",
+  "observation",
+  "social",
+  "planning",
+  "daydream",
+  "retrospective"
+] as const;
+export type ConversationLens = (typeof conversationLenses)[number];
+
+export const punchlineMechanisms = [
+  "reversal",
+  "expectation_violation",
+  "literal_interpretation",
+  "scale_mismatch",
+  "mistaken_target",
+  "circular_return",
+  "overpreparation",
+  "delayed_realization",
+  "character_flaw_callback",
+  "word_attribute_callback",
+  "relation_callback"
+] as const;
+export type PunchlineMechanism = (typeof punchlineMechanisms)[number];
+
+export type NarrativeBeat = {
+  kind: "premise" | "setup" | "development" | "turn" | "payoff";
+  text: string;
+  conceptIds: string[];
+  grounding: "confirmed_memory" | "user_attribute" | "scene_hypothesis" | "imagination";
+};
+
+export type NarrativePlan = {
+  id: string;
+  lens: ConversationLens;
+  mechanism: PunchlineMechanism;
+  focusConceptId: string;
+  callbackConceptIds: string[];
+  beats: [NarrativeBeat, NarrativeBeat, NarrativeBeat, NarrativeBeat, NarrativeBeat];
+  emotionalCurve: CharacterEmotion[];
+  evidenceBoundary: "memory" | "typed_attribute" | "hypothesis" | "imagination";
+  confidence: number;
+  signature: string;
+};
+
 export type QuestionIntent =
   | "relation_discovery"
   | "relation_confirmation"
@@ -127,6 +172,7 @@ export type ConversationSession = {
   slotConceptIds: Record<string, string>;
   topicWordIds: string[];
   proposition: CompositionProposition;
+  narrativePlan?: NarrativePlan;
   questionIntent: QuestionIntent;
   history: DialogueTurn[];
   queuedTurns: DialogueTurn[];
