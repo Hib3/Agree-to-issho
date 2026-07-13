@@ -19,22 +19,20 @@ import {
 import { validateConversationSession } from "../../domain/conversation/dialogueValidator";
 
 export async function startConversation(now = Date.now(), initiatedByUser = true) {
-  const [concepts, relations, recentSessions, character] = await Promise.all([
+  const [concepts, relations, activeSessions, newestCompletedSessions, character] = await Promise.all([
     db.concepts.toArray(),
     db.relations.toArray(),
+    db.conversationSessions.where("phase").notEqual("completed").sortBy("updatedAt"),
     db.conversationSessions
-      .where("phase")
-      .notEqual("completed")
-      .toArray()
-      .then(async (active) => {
-        if (active.length > 0)
-          return db.conversationSessions.orderBy("updatedAt").reverse().limit(24).toArray();
-        return db.conversationSessions.orderBy("updatedAt").reverse().limit(24).toArray();
-      }),
+      .orderBy("updatedAt")
+      .reverse()
+      .filter((session) => session.phase === "completed")
+      .limit(24)
+      .toArray(),
     db.character.get("aguri")
   ]);
   if (!character) throw new Error("アグリちゃんの状態を読み込めません。");
-  const active = recentSessions.find((session) => session.phase !== "completed");
+  const active = activeSessions.at(-1);
   if (active) {
     const validationErrors = isCurrentConversationSession(active)
       ? validateConversationSession(active)
@@ -42,7 +40,7 @@ export async function startConversation(now = Date.now(), initiatedByUser = true
     if (validationErrors.length === 0) return active;
     await db.conversationSessions.put(migrateConversationSession(active, now, validationErrors));
   }
-  const completedSessions = recentSessions.filter((item) => item.phase === "completed");
+  const completedSessions = newestCompletedSessions.reverse();
   const location = locations.find((item) => item.id === character.currentLocationId) ?? locations[0]!;
   const randomSeed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
   const session = planConversation({

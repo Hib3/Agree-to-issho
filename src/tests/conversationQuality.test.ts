@@ -87,13 +87,14 @@ describe("clean-room conversation composition", () => {
         relationDirection: "forward" as const
       }
     };
+    const relationIds = [ids[0]!, starterConcepts.find((concept) => concept.id !== ids[0])!.id];
     const relationSession: ConversationSession = {
       ...session,
-      topicWordIds: ids.slice(0, 2),
+      topicWordIds: relationIds,
       questionIntent: "relation_discovery",
       proposition: {
         ...session.proposition,
-        wordIds: ids.slice(0, 2),
+        wordIds: relationIds,
         relationType: "relation_discovery",
         questionIntent: "relation_discovery"
       }

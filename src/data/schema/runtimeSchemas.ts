@@ -19,6 +19,23 @@ const grammarSchema = z.object({
   canBePossessed: z.boolean()
 });
 
+const lexicalProfileSchema = z.object({
+  partOfSpeech: z.enum([
+    "common_noun",
+    "proper_noun",
+    "verbal_noun",
+    "verb",
+    "i_adjective",
+    "na_adjective",
+    "expression",
+    "unknown"
+  ]),
+  conjugation: z.enum(["godan", "ichidan", "suru", "kuru", "unknown"]).optional(),
+  quotePolicy: z.enum(["mention_only", "allow_inflection"]),
+  honorificPolicy: z.enum(["none", "person_only"]),
+  confidence: z.number().min(0).max(1)
+});
+
 const characterEmotionSchema = z.enum([
   "calm",
   "curious",
@@ -156,6 +173,7 @@ export const conceptSchema = z.object({
   categoryConfidence: z.number().min(0).max(1),
   preference: z.union([z.literal(-2), z.literal(-1), z.literal(0), z.literal(1), z.literal(2)]).optional(),
   grammar: grammarSchema,
+  lexicalProfile: lexicalProfileSchema.optional(),
   attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
   learnedAt: z.number(),
   lastReviewedAt: z.number().optional(),

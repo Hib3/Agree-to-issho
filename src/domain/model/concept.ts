@@ -28,6 +28,22 @@ export const conceptCategories = [
 export type ConceptCategory = (typeof conceptCategories)[number];
 export type ConceptSource = "starter" | "user";
 
+export type LexicalProfile = {
+  partOfSpeech:
+    | "common_noun"
+    | "proper_noun"
+    | "verbal_noun"
+    | "verb"
+    | "i_adjective"
+    | "na_adjective"
+    | "expression"
+    | "unknown";
+  conjugation?: "godan" | "ichidan" | "suru" | "kuru" | "unknown";
+  quotePolicy: "mention_only" | "allow_inflection";
+  honorificPolicy: "none" | "person_only";
+  confidence: number;
+};
+
 export type ConceptAttributeValue = string | number | boolean | null;
 
 export type ConceptAttributes = Record<string, ConceptAttributeValue> & {
@@ -93,6 +109,7 @@ export type Concept = {
   categoryConfidence: number;
   preference?: -2 | -1 | 0 | 1 | 2;
   grammar: ConceptGrammar;
+  lexicalProfile?: LexicalProfile;
   attributes: ConceptAttributes;
   learnedAt: number;
   lastReviewedAt?: number;

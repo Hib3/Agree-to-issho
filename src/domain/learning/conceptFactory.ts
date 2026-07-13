@@ -1,5 +1,11 @@
 import { duplicateKey, normalizeJapanese } from "../grammar/japaneseNormalizer";
-import type { Concept, ConceptAttributes, ConceptCategory, ConceptGrammar } from "../model/concept";
+import type {
+  Concept,
+  ConceptAttributes,
+  ConceptCategory,
+  ConceptGrammar,
+  LexicalProfile
+} from "../model/concept";
 
 export type ConceptDraft = {
   surface: string;
@@ -7,13 +13,50 @@ export type ConceptDraft = {
   preference?: -2 | -1 | 0 | 1 | 2;
   attributes?: ConceptAttributes;
   reading?: string;
+  lexicalProfile?: LexicalProfile;
 };
+
+export function lexicalProfileForCategory(category: ConceptCategory): LexicalProfile {
+  const person = ["famous_person", "person_name", "occupation", "person_descriptor"].includes(category);
+  if (["action", "required_action", "forbidden_action", "sport", "skill"].includes(category)) {
+    return {
+      partOfSpeech: "verbal_noun",
+      conjugation: "suru",
+      quotePolicy: "allow_inflection",
+      honorificPolicy: "none",
+      confidence: 0.72
+    };
+  }
+  if (category === "word_expression") {
+    return {
+      partOfSpeech: "expression",
+      quotePolicy: "mention_only",
+      honorificPolicy: "none",
+      confidence: 0.9
+    };
+  }
+  return {
+    partOfSpeech: category === "person_name" || category === "famous_person" ? "proper_noun" : "common_noun",
+    quotePolicy: "mention_only",
+    honorificPolicy: person ? "person_only" : "none",
+    confidence: category === "other" ? 0.45 : 0.82
+  };
+}
 
 export function grammarForCategory(category: ConceptCategory): ConceptGrammar {
   const actionLike = ["action", "required_action", "forbidden_action", "sport", "skill"].includes(category);
   const location = category === "place";
-  const object = ["food_drink", "usable_object", "wearable", "vehicle", "readable", "viewable"].includes(category);
-  const person = ["famous_person", "person_name", "occupation", "person_descriptor", "robot", "living_thing"].includes(category);
+  const object = ["food_drink", "usable_object", "wearable", "vehicle", "readable", "viewable"].includes(
+    category
+  );
+  const person = [
+    "famous_person",
+    "person_name",
+    "occupation",
+    "person_descriptor",
+    "robot",
+    "living_thing"
+  ].includes(category);
   return {
     nounLike: true,
     suruAction: actionLike,
@@ -26,7 +69,11 @@ export function grammarForCategory(category: ConceptCategory): ConceptGrammar {
   };
 }
 
-export function createUserConcept(draft: ConceptDraft, now: number, id: string = crypto.randomUUID()): Concept {
+export function createUserConcept(
+  draft: ConceptDraft,
+  now: number,
+  id: string = crypto.randomUUID()
+): Concept {
   const surface = normalizeJapanese(draft.surface);
   const grammar = grammarForCategory(draft.category);
   if (draft.attributes?.usageMode === "contain" || draft.attributes?.objectKind === "container") {
@@ -41,6 +88,7 @@ export function createUserConcept(draft: ConceptDraft, now: number, id: string =
     userCategory: draft.category,
     categoryConfidence: 1,
     grammar,
+    lexicalProfile: draft.lexicalProfile ?? lexicalProfileForCategory(draft.category),
     attributes: draft.attributes ?? {},
     learnedAt: now,
     usageCount: 0,
