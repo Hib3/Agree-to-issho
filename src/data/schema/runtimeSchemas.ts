@@ -19,7 +19,16 @@ const grammarSchema = z.object({
   canBePossessed: z.boolean()
 });
 
-const characterEmotionSchema = z.enum(["calm", "curious", "happy", "excited", "embarrassed", "confused", "lonely", "sleepy"]);
+const characterEmotionSchema = z.enum([
+  "calm",
+  "curious",
+  "happy",
+  "excited",
+  "embarrassed",
+  "confused",
+  "lonely",
+  "sleepy"
+]);
 const questionIntentSchema = z.enum([
   "relation_discovery",
   "relation_confirmation",
@@ -32,9 +41,24 @@ const questionIntentSchema = z.enum([
   "none"
 ]);
 const answerEffectSchema = z.object({
-  semanticEffect: z.enum(["confirm", "reject", "unknown", "preference_like", "preference_neutral", "preference_dislike", "none"]),
+  semanticEffect: z.enum([
+    "confirm",
+    "reject",
+    "unknown",
+    "preference_like",
+    "preference_neutral",
+    "preference_dislike",
+    "none"
+  ]),
   navigationEffect: z.enum(["continue", "close", "stay", "none"]),
-  memoryEffect: z.enum(["link_words", "unlink_words", "update_preference", "update_category", "update_attribute", "none"]),
+  memoryEffect: z.enum([
+    "link_words",
+    "unlink_words",
+    "update_preference",
+    "update_category",
+    "update_attribute",
+    "none"
+  ]),
   relationType: z.enum(relationTypes).optional(),
   relationDirection: z.enum(["forward", "reverse"]).optional()
 });
@@ -67,18 +91,41 @@ const dialogueTurnSchema = z.object({
 const propositionSchema = z.object({
   wordIds: z.array(z.string()),
   frameId: z.string(),
-  relationType: z.enum(["confirmed_relation", "scene_hypothesis", "relation_discovery", "single_word", "drift_hypothesis"]),
+  relationType: z.enum([
+    "confirmed_relation",
+    "scene_hypothesis",
+    "relation_discovery",
+    "single_word",
+    "drift_hypothesis"
+  ]),
   relationText: z.string(),
   evidence: z.enum(["confirmed_relation", "scene_frame", "category_only", "none"]),
   confidence: z.number(),
   questionIntent: questionIntentSchema,
-  attributeClaim: z.object({
-    conceptId: z.string().min(1),
-    key: z.string().min(1),
-    value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
-    prompt: z.string().min(1),
-    answerLabel: z.string().min(1)
-  }).optional()
+  relationClaim: z
+    .object({
+      relationId: z.string().min(1),
+      type: z.enum(relationTypes),
+      fromConceptId: z.string().min(1),
+      toConceptId: z.string().min(1)
+    })
+    .optional(),
+  categoryClaim: z
+    .object({
+      conceptId: z.string().min(1),
+      category: z.enum(conceptCategories),
+      label: z.string().min(1)
+    })
+    .optional(),
+  attributeClaim: z
+    .object({
+      conceptId: z.string().min(1),
+      key: z.string().min(1),
+      value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+      prompt: z.string().min(1),
+      answerLabel: z.string().min(1)
+    })
+    .optional()
 });
 
 const pendingQuestionSchema = z.object({
@@ -88,11 +135,13 @@ const pendingQuestionSchema = z.object({
   questionIntent: questionIntentSchema.optional(),
   answerSchema: z.array(dialogueChoiceSchema).optional(),
   proposition: propositionSchema.optional(),
-  relationDraft: z.object({
-    fromConceptId: z.string().min(1),
-    toConceptId: z.string().min(1),
-    type: z.string().min(1)
-  }).optional()
+  relationDraft: z
+    .object({
+      fromConceptId: z.string().min(1),
+      toConceptId: z.string().min(1),
+      type: z.string().min(1)
+    })
+    .optional()
 });
 
 export const conceptSchema = z.object({
@@ -156,7 +205,18 @@ const characterSchema = z.object({
 
 const memorySchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["word_learned", "word_reviewed", "conversation", "outing", "rumor", "discovery", "warning", "meeting", "diary", "player_choice"]),
+  type: z.enum([
+    "word_learned",
+    "word_reviewed",
+    "conversation",
+    "outing",
+    "rumor",
+    "discovery",
+    "warning",
+    "meeting",
+    "diary",
+    "player_choice"
+  ]),
   conceptIds: z.array(z.string()),
   relationIds: z.array(z.string()),
   participantIds: z.array(z.string()),
@@ -169,28 +229,87 @@ const memorySchema = z.object({
   payload: z.record(z.string(), z.unknown())
 });
 
-const conversationSessionSchema = z.object({
-  schemaVersion: z.literal(2).optional(),
-  dialogueRevision: z.union([z.literal(2), z.literal(3)]).optional(),
-  id: z.string().min(1),
-  phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
-  intent: z.enum(conversationIntents),
-  locationId: z.string().min(1),
-  templateIds: z.array(z.string()),
-  slotConceptIds: z.record(z.string(), z.string()),
-  topicWordIds: z.array(z.string()).optional(),
-  proposition: propositionSchema.optional(),
-  questionIntent: questionIntentSchema.optional(),
-  history: z.array(dialogueTurnSchema),
-  queuedTurns: z.array(dialogueTurnSchema),
-  pendingQuestion: pendingQuestionSchema.optional(),
-  absurdityCount: z.number().int().min(0).max(1),
-  randomSeed: z.number().optional(),
-  validationErrors: z.array(z.string()).optional(),
-  startedAt: z.number(),
-  updatedAt: z.number(),
-  completedAt: z.number().optional()
-});
+const conversationSessionSchema = z
+  .object({
+    schemaVersion: z.literal(2).optional(),
+    dialogueRevision: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
+    id: z.string().min(1),
+    phase: z.enum([
+      "opening",
+      "premise",
+      "question",
+      "awaiting_answer",
+      "reaction",
+      "twist",
+      "closing",
+      "completed"
+    ]),
+    intent: z.enum(conversationIntents),
+    locationId: z.string().min(1),
+    templateIds: z.array(z.string()),
+    slotConceptIds: z.record(z.string(), z.string()),
+    topicWordIds: z.array(z.string()).optional(),
+    proposition: propositionSchema.optional(),
+    questionIntent: questionIntentSchema.optional(),
+    history: z.array(dialogueTurnSchema),
+    queuedTurns: z.array(dialogueTurnSchema),
+    pendingQuestion: pendingQuestionSchema.optional(),
+    absurdityCount: z.number().int().min(0).max(1),
+    randomSeed: z.number().optional(),
+    validationErrors: z.array(z.string()).optional(),
+    startedAt: z.number(),
+    updatedAt: z.number(),
+    completedAt: z.number().optional()
+  })
+  .superRefine((session, context) => {
+    if (session.dialogueRevision !== 4) return;
+    const required = [
+      [session.schemaVersion, "schemaVersion"],
+      [session.topicWordIds, "topicWordIds"],
+      [session.proposition, "proposition"],
+      [session.questionIntent, "questionIntent"],
+      [session.randomSeed, "randomSeed"],
+      [session.validationErrors, "validationErrors"]
+    ] as const;
+    for (const [value, key] of required) {
+      if (value === undefined)
+        context.addIssue({ code: "custom", path: [key], message: `${key} is required for revision 4` });
+    }
+    for (const [collectionName, turns] of [
+      ["history", session.history],
+      ["queuedTurns", session.queuedTurns]
+    ] as const) {
+      turns.forEach((turn, index) => {
+        for (const key of [
+          "requiresAnswer",
+          "answerSchema",
+          "semanticKey",
+          "templateId",
+          "usedWordIds",
+          "styleBasePage",
+          "styledPreview",
+          "validationErrors"
+        ] as const) {
+          if (turn[key] === undefined)
+            context.addIssue({
+              code: "custom",
+              path: [collectionName, index, key],
+              message: `${key} is required for revision 4`
+            });
+        }
+      });
+    }
+    if (session.pendingQuestion) {
+      for (const key of ["questionIntent", "answerSchema", "proposition"] as const) {
+        if (session.pendingQuestion[key] === undefined)
+          context.addIssue({
+            code: "custom",
+            path: ["pendingQuestion", key],
+            message: `${key} is required for revision 4`
+          });
+      }
+    }
+  });
 
 const dialogueHistorySchema = dialogueTurnSchema.extend({
   sessionId: z.string().min(1),
@@ -243,11 +362,43 @@ export const dialogueTemplateSchema = z.object({
   semanticFrame: z.string().min(1),
   grounding: z.enum(["scene_frame", "relation_required"]),
   intent: z.enum(conversationIntents),
-  phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
+  phase: z.enum([
+    "opening",
+    "premise",
+    "question",
+    "awaiting_answer",
+    "reaction",
+    "twist",
+    "closing",
+    "completed"
+  ]),
   locations: z.array(z.string()).min(1),
   moods: z.array(z.string()).min(1),
-  slots: z.array(z.object({ name: z.string(), categories: z.array(z.enum(conceptCategories)).min(1), grammaticalRole: z.enum(["topic", "subject", "object", "location", "action", "container", "body_part", "companion"]), required: z.boolean() })).min(1),
-  constraints: z.object({ minUserWords: z.number().optional(), maxRecentUse: z.number().optional(), requiredRelations: z.array(z.enum(relationTypes)).optional(), forbiddenSameConcept: z.array(z.array(z.string())).optional() }),
+  slots: z
+    .array(
+      z.object({
+        name: z.string(),
+        categories: z.array(z.enum(conceptCategories)).min(1),
+        grammaticalRole: z.enum([
+          "topic",
+          "subject",
+          "object",
+          "location",
+          "action",
+          "container",
+          "body_part",
+          "companion"
+        ]),
+        required: z.boolean()
+      })
+    )
+    .min(1),
+  constraints: z.object({
+    minUserWords: z.number().optional(),
+    maxRecentUse: z.number().optional(),
+    requiredRelations: z.array(z.enum(relationTypes)).optional(),
+    forbiddenSameConcept: z.array(z.array(z.string())).optional()
+  }),
   variants: z.array(z.string().min(1)).min(1),
   responsePatternIds: z.array(z.string()).optional(),
   cooldownSessions: z.number().int().min(1)

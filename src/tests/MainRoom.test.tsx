@@ -19,7 +19,13 @@ const serviceMocks = vi.hoisted(() => ({
 vi.mock("../features/conversation/conversationService", () => serviceMocks);
 
 const now = 1_700_000_000_000;
-const player: PlayerProfile = { id: "local", name: "意味QA", callName: "意味QA", createdAt: now, updatedAt: now };
+const player: PlayerProfile = {
+  id: "local",
+  name: "意味QA",
+  callName: "意味QA",
+  createdAt: now,
+  updatedAt: now
+};
 const character: CharacterState = {
   id: "aguri",
   name: "アグリちゃん",
@@ -65,7 +71,7 @@ const proposition: CompositionProposition = {
 const answers = answerSchemaFor(proposition);
 const session: ConversationSession = {
   schemaVersion: 2,
-  dialogueRevision: 3,
+  dialogueRevision: 4,
   id: "room_semantic_session",
   phase: "awaiting_answer",
   intent: "ask_relation",

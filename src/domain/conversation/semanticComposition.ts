@@ -1,9 +1,15 @@
 import type { DialogueTemplate } from "../../data/schema/dialogue";
 import { isPersonCategory, type Concept } from "../model/concept";
-import type { CompositionProposition, DialogueAnswerEffect, DialogueChoice, QuestionIntent } from "../model/conversation";
+import type {
+  CompositionProposition,
+  DialogueAnswerEffect,
+  DialogueChoice,
+  QuestionIntent
+} from "../model/conversation";
 import type { ConceptRelation, RelationType } from "../model/relation";
 import { displayConcept } from "../grammar/japaneseRealizer";
 import { answerLabel, attributeQuestionsForCategory } from "../learning/attributeQuestions";
+import { categoryLabels } from "../learning/categoryRouting";
 
 export function isConfirmedRelation(relation: ConceptRelation) {
   return relation.confidence >= 0.6 && ["explicit", "answer"].includes(relation.source);
@@ -18,12 +24,24 @@ export function composeProposition(input: {
 }): CompositionProposition {
   const concepts = Object.values(input.slots);
   const wordIds = concepts.map((concept) => concept.id);
+  const requiredRelationTypes = input.template.constraints.requiredRelations ?? [];
   const relation = input.relations.find(
     (item) =>
       isConfirmedRelation(item) &&
       wordIds.includes(item.fromConceptId) &&
-      wordIds.includes(item.toConceptId)
+      wordIds.includes(item.toConceptId) &&
+      (input.template.grounding === "relation_required"
+        ? requiredRelationTypes.length === 0 || requiredRelationTypes.includes(item.type)
+        : requiredRelationTypes.includes(item.type))
   );
+  const relationClaim = relation
+    ? {
+        relationId: relation.id,
+        type: relation.type,
+        fromConceptId: relation.fromConceptId,
+        toConceptId: relation.toConceptId
+      }
+    : undefined;
 
   if (concepts.length >= 2 && input.template.intent === "misunderstanding") {
     return {
@@ -33,7 +51,8 @@ export function composeProposition(input: {
       relationText: input.renderedText,
       evidence: relation ? "confirmed_relation" : "category_only",
       confidence: relation ? Math.min(0.65, relation.confidence) : 0.35,
-      questionIntent: input.hasResponse ? "correction_request" : "none"
+      questionIntent: input.hasResponse ? "correction_request" : "none",
+      ...(relationClaim ? { relationClaim } : {})
     };
   }
 
@@ -45,7 +64,10 @@ export function composeProposition(input: {
       relationText: input.renderedText,
       evidence: relation ? "confirmed_relation" : "category_only",
       confidence: relation ? Math.min(0.75, relation.confidence) : 0.45,
-      questionIntent: input.hasResponse ? questionIntentFor(input.template.intent, "situation_question") : "none"
+      questionIntent: input.hasResponse
+        ? questionIntentFor(input.template.intent, "situation_question")
+        : "none",
+      ...(relationClaim ? { relationClaim } : {})
     };
   }
 
@@ -57,15 +79,15 @@ export function composeProposition(input: {
       relationText: describeRelation(relation, concepts),
       evidence: "confirmed_relation",
       confidence: relation.confidence,
-      questionIntent: input.hasResponse
-        ? "relation_confirmation"
-        : "none"
+      questionIntent: input.hasResponse ? "relation_confirmation" : "none",
+      relationClaim: relationClaim!
     };
   }
 
   if (
     concepts.length >= 2 &&
-    (input.template.grounding === "relation_required" || ["ask_relation", "misunderstanding"].includes(input.template.intent))
+    (input.template.grounding === "relation_required" ||
+      ["ask_relation", "misunderstanding"].includes(input.template.intent))
   ) {
     return {
       wordIds: wordIds.slice(0, 2),
@@ -79,17 +101,28 @@ export function composeProposition(input: {
   }
 
   const singleConcept = concepts[0];
-  const attributeClaim = input.hasResponse && input.template.intent === "ask_meaning" && singleConcept
-    ? attributeClaimFor(singleConcept)
-    : undefined;
+  const attributeClaim =
+    input.hasResponse && input.template.intent === "ask_meaning" && singleConcept
+      ? attributeClaimFor(singleConcept)
+      : undefined;
   const singleQuestionIntent = attributeClaim
-    ? "attribute_confirmation" as const
+    ? ("attribute_confirmation" as const)
     : input.hasResponse
       ? questionIntentFor(
           input.template.intent,
-          input.template.semanticFrame.endsWith(".single_topic") ? "category_confirmation" : "situation_question"
+          input.template.semanticFrame.endsWith(".single_topic")
+            ? "category_confirmation"
+            : "situation_question"
         )
-      : "none" as const;
+      : ("none" as const);
+  const categoryClaim =
+    singleConcept && singleQuestionIntent === "category_confirmation"
+      ? {
+          conceptId: singleConcept.id,
+          category: singleConcept.userCategory,
+          label: categoryLabels[singleConcept.userCategory]
+        }
+      : undefined;
   return {
     wordIds: wordIds.slice(0, 1),
     frameId: input.template.semanticFrame,
@@ -98,11 +131,14 @@ export function composeProposition(input: {
     evidence: "none",
     confidence: concepts[0]?.understanding ?? 0,
     questionIntent: singleQuestionIntent,
+    ...(categoryClaim ? { categoryClaim } : {}),
     ...(attributeClaim ? { attributeClaim } : {})
   };
 }
 
-function attributeClaimFor(concept: Concept): NonNullable<CompositionProposition["attributeClaim"]> | undefined {
+function attributeClaimFor(
+  concept: Concept
+): NonNullable<CompositionProposition["attributeClaim"]> | undefined {
   const claims = attributeQuestionsForCategory(concept.userCategory)
     .filter((question) => {
       const value = concept.attributes[question.key];
@@ -137,7 +173,9 @@ export function questionForProposition(proposition: CompositionProposition, conc
     case "preference_question":
       return word + "のこと、好きですか？";
     case "category_confirmation":
-      return word + "の種類は、今の覚え方で近いですか？";
+      return proposition.categoryClaim
+        ? `${word}を「${proposition.categoryClaim.label}」として覚えています。この種類で近いですか？`
+        : `${word}の種類を、もう一度教えてもらえますか？`;
     case "attribute_confirmation":
       return proposition.attributeClaim
         ? `${word}のメモを確かめます。「${proposition.attributeClaim.prompt}」には「${proposition.attributeClaim.answerLabel}」と答えてくれました。今も合っていますか？`
@@ -149,7 +187,10 @@ export function questionForProposition(proposition: CompositionProposition, conc
   }
 }
 
-export function answerSchemaFor(proposition: CompositionProposition, concepts: Concept[] = []): DialogueChoice[] {
+export function answerSchemaFor(
+  proposition: CompositionProposition,
+  concepts: Concept[] = []
+): DialogueChoice[] {
   const choice = (
     id: string,
     label: string,
@@ -218,20 +259,40 @@ function relationChoicesFor(proposition: CompositionProposition, concepts: Conce
   const pair = proposition.wordIds.slice(0, 2).map((id) => concepts.find((concept) => concept.id === id));
   const first = pair[0];
   const second = pair[1];
-  const choices: Array<{ label: string; relationType: RelationType; relationDirection: "forward" | "reverse" }> = [];
-  if (!first || !second) return [{ label: "関係がある", relationType: "associated_with" as const, relationDirection: "forward" as const }];
+  const choices: Array<{
+    label: string;
+    relationType: RelationType;
+    relationDirection: "forward" | "reverse";
+  }> = [];
+  if (!first || !second)
+    return [
+      { label: "関係がある", relationType: "associated_with" as const, relationDirection: "forward" as const }
+    ];
 
   const add = (label: string, relationType: RelationType, from: Concept, to: Concept) => {
-    const relationDirection = from.id === first.id && to.id === second.id ? "forward" as const : "reverse" as const;
-    if (!choices.some((item) => item.relationType === relationType && item.relationDirection === relationDirection)) {
+    const relationDirection =
+      from.id === first.id && to.id === second.id ? ("forward" as const) : ("reverse" as const);
+    if (
+      !choices.some(
+        (item) => item.relationType === relationType && item.relationDirection === relationDirection
+      )
+    ) {
       choices.push({ label, relationType, relationDirection });
     }
   };
-  const actionLike = (concept: Concept) => ["action", "required_action", "forbidden_action", "sport", "skill"].includes(concept.userCategory);
-  const personLike = (concept: Concept) => isPersonCategory(concept.userCategory) || ["robot", "living_thing"].includes(concept.userCategory);
-  const objectLike = (concept: Concept) => ["food_drink", "usable_object", "wearable", "vehicle", "readable", "viewable"].includes(concept.userCategory);
+  const actionLike = (concept: Concept) =>
+    ["action", "required_action", "forbidden_action", "sport", "skill"].includes(concept.userCategory);
+  const personLike = (concept: Concept) =>
+    isPersonCategory(concept.userCategory) || ["robot", "living_thing"].includes(concept.userCategory);
+  const objectLike = (concept: Concept) =>
+    ["food_drink", "usable_object", "wearable", "vehicle", "readable", "viewable"].includes(
+      concept.userCategory
+    );
 
-  for (const [left, right] of [[first, second], [second, first]] as const) {
+  for (const [left, right] of [
+    [first, second],
+    [second, first]
+  ] as const) {
     if (actionLike(left) && right.userCategory === "place") add("そこで行う", "done_at", left, right);
     if (personLike(left) && right.userCategory === "place") add("そこで過ごす", "lives_at", left, right);
     if (personLike(left) && right.userCategory === "food_drink") {
@@ -239,16 +300,28 @@ function relationChoicesFor(proposition: CompositionProposition, concepts: Conce
       add("好きなもの", "likes", left, right);
     }
     if (personLike(left) && right.userCategory === "wearable") add("身につける", "wears", left, right);
-    if (personLike(left) && objectLike(right) && right.userCategory !== "wearable" && right.userCategory !== "food_drink") {
+    if (
+      personLike(left) &&
+      objectLike(right) &&
+      right.userCategory !== "wearable" &&
+      right.userCategory !== "food_drink"
+    ) {
       add("それを使う", "uses", left, right);
     }
     if (actionLike(left) && objectLike(right)) add("それを使う", "uses", left, right);
     if (left.userCategory === "place" && objectLike(right)) add("そこにある", "located_at", right, left);
-    if ((left.attributes.usageMode === "contain" || left.attributes.objectKind === "container") && objectLike(right)) {
+    if (
+      (left.attributes.usageMode === "contain" || left.attributes.objectKind === "container") &&
+      objectLike(right)
+    ) {
       add("中に入っている", "contains", left, right);
     }
   }
-  if ([first.userCategory, second.userCategory].every((category) => ["abstract", "word_expression", "other"].includes(category))) {
+  if (
+    [first.userCategory, second.userCategory].every((category) =>
+      ["abstract", "word_expression", "other"].includes(category)
+    )
+  ) {
     add("少し似ている", "similar_to", first, second);
     add("反対に近い", "opposite_of", first, second);
   }

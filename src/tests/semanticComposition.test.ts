@@ -9,11 +9,19 @@ import { responsePatterns } from "../data/response-patterns/responsePatterns";
 import { SeededRandom } from "../infrastructure/random/random";
 import { dialogueTemplates } from "../data/dialogue-templates/dialogueTemplates";
 import { starterConcepts } from "../data/starter/starterConcepts";
-import { validateAnswerSchema, validateConversationSession, validateStylePreservation } from "../domain/conversation/dialogueValidator";
+import {
+  validateAnswerSchema,
+  validateConversationSession,
+  validateStylePreservation
+} from "../domain/conversation/dialogueValidator";
 import { migrateConversationSession } from "../domain/conversation/sessionMigration";
 import { applyAguriVoice } from "../domain/voice/aguriVoice";
 import type { ConceptRelation } from "../domain/model/relation";
-import { answerSchemaFor } from "../domain/conversation/semanticComposition";
+import {
+  answerSchemaFor,
+  composeProposition,
+  questionForProposition
+} from "../domain/conversation/semanticComposition";
 
 const now = 1_700_000_000_000;
 const character: CharacterState = {
@@ -95,7 +103,11 @@ describe("semantic composition regression", () => {
     const relationChoices = choices.filter((choice) => choice.effect === "affirm");
 
     expect(relationChoices.length).toBeGreaterThan(0);
-    expect(relationChoices.every((choice) => choice.answerEffect?.relationType && choice.answerEffect.memoryEffect === "link_words")).toBe(true);
+    expect(
+      relationChoices.every(
+        (choice) => choice.answerEffect?.relationType && choice.answerEffect.memoryEffect === "link_words"
+      )
+    ).toBe(true);
     expect(choices.at(-2)?.effect).toBe("deny");
     expect(choices.at(-1)?.effect).toBe("curious");
     expect(choices.map((choice) => choice.label)).not.toContain("続きを聞きたい");
@@ -158,9 +170,18 @@ describe("semantic composition regression", () => {
 
   it("does not create a relation when relation discovery is rejected", () => {
     const { concepts, session } = planUnrelatedPair();
-    const reject = session.pendingQuestion?.answerSchema.find((choice) => choice.answerEffect?.semanticEffect === "reject");
+    const reject = session.pendingQuestion?.answerSchema.find(
+      (choice) => choice.answerEffect?.semanticEffect === "reject"
+    );
     expect(reject).toBeDefined();
-    const result = applyResponse({ ...session, phase: "awaiting_answer" }, reject!, character, [], concepts, now + 1);
+    const result = applyResponse(
+      { ...session, phase: "awaiting_answer" },
+      reject!,
+      character,
+      [],
+      concepts,
+      now + 1
+    );
 
     expect(result.relations).toEqual([]);
     expect(result.answer.memoryEffect).toBe("none");
@@ -168,9 +189,18 @@ describe("semantic composition regression", () => {
 
   it("stores the relation type selected by the player", () => {
     const { concepts, session } = planUnrelatedPair();
-    const eats = session.pendingQuestion?.answerSchema.find((choice) => choice.answerEffect?.relationType === "eats_drinks");
+    const eats = session.pendingQuestion?.answerSchema.find(
+      (choice) => choice.answerEffect?.relationType === "eats_drinks"
+    );
     expect(eats).toBeDefined();
-    const result = applyResponse({ ...session, phase: "awaiting_answer" }, eats!, character, [], concepts, now + 1);
+    const result = applyResponse(
+      { ...session, phase: "awaiting_answer" },
+      eats!,
+      character,
+      [],
+      concepts,
+      now + 1
+    );
 
     expect(result.relations).toHaveLength(1);
     expect(result.relations[0]).toMatchObject({
@@ -203,7 +233,9 @@ describe("semantic composition regression", () => {
     const reaction = result.session.queuedTurns.at(-1)?.page ?? "";
 
     expect(result.concepts.find((item) => item.id === concepts[0]!.id)?.preference).toBe(0);
-    expect(result.concepts.find((item) => item.id === concepts[1]!.id)?.preference).toBe(concepts[1]!.preference);
+    expect(result.concepts.find((item) => item.id === concepts[1]!.id)?.preference).toBe(
+      concepts[1]!.preference
+    );
     expect(reaction).toContain("おとな");
     expect(reaction).not.toContain("かつお節");
     expect(result.effect.flags).toContain("preference_learned");
@@ -221,7 +253,16 @@ describe("semantic composition regression", () => {
       templateIds: ["legacy"],
       slotConceptIds: { first: "adult", second: "bonito" },
       history: [],
-      queuedTurns: [{ id: "old", speaker: "aguri", page: "このつながりですか？", emotion: "curious", conceptIds: ["adult", "bonito"], createdAt: now }],
+      queuedTurns: [
+        {
+          id: "old",
+          speaker: "aguri",
+          page: "このつながりですか？",
+          emotion: "curious",
+          conceptIds: ["adult", "bonito"],
+          createdAt: now
+        }
+      ],
       pendingQuestion: { id: "old_question", prompt: "このつながりですか？", choices: [] },
       absurdityCount: 0,
       startedAt: now,
@@ -230,7 +271,7 @@ describe("semantic composition regression", () => {
     const migrated = migrateConversationSession(legacy, now + 1);
 
     expect(migrated.phase).toBe("completed");
-    expect(migrated.dialogueRevision).toBe(3);
+    expect(migrated.dialogueRevision).toBe(4);
     expect(migrated.queuedTurns).toEqual([]);
     expect(migrated.pendingQuestion).toBeUndefined();
     expect(migrated.validationErrors).toContain("legacy_session_invalidated");
@@ -239,7 +280,9 @@ describe("semantic composition regression", () => {
   it("keeps words, negation and the question target through Aguri's style layer", () => {
     const base = "「おとな」と「かつお節」には関係がないですか？";
     const styled = applyAguriVoice(base, "curious");
-    expect(validateStylePreservation(base, styled, ["おとな", "かつお節"], "relation_confirmation")).toEqual([]);
+    expect(validateStylePreservation(base, styled, ["おとな", "かつお節"], "relation_confirmation")).toEqual(
+      []
+    );
     expect(styled).toContain("関係がない");
     expect(styled).toMatch(/[？?]/u);
   });
@@ -256,11 +299,17 @@ describe("semantic composition regression", () => {
     ]);
     expect(preferences.every((template) => template.slots.length === 1)).toBe(true);
     expect(meaningChecks.every((template) => template.slots.length === 1)).toBe(true);
-    expect(relationChecks.every((template) => template.grounding === "relation_required" && template.slots.length === 2)).toBe(true);
+    expect(
+      relationChecks.every(
+        (template) => template.grounding === "relation_required" && template.slots.length === 2
+      )
+    ).toBe(true);
   });
 
   it("realizes a typed person-place-action scene with explicit grammatical roles", () => {
-    const sceneTemplate = dialogueTemplates.find((template) => template.id === "dialogue_daydream_person_action_place")!;
+    const sceneTemplate = dialogueTemplates.find(
+      (template) => template.id === "dialogue_daydream_person_action_place"
+    )!;
     const concepts = [
       createUserConcept({ surface: "運転手", category: "occupation" }, now, "driver"),
       createUserConcept({ surface: "水やり", category: "action" }, now, "watering"),
@@ -289,7 +338,9 @@ describe("semantic composition regression", () => {
   });
 
   it("marks a deliberate category-based mismatch as one correctable hypothesis", () => {
-    const mismatchTemplate = dialogueTemplates.find((template) => template.id === "dialogue_misunderstanding_person_action_place")!;
+    const mismatchTemplate = dialogueTemplates.find(
+      (template) => template.id === "dialogue_misunderstanding_person_action_place"
+    )!;
     const concepts = [
       createUserConcept({ surface: "運転手", category: "occupation" }, now, "driver-mismatch"),
       createUserConcept({ surface: "水やり", category: "action" }, now, "watering-mismatch"),
@@ -340,14 +391,124 @@ describe("semantic composition regression", () => {
       }
     };
 
-    expect(validateAnswerSchema("relation_discovery", [preferenceChoice])).toContain("answer_intent_mismatch");
-    expect(validateAnswerSchema("relation_discovery", [preferenceChoice])).toContain("memory_intent_mismatch");
+    expect(validateAnswerSchema("relation_discovery", [preferenceChoice])).toContain(
+      "answer_intent_mismatch"
+    );
+    expect(validateAnswerSchema("relation_discovery", [preferenceChoice])).toContain(
+      "memory_intent_mismatch"
+    );
+  });
+
+  it("rejects an unsafe semantic and memory effect pair", () => {
+    const unsafeChoice = {
+      id: "reject_but_link",
+      label: "関係はない",
+      effect: "deny" as const,
+      answerEffect: {
+        semanticEffect: "reject" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "link_words" as const
+      }
+    };
+
+    expect(validateAnswerSchema("relation_discovery", [unsafeChoice])).toContain(
+      "answer_effect_pair_mismatch"
+    );
+  });
+
+  it("names the category that is being confirmed", () => {
+    const concept = createUserConcept(
+      { surface: "星形クッキー", category: "food_drink" },
+      now,
+      "category-claim"
+    );
+    const template: DialogueTemplate = {
+      ...unrelatedPairTemplate,
+      id: "test_category_claim",
+      semanticFrame: "test.single_topic",
+      grounding: "scene_frame",
+      intent: "ask_meaning",
+      slots: [
+        {
+          name: "topic",
+          categories: ["food_drink"],
+          grammaticalRole: "topic",
+          required: true
+        }
+      ],
+      constraints: {},
+      variants: ["「{topic}」のことを考えます。"]
+    };
+    const proposition = composeProposition({
+      template,
+      slots: { topic: concept },
+      relations: [],
+      renderedText: "「星形クッキー」のことを考えます。",
+      hasResponse: true
+    });
+
+    expect(proposition.categoryClaim).toEqual({
+      conceptId: concept.id,
+      category: "food_drink",
+      label: "食べ物・飲み物"
+    });
+    expect(questionForProposition(proposition, [concept])).toContain("食べ物・飲み物");
+  });
+
+  it("creates the selected relation without strengthening another relation on the same pair", () => {
+    const { concepts, session } = planUnrelatedPair();
+    const [fromConceptId, toConceptId] = session.topicWordIds;
+    const unrelatedRelation: ConceptRelation = {
+      id: "relation_other_type",
+      fromConceptId: fromConceptId!,
+      toConceptId: toConceptId!,
+      type: "associated_with",
+      source: "inferred",
+      strength: 0.2,
+      confidence: 0.2,
+      createdAt: now,
+      reinforcedAt: now
+    };
+    const selectedChoice = {
+      id: "relation_type_food",
+      label: "食べたり飲んだりする",
+      effect: "affirm" as const,
+      answerEffect: {
+        semanticEffect: "confirm" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "link_words" as const,
+        relationType: "eats_drinks" as const,
+        relationDirection: "forward" as const
+      }
+    };
+
+    const result = applyResponse(session, selectedChoice, character, [unrelatedRelation], concepts, now + 1);
+
+    expect(result.relations.find((relation) => relation.id === unrelatedRelation.id)).toEqual(
+      unrelatedRelation
+    );
+    expect(result.relations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fromConceptId,
+          toConceptId,
+          type: "eats_drinks",
+          source: "answer"
+        })
+      ])
+    );
   });
 
   it("generates 1000 deterministic sessions without ungrounded or mismatched dialogue", () => {
-    const learned = createUserConcept({ surface: "星形クッキー", category: "food_drink", preference: 2 }, now, "mass");
+    const learned = createUserConcept(
+      { surface: "星形クッキー", category: "food_drink", preference: 2 },
+      now,
+      "mass"
+    );
     const concepts = [...starterConcepts, learned];
-    const templates = dialogueTemplates.filter((template) => template.locations.includes("room")).slice(0, 64);
+    const templates = dialogueTemplates
+      .filter((template) => template.locations.includes("room"))
+      .slice(0, 64);
     const failures: string[] = [];
 
     for (let seed = 1; seed <= 1000; seed += 1) {
@@ -366,12 +527,17 @@ describe("semantic composition regression", () => {
       const transcript = session.queuedTurns.map((turn) => turn.page).join("\n");
       const errors = validateConversationSession(session);
       if (errors.length > 0) failures.push(seed + ":validation:" + errors.join(","));
-      if (session.validationErrors.length > 0) failures.push(seed + ":fallback:" + session.validationErrors.join(","));
+      if (session.validationErrors.length > 0)
+        failures.push(seed + ":fallback:" + session.validationErrors.join(","));
       if (/こんなふうに|このつながり|この組み合わせ|変じゃない/u.test(transcript)) {
         failures.push(seed + ":bare_reference");
       }
       if (session.pendingQuestion) {
-        const answerErrors = validateConversationSession({ ...session, phase: "awaiting_answer", queuedTurns: [] });
+        const answerErrors = validateConversationSession({
+          ...session,
+          phase: "awaiting_answer",
+          queuedTurns: []
+        });
         if (answerErrors.length > 0) failures.push(seed + ":answer:" + answerErrors.join(","));
       }
     }

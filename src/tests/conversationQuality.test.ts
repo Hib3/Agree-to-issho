@@ -33,7 +33,11 @@ const character: CharacterState = {
 
 describe("clean-room conversation composition", () => {
   it("uses a learned word in a multi-page, fully resolved conversation", () => {
-    const learned = createUserConcept({ surface: "星形クッキー", category: "food_drink", preference: 2 }, now, "learned");
+    const learned = createUserConcept(
+      { surface: "星形クッキー", category: "food_drink", preference: 2 },
+      now,
+      "learned"
+    );
     const session = planConversation({
       templates: dialogueTemplates,
       responsePatterns,
@@ -75,11 +79,30 @@ describe("clean-room conversation composition", () => {
       id: "yes",
       label: "合ってる",
       effect: "affirm" as const,
-      answerEffect: { semanticEffect: "confirm" as const, navigationEffect: "none" as const, memoryEffect: "link_words" as const }
+      answerEffect: {
+        semanticEffect: "confirm" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "link_words" as const,
+        relationType: "associated_with" as const,
+        relationDirection: "forward" as const
+      }
     };
-    const result = applyResponse(session, choice, character, [], starterConcepts, now + 1);
+    const relationSession: ConversationSession = {
+      ...session,
+      topicWordIds: ids.slice(0, 2),
+      questionIntent: "relation_discovery",
+      proposition: {
+        ...session.proposition,
+        wordIds: ids.slice(0, 2),
+        relationType: "relation_discovery",
+        questionIntent: "relation_discovery"
+      }
+    };
+    const result = applyResponse(relationSession, choice, character, [], starterConcepts, now + 1);
     const reaction = result.session.queuedTurns.at(-1)?.page ?? "";
-    const surfaces = ids.map((id) => starterConcepts.find((concept) => concept.id === id)?.surface).filter(Boolean);
+    const surfaces = ids
+      .map((id) => starterConcepts.find((concept) => concept.id === id)?.surface)
+      .filter(Boolean);
 
     expect(surfaces.some((surface) => reaction.includes(surface!))).toBe(true);
     expect(reaction).not.toContain("そのつながり");
@@ -91,8 +114,18 @@ describe("clean-room conversation composition", () => {
   });
 
   it("prioritizes meaning checks for an uncertain learned word", () => {
-    const learned = { ...createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "uncertain"), understanding: 0.25, ambiguity: 0.82 };
-    const bias = buildIntentBias({ concepts: [...starterConcepts, learned], recentSessions: [], character, location: locations[0]!, now });
+    const learned = {
+      ...createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "uncertain"),
+      understanding: 0.25,
+      ambiguity: 0.82
+    };
+    const bias = buildIntentBias({
+      concepts: [...starterConcepts, learned],
+      recentSessions: [],
+      character,
+      location: locations[0]!,
+      now
+    });
     expect(bias.ask_meaning).toBeGreaterThan(bias.small_talk ?? 0);
     expect(bias.misunderstanding).toBeGreaterThan(0);
   });
@@ -130,17 +163,21 @@ describe("clean-room conversation composition", () => {
       relationText: "",
       evidence: "none" as const,
       confidence: 0,
-      questionIntent: "category_confirmation" as const
+      questionIntent: "situation_question" as const
     };
     const answer = {
       id: "yes",
       label: "はい",
       effect: "affirm" as const,
-      answerEffect: { semanticEffect: "confirm" as const, navigationEffect: "none" as const, memoryEffect: "update_category" as const }
+      answerEffect: {
+        semanticEffect: "confirm" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "none" as const
+      }
     };
     const session: ConversationSession = {
       schemaVersion: 2,
-      dialogueRevision: 3,
+      dialogueRevision: 4,
       id: "session_phase_order",
       phase: "premise",
       intent: "ask_relation",
@@ -149,14 +186,14 @@ describe("clean-room conversation composition", () => {
       slotConceptIds: {},
       topicWordIds: [],
       proposition,
-      questionIntent: "category_confirmation",
+      questionIntent: "situation_question",
       history: [],
       queuedTurns: [turn],
       pendingQuestion: {
         id: "question_test",
         prompt: "この質問に答えますかっ？",
         choices: [answer],
-        questionIntent: "category_confirmation",
+        questionIntent: "situation_question",
         answerSchema: [answer],
         proposition
       },
@@ -182,7 +219,11 @@ describe("clean-room conversation composition", () => {
     await db.transaction("rw", db.tables, async () => {
       for (const table of db.tables) await table.clear();
     });
-    const learned = createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "answer-flow");
+    const learned = createUserConcept(
+      { surface: "星形クッキー", category: "food_drink" },
+      now,
+      "answer-flow"
+    );
     const proposition = {
       wordIds: [learned.id],
       frameId: "test.answer",
@@ -190,17 +231,26 @@ describe("clean-room conversation composition", () => {
       relationText: "",
       evidence: "none" as const,
       confidence: 0.5,
-      questionIntent: "category_confirmation" as const
+      questionIntent: "category_confirmation" as const,
+      categoryClaim: {
+        conceptId: learned.id,
+        category: "food_drink" as const,
+        label: "食べ物・飲み物"
+      }
     };
     const answer = {
       id: "no",
       label: "違う",
       effect: "deny" as const,
-      answerEffect: { semanticEffect: "reject" as const, navigationEffect: "none" as const, memoryEffect: "update_category" as const }
+      answerEffect: {
+        semanticEffect: "reject" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "update_category" as const
+      }
     };
     const session: ConversationSession = {
       schemaVersion: 2,
-      dialogueRevision: 3,
+      dialogueRevision: 4,
       id: "session_answer_reaction",
       phase: "awaiting_answer",
       intent: "ask_relation",
@@ -230,10 +280,21 @@ describe("clean-room conversation composition", () => {
     await db.concepts.put(learned);
     await db.conversationSessions.put(session);
 
-    const reacted = await answerConversation(session.id, answer, now + 1);
+    const tamperedAnswer = {
+      ...answer,
+      answerEffect: {
+        semanticEffect: "confirm" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "link_words" as const,
+        relationType: "associated_with" as const
+      }
+    };
+    const reacted = await answerConversation(session.id, tamperedAnswer, now + 1);
     expect(reacted.phase).toBe("closing");
     expect(reacted.history.at(-1)?.page).toContain("違うんですね");
     expect(reacted.pendingQuestion).toBeUndefined();
+    expect(await db.relations.count()).toBe(0);
+    expect((await db.concepts.get(learned.id))?.categoryConfidence).toBeLessThan(learned.categoryConfidence);
   });
 
   it("stores only the asked word in preference answer memory", async () => {
@@ -241,7 +302,11 @@ describe("clean-room conversation composition", () => {
     await db.transaction("rw", db.tables, async () => {
       for (const table of db.tables) await table.clear();
     });
-    const food = createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "preference-food");
+    const food = createUserConcept(
+      { surface: "星形クッキー", category: "food_drink" },
+      now,
+      "preference-food"
+    );
     const place = createUserConcept({ surface: "広場", category: "place" }, now, "preference-place");
     const proposition = {
       wordIds: [food.id, place.id],
@@ -264,7 +329,7 @@ describe("clean-room conversation composition", () => {
     };
     const session: ConversationSession = {
       schemaVersion: 2,
-      dialogueRevision: 3,
+      dialogueRevision: 4,
       id: "session_preference_target",
       phase: "awaiting_answer",
       intent: "ask_preference",

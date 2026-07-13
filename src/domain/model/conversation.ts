@@ -1,5 +1,6 @@
 import type { CharacterEmotion } from "./character";
 import type { RelationType } from "./relation";
+import type { ConceptCategory } from "./concept";
 
 export const conversationIntents = [
   "small_talk",
@@ -21,14 +22,7 @@ export const conversationIntents = [
 
 export type ConversationIntent = (typeof conversationIntents)[number];
 export type ConversationPhase =
-  | "opening"
-  | "premise"
-  | "question"
-  | "awaiting_answer"
-  | "reaction"
-  | "twist"
-  | "closing"
-  | "completed";
+  "opening" | "premise" | "question" | "awaiting_answer" | "reaction" | "twist" | "closing" | "completed";
 
 export type QuestionIntent =
   | "relation_discovery"
@@ -44,11 +38,23 @@ export type QuestionIntent =
 export type CompositionProposition = {
   wordIds: string[];
   frameId: string;
-  relationType: "confirmed_relation" | "scene_hypothesis" | "relation_discovery" | "single_word" | "drift_hypothesis";
+  relationType:
+    "confirmed_relation" | "scene_hypothesis" | "relation_discovery" | "single_word" | "drift_hypothesis";
   relationText: string;
   evidence: "confirmed_relation" | "scene_frame" | "category_only" | "none";
   confidence: number;
   questionIntent: QuestionIntent;
+  relationClaim?: {
+    relationId: string;
+    type: RelationType;
+    fromConceptId: string;
+    toConceptId: string;
+  };
+  categoryClaim?: {
+    conceptId: string;
+    category: ConceptCategory;
+    label: string;
+  };
   attributeClaim?: {
     conceptId: string;
     key: string;
@@ -59,9 +65,17 @@ export type CompositionProposition = {
 };
 
 export type DialogueAnswerEffect = {
-  semanticEffect: "confirm" | "reject" | "unknown" | "preference_like" | "preference_neutral" | "preference_dislike" | "none";
+  semanticEffect:
+    | "confirm"
+    | "reject"
+    | "unknown"
+    | "preference_like"
+    | "preference_neutral"
+    | "preference_dislike"
+    | "none";
   navigationEffect: "continue" | "close" | "stay" | "none";
-  memoryEffect: "link_words" | "unlink_words" | "update_preference" | "update_category" | "update_attribute" | "none";
+  memoryEffect:
+    "link_words" | "unlink_words" | "update_preference" | "update_category" | "update_attribute" | "none";
   relationType?: RelationType;
   relationDirection?: "forward" | "reverse";
 };
@@ -97,10 +111,10 @@ export type PendingQuestion = {
   questionIntent: QuestionIntent;
   answerSchema: DialogueChoice[];
   proposition: CompositionProposition;
-  relationDraft?: { fromConceptId: string; toConceptId: string; type: string };
+  relationDraft?: { fromConceptId: string; toConceptId: string; type: RelationType };
 };
 
-export const CURRENT_DIALOGUE_REVISION = 3 as const;
+export const CURRENT_DIALOGUE_REVISION = 4 as const;
 
 export type ConversationSession = {
   schemaVersion: 2;
@@ -125,7 +139,11 @@ export type ConversationSession = {
   completedAt?: number;
 };
 
-export type DialogueHistoryEntry = DialogueTurn & { sessionId: string; intent: ConversationIntent; locationId: string };
+export type DialogueHistoryEntry = DialogueTurn & {
+  sessionId: string;
+  intent: ConversationIntent;
+  locationId: string;
+};
 
 export type ResponseEffect = {
   relationshipDelta: number;

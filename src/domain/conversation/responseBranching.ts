@@ -55,34 +55,77 @@ export function applyResponse(
   const answer = normalizeAnswerEffect(choice);
   const involvedIds = session.topicWordIds;
   const answerTargetIds = singleWordQuestion(session.questionIntent) ? involvedIds.slice(0, 1) : involvedIds;
-  const involvedRelations = relations.filter(
-    (relation) => involvedIds.includes(relation.fromConceptId) && involvedIds.includes(relation.toConceptId)
+  const targetRelationId = session.proposition.relationClaim?.relationId;
+  const involvedRelations = targetRelationId
+    ? relations.filter((relation) => relation.id === targetRelationId)
+    : [];
+  const effect = effectForChoice(
+    choice,
+    involvedRelations.map((relation) => relation.id)
   );
-  const effect = effectForChoice(choice, involvedRelations.map((relation) => relation.id));
   let updatedRelations = relations.map((relation) => {
     if (answer.memoryEffect === "link_words" && effect.strengthenRelationIds?.includes(relation.id)) {
-      return { ...relation, strength: Math.min(1, relation.strength + 0.12), confidence: Math.min(1, relation.confidence + 0.08), reinforcedAt: now };
+      return {
+        ...relation,
+        strength: Math.min(1, relation.strength + 0.12),
+        confidence: Math.min(1, relation.confidence + 0.08),
+        reinforcedAt: now
+      };
     }
     if (answer.memoryEffect === "unlink_words" && effect.weakenRelationIds?.includes(relation.id)) {
-      return { ...relation, strength: Math.max(0, relation.strength - 0.18), confidence: Math.max(0, relation.confidence - 0.12), reinforcedAt: now };
+      return {
+        ...relation,
+        strength: Math.max(0, relation.strength - 0.18),
+        confidence: Math.max(0, relation.confidence - 0.12),
+        reinforcedAt: now
+      };
     }
     return relation;
   });
-  if (answer.memoryEffect === "link_words" && involvedIds.length >= 2 && involvedRelations.length === 0) {
-    const [firstId, secondId] = answer.relationDirection === "reverse"
-      ? [involvedIds[1]!, involvedIds[0]!]
-      : [involvedIds[0]!, involvedIds[1]!];
-    updatedRelations = [...updatedRelations, {
-      id: "relation_" + crypto.randomUUID(),
-      fromConceptId: firstId,
-      toConceptId: secondId,
-      type: answer.relationType ?? "associated_with",
-      source: "answer",
-      strength: 0.45,
-      confidence: 0.7,
-      createdAt: now,
-      reinforcedAt: now
-    }];
+  if (
+    session.questionIntent === "relation_discovery" &&
+    answer.semanticEffect === "confirm" &&
+    answer.memoryEffect === "link_words" &&
+    involvedIds.length >= 2
+  ) {
+    const [firstId, secondId] =
+      answer.relationDirection === "reverse"
+        ? [involvedIds[1]!, involvedIds[0]!]
+        : [involvedIds[0]!, involvedIds[1]!];
+    const relationType = answer.relationType ?? "associated_with";
+    const existingIndex = updatedRelations.findIndex(
+      (relation) =>
+        relation.fromConceptId === firstId &&
+        relation.toConceptId === secondId &&
+        relation.type === relationType
+    );
+    if (existingIndex >= 0) {
+      updatedRelations = updatedRelations.map((relation, index) =>
+        index === existingIndex
+          ? {
+              ...relation,
+              strength: Math.min(1, relation.strength + 0.12),
+              confidence: Math.min(1, relation.confidence + 0.08),
+              reinforcedAt: now
+            }
+          : relation
+      );
+    } else {
+      updatedRelations = [
+        ...updatedRelations,
+        {
+          id: "relation_" + crypto.randomUUID(),
+          fromConceptId: firstId,
+          toConceptId: secondId,
+          type: relationType,
+          source: "answer",
+          strength: 0.45,
+          confidence: 0.7,
+          createdAt: now,
+          reinforcedAt: now
+        }
+      ];
+    }
   }
 
   const names = answerTargetIds
@@ -90,9 +133,33 @@ export function applyResponse(
     .filter((concept): concept is Concept => Boolean(concept))
     .slice(0, 2)
     .map(displayConcept);
-  const pair = names.length >= 2 ? "「" + names[0] + "」と「" + names[1] + "」" : names[0] ? "「" + names[0] + "」" : "今の話";
+  const pair =
+    names.length >= 2
+      ? "「" + names[0] + "」と「" + names[1] + "」"
+      : names[0]
+        ? "「" + names[0] + "」"
+        : "今の話";
   const updatedConcepts = concepts.map((concept) => {
     if (!answerTargetIds.includes(concept.id) || answer.semanticEffect === "none") return concept;
+    const categoryAnswer =
+      session.questionIntent === "category_confirmation" &&
+      answer.memoryEffect === "update_category" &&
+      session.proposition.categoryClaim?.conceptId === concept.id;
+    if (categoryAnswer) {
+      const confirmed = answer.semanticEffect === "confirm";
+      return {
+        ...concept,
+        categoryConfidence: confirmed
+          ? Math.min(1, concept.categoryConfidence + 0.1)
+          : Math.max(0, concept.categoryConfidence - 0.25),
+        understanding: confirmed
+          ? Math.min(1, concept.understanding + 0.08)
+          : Math.max(0.2, concept.understanding - 0.04),
+        ambiguity: confirmed ? Math.max(0, concept.ambiguity - 0.08) : Math.min(1, concept.ambiguity + 0.18),
+        reviewCount: concept.reviewCount + 1,
+        lastReviewedAt: now
+      };
+    }
     const rejectedAttribute =
       session.questionIntent === "attribute_confirmation" &&
       answer.semanticEffect === "reject" &&
@@ -116,8 +183,10 @@ export function applyResponse(
           : answer.semanticEffect === "preference_dislike"
             ? -2
             : concept.preference;
-    const understandingGain = answer.semanticEffect === "confirm" ? 0.08 : answer.semanticEffect === "reject" ? 0.05 : 0.03;
-    const ambiguityDrop = answer.semanticEffect === "reject" ? 0.14 : answer.semanticEffect === "confirm" ? 0.08 : 0.03;
+    const understandingGain =
+      answer.semanticEffect === "confirm" ? 0.08 : answer.semanticEffect === "reject" ? 0.05 : 0.03;
+    const ambiguityDrop =
+      answer.semanticEffect === "reject" ? 0.14 : answer.semanticEffect === "confirm" ? 0.08 : 0.03;
     return {
       ...concept,
       ...(preference === undefined ? {} : { preference }),
@@ -138,7 +207,7 @@ export function applyResponse(
       ...character,
       closeness: clamp(character.closeness + effect.relationshipDelta),
       trust: clamp(character.trust + effect.trustDelta),
-      emotion: answer.semanticEffect === "reject" ? "embarrassed" as const : "happy" as const,
+      emotion: answer.semanticEffect === "reject" ? ("embarrassed" as const) : ("happy" as const),
       updatedAt: now
     },
     relations: updatedRelations,
@@ -192,7 +261,11 @@ function createReaction(
 }
 
 function semanticReaction(session: ConversationSession, answer: DialogueAnswerEffect, pair: string) {
-  if (session.questionIntent === "relation_discovery" && answer.semanticEffect === "confirm" && answer.relationType) {
+  if (
+    session.questionIntent === "relation_discovery" &&
+    answer.semanticEffect === "confirm" &&
+    answer.relationType
+  ) {
     return pair + "は、" + relationLabel(answer.relationType) + "つながりとして覚えますっ！";
   }
   if (session.questionIntent === "category_confirmation") {
