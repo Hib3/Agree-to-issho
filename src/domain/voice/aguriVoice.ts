@@ -3,32 +3,93 @@ import type { CharacterEmotion } from "../model/character";
 const existingOpener = /^(?:まァっ|なんかっ|あのっそのっ|あのっ|えェっ|あっ|あれっ|ねえっ)[、！！？]?/u;
 const uncertaintyCue = /(かもしれ|気がし|まだ|分から|わから|迷|想像|考え|気にな|ふわふわ|たぶん|ひょっと)/u;
 
+const quietEmotions = new Set<CharacterEmotion>(["calm", "lonely", "sleepy"]);
+const quotePairs = new Map([
+  ["「", "」"],
+  ["『", "』"]
+]);
+
 export function applyAguriVoice(text: string, emotion: CharacterEmotion = "curious") {
   const clean = text.trim();
   if (!clean) return clean;
 
-  const energetic = applySentenceRhythm(clean, emotion);
+  const energetic = transformOutsideQuotes(clean, (part) => applySentenceRhythm(part, emotion));
   return `${softenerFor(clean, emotion)}${energetic}`;
 }
 
 function applySentenceRhythm(text: string, emotion: CharacterEmotion) {
+  if (!text) return text;
+  const questionEnding = quietEmotions.has(emotion) ? "っ？" : "っ！？";
   let result = text
-    .replace(/ですか(?:っ)?[？?]/gu, "ですかっ！？")
-    .replace(/ますか(?:っ)?[？?]/gu, "ますかっ！？")
-    .replace(/しょうか(?:っ)?[？?]/gu, "しょうかっ！？")
-    .replace(/でしょう。/gu, "でしょうねェっ！")
+    .replace(/(です|ます|でした|ました|ません)か(?:っ)?[？！?!]+/gu, `$1か${questionEnding}`)
+    .replace(/しょうか(?:っ)?[？！?!]+/gu, `しょうか${questionEnding}`);
+
+  result = result.replace(/[？！?!]+/gu, (marks) => {
+    if (!/[？?]/u.test(marks)) return "！";
+    return quietEmotions.has(emotion) ? "？" : "！？";
+  });
+
+  if (quietEmotions.has(emotion)) return result;
+
+  result = result
+    .replace(/でしょう。/gu, "でしょうっ！")
     .replace(/ですね。/gu, "ですねェっ！")
     .replace(/ません。/gu, "ませんっ！")
     .replace(/です。/gu, "ですっ！")
     .replace(/ます。/gu, "ますっ！")
     .replace(/かな。/gu, "かなァっ！")
-    .replace(/よね。/gu, "よなァっ！")
+    .replace(/よね。/gu, "よねェっ！")
     .replace(/っ。/gu, "っ！");
 
-  if (!["calm", "sleepy"].includes(emotion)) result = result.replace(/。/gu, "っ！");
-  if (!["。", "！", "？", "!", "?"].some((ending) => result.endsWith(ending)) && ["happy", "excited"].includes(emotion)) {
+  result = result.replace(/。/gu, "っ！");
+  if (
+    !["。", "！", "？", "!", "?"].some((ending) => result.endsWith(ending)) &&
+    ["happy", "excited"].includes(emotion)
+  ) {
     result += "っ！";
   }
+  return result;
+}
+
+function transformOutsideQuotes(text: string, transform: (part: string) => string) {
+  let result = "";
+  let unquoted = "";
+  let quoted = "";
+  const expectedClosers: string[] = [];
+
+  const flushUnquoted = () => {
+    result += transform(unquoted);
+    unquoted = "";
+  };
+  const flushQuoted = () => {
+    result += quoted;
+    quoted = "";
+  };
+
+  for (const character of text) {
+    const closer = quotePairs.get(character);
+    if (expectedClosers.length === 0) {
+      if (closer) {
+        flushUnquoted();
+        expectedClosers.push(closer);
+        quoted += character;
+      } else {
+        unquoted += character;
+      }
+      continue;
+    }
+
+    quoted += character;
+    if (closer) {
+      expectedClosers.push(closer);
+    } else if (character === expectedClosers.at(-1)) {
+      expectedClosers.pop();
+      if (expectedClosers.length === 0) flushQuoted();
+    }
+  }
+
+  if (expectedClosers.length > 0) return text;
+  flushUnquoted();
   return result;
 }
 
