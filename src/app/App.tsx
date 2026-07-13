@@ -105,7 +105,7 @@ export function App() {
       {screen === "diary" ? <DiaryScreen concepts={store.concepts} memories={store.memories} dialogue={store.dialogue} diaries={store.diaries} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
       {screen === "locations" && store.character ? <LocationsScreen character={store.character} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
       {screen === "settings" && store.settings ? <SettingsScreen settings={store.settings} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
-      {screen === "news" && store.settings ? <NewsScreen items={store.newsItems} concepts={store.concepts} settings={store.settings} onChanged={store.refresh} onOpenSettings={() => store.setScreen("settings")} onBack={() => store.setScreen("room")} /> : null}
+      {screen === "news" && store.settings ? <NewsScreen items={store.newsItems} concepts={store.concepts} character={store.character ?? undefined} relations={store.relations} memories={store.memories} settings={store.settings} onChanged={store.refresh} onOpenSettings={() => store.setScreen("settings")} onBack={() => store.setScreen("room")} /> : null}
       {screen === "backup" ? <BackupScreen onChanged={store.refresh} onBack={() => store.setScreen(store.player ? "room" : "title")} /> : null}
       {screen === "manual" ? <ManualScreen onBack={() => store.setScreen(store.player ? "room" : "title")} /> : null}
     </div>

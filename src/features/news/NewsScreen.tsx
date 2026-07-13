@@ -1,17 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, MessageCircle, Newspaper } from "lucide-react";
+import type { CharacterState } from "../../domain/model/character";
 import type { Concept } from "../../domain/model/concept";
-import type { NewsItem } from "../../domain/model/news";
+import type { MemoryEvent } from "../../domain/model/memory";
+import type { ArticleDigest, NewsItem } from "../../domain/model/news";
 import type { GameSettings } from "../../domain/model/player";
-import { buildNewsExplanation } from "../../domain/news/newsExplanation";
+import type { ConceptRelation } from "../../domain/model/relation";
+import { buildNewsConversationPlan } from "../../domain/news/newsExplanation";
 import { playGameSound } from "../../infrastructure/audio/gameAudio";
 import { db } from "../../infrastructure/db/database";
+import { buildFeedDigest, fetchArticleDigest } from "../../infrastructure/news/articleDigestService";
 import { DialogueBox } from "../../ui/components/DialogueBox";
 import { ScreenHeader } from "../../ui/components/ScreenHeader";
 
-export function NewsScreen({ items, concepts, settings, onBack, onOpenSettings, onChanged }: {
+export function NewsScreen({ items, concepts, character, relations, memories, settings, onBack, onOpenSettings, onChanged }: {
   items: NewsItem[];
   concepts: Concept[];
+  character?: CharacterState | undefined;
+  relations?: ConceptRelation[] | undefined;
+  memories?: MemoryEvent[] | undefined;
   settings: GameSettings;
   onBack: () => void;
   onOpenSettings: () => void;
@@ -19,15 +26,42 @@ export function NewsScreen({ items, concepts, settings, onBack, onOpenSettings, 
 }) {
   const [selectedId, setSelectedId] = useState("");
   const [pageIndex, setPageIndex] = useState(0);
+  const [digest, setDigest] = useState<ArticleDigest | null>(null);
+  const [readingArticle, setReadingArticle] = useState(false);
+  const requestRef = useRef<{ id: number; controller: AbortController } | null>(null);
   const selected = items.find((item) => item.id === selectedId);
-  const pages = useMemo(() => selected ? buildNewsExplanation(selected, concepts) : [], [concepts, selected]);
+  const plan = useMemo(() => selected && digest
+    ? buildNewsConversationPlan(selected, digest, concepts, { character, relations, memories })
+    : null, [character, concepts, digest, memories, relations, selected]);
+  const pages = plan?.pages ?? [];
+
+  useEffect(() => () => requestRef.current?.controller.abort(), []);
 
   async function discuss(item: NewsItem, now: number) {
+    requestRef.current?.controller.abort();
+    const request = { id: (requestRef.current?.id ?? 0) + 1, controller: new AbortController() };
+    requestRef.current = request;
     setSelectedId(item.id);
     setPageIndex(0);
+    setDigest(buildFeedDigest(item, now));
+    setReadingArticle(true);
     playGameSound("talk", settings);
-    await db.newsItems.put({ ...item, discussedAt: now });
-    await onChanged();
+    await db.newsItems.update(item.id, { discussedAt: now });
+    void onChanged();
+    try {
+      const nextDigest = await fetchArticleDigest(item, {
+        useArticleHelper: settings.newsUseArticleHelper,
+        signal: request.controller.signal,
+        now
+      });
+      if (requestRef.current?.id !== request.id || request.controller.signal.aborted) return;
+      setDigest(nextDigest);
+      setPageIndex(0);
+    } catch {
+      // A newer selection or an explicit cancellation keeps the compact RSS digest.
+    } finally {
+      if (requestRef.current?.id === request.id) setReadingArticle(false);
+    }
   }
 
   function nextPage() {
@@ -46,12 +80,19 @@ export function NewsScreen({ items, concepts, settings, onBack, onOpenSettings, 
         <section className="news-dialogue paper-panel">
           <DialogueBox
             speaker="アグリちゃん"
-            text={pages[pageIndex] ?? "ニュースを読み直していますっ。"}
+            text={pages[pageIndex]?.text ?? "見出しを読み直しています。"}
             textSpeed={settings.textSpeed}
-            emotion={pageIndex === 0 ? "excited" : "curious"}
+            emotion={pages[pageIndex]?.emotion ?? "curious"}
             hasNext={pageIndex < pages.length - 1}
             onNext={nextPage}
           />
+          <p className="article-read-status" role="status">{readingArticle ? "記事を直接読めるか確認しています…" : `確認範囲: ${contentLevelLabel(plan?.contentLevel ?? "headline_only")}`}</p>
+          {plan ? (
+            <details className="news-grounding-debug">
+              <summary>会話の根拠</summary>
+              <ol>{plan.pages.map((page) => <li key={page.id}>{groundingLabel(page.source)}{page.evidenceIds.length > 0 ? ` (${page.evidenceIds.length}件)` : ""}</li>)}</ol>
+            </details>
+          ) : null}
           <a className="source-link" href={selected.url} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />元の記事を開く</a>
         </section>
       ) : null}
@@ -78,4 +119,27 @@ export function NewsScreen({ items, concepts, settings, onBack, onOpenSettings, 
       </section>
     </main>
   );
+}
+
+function contentLevelLabel(level: "headline_only" | "feed_summary" | "feed_content" | "article_extract") {
+  return {
+    headline_only: "見出しのみ",
+    feed_summary: "RSSの短い説明まで",
+    feed_content: "RSS内の本文まで",
+    article_extract: "取得できた記事本文の一部まで"
+  }[level];
+}
+
+function groundingLabel(source: NonNullable<ReturnType<typeof buildNewsConversationPlan>["pages"]>[number]["source"]) {
+  return {
+    headline: "見出し",
+    feed_summary: "RSSの短い説明",
+    feed_content: "RSS内の本文",
+    article: "記事本文",
+    memory: "教えてもらった記憶",
+    inference: "アグリの整理",
+    aguri_opinion: "アグリの感想",
+    imagination: "アグリの想像",
+    unknown: "まだ不明なこと"
+  }[source];
 }
