@@ -91,7 +91,7 @@ describe("grounded news explanation", () => {
     const plan = buildNewsConversationPlan(technical, digest, []);
 
     expect(digest.keyFacts).toEqual([]);
-    expect(plan.openingReaction.text).toContain("見出しで示された出来事の内容");
+    expect(plan.openingReaction.text).toContain("配信文が示す出来事");
     expect(plan.openingReaction.text).not.toContain(
       "「feat: add punchline story arcs and integra」という変化"
     );

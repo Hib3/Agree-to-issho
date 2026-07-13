@@ -277,7 +277,7 @@ function selectSpecificTarget(digest: ArticleDigest) {
   const concreteTarget = digest.numericalFacts[0]?.value ?? digest.entities[0]?.name;
   if (concreteTarget) return concreteTarget;
   const topic = digest.topics[0];
-  return topic && topic.key !== "general" ? `${topic.label}への影響` : "見出しで示された出来事の内容";
+  return topic && topic.key !== "general" ? `${topic.label}への影響` : "配信文が示す出来事";
 }
 
 function selectLens(
