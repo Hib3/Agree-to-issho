@@ -71,7 +71,12 @@ describe("clean-room conversation composition", () => {
       random: new SeededRandom(7)
     });
     const ids = Object.values(session.slotConceptIds);
-    const choice = { id: "yes", label: "合ってる", effect: "affirm" as const };
+    const choice = {
+      id: "yes",
+      label: "合ってる",
+      effect: "affirm" as const,
+      answerEffect: { semanticEffect: "confirm" as const, navigationEffect: "none" as const, memoryEffect: "link_words" as const }
+    };
     const result = applyResponse(session, choice, character, [], starterConcepts, now + 1);
     const reaction = result.session.queuedTurns.at(-1)?.page ?? "";
     const surfaces = ids.map((id) => starterConcepts.find((concept) => concept.id === id)?.surface).filter(Boolean);
@@ -108,23 +113,55 @@ describe("clean-room conversation composition", () => {
       page: "質問の前に見せる最後のページですっ！",
       emotion: "curious",
       conceptIds: [],
+      requiresAnswer: false,
+      answerSchema: [],
+      semanticKey: "test.phase",
+      templateId: "test",
+      usedWordIds: [],
+      styleBasePage: "質問の前に見せる最後のページですっ！",
+      styledPreview: "質問の前に見せる最後のページですっ！",
+      validationErrors: [],
       createdAt: now
     };
+    const proposition = {
+      wordIds: [] as string[],
+      frameId: "test.phase",
+      relationType: "single_word" as const,
+      relationText: "",
+      evidence: "none" as const,
+      confidence: 0,
+      questionIntent: "category_confirmation" as const
+    };
+    const answer = {
+      id: "yes",
+      label: "はい",
+      effect: "affirm" as const,
+      answerEffect: { semanticEffect: "confirm" as const, navigationEffect: "none" as const, memoryEffect: "update_category" as const }
+    };
     const session: ConversationSession = {
+      schemaVersion: 2,
       id: "session_phase_order",
       phase: "premise",
       intent: "ask_relation",
       locationId: "room",
       templateIds: ["test"],
       slotConceptIds: {},
+      topicWordIds: [],
+      proposition,
+      questionIntent: "category_confirmation",
       history: [],
       queuedTurns: [turn],
       pendingQuestion: {
         id: "question_test",
         prompt: "この質問に答えますかっ？",
-        choices: [{ id: "yes", label: "はい", effect: "affirm" }]
+        choices: [answer],
+        questionIntent: "category_confirmation",
+        answerSchema: [answer],
+        proposition
       },
       absurdityCount: 0,
+      randomSeed: 1,
+      validationErrors: [],
       startedAt: now,
       updatedAt: now
     };
@@ -145,21 +182,45 @@ describe("clean-room conversation composition", () => {
       for (const table of db.tables) await table.clear();
     });
     const learned = createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "answer-flow");
+    const proposition = {
+      wordIds: [learned.id],
+      frameId: "test.answer",
+      relationType: "single_word" as const,
+      relationText: "",
+      evidence: "none" as const,
+      confidence: 0.5,
+      questionIntent: "category_confirmation" as const
+    };
+    const answer = {
+      id: "no",
+      label: "違う",
+      effect: "deny" as const,
+      answerEffect: { semanticEffect: "reject" as const, navigationEffect: "none" as const, memoryEffect: "update_category" as const }
+    };
     const session: ConversationSession = {
+      schemaVersion: 2,
       id: "session_answer_reaction",
       phase: "awaiting_answer",
       intent: "ask_relation",
       locationId: "room",
       templateIds: ["test"],
       slotConceptIds: { subject: learned.id },
+      topicWordIds: [learned.id],
+      proposition,
+      questionIntent: "category_confirmation",
       history: [],
       queuedTurns: [],
       pendingQuestion: {
         id: "question_test",
-        prompt: "このつながりですかっ？",
-        choices: [{ id: "no", label: "違う", effect: "deny" }]
+        prompt: "「星形クッキー」の種類は違いますかっ？",
+        choices: [answer],
+        questionIntent: "category_confirmation",
+        answerSchema: [answer],
+        proposition
       },
       absurdityCount: 0,
+      randomSeed: 2,
+      validationErrors: [],
       startedAt: now,
       updatedAt: now
     };
@@ -167,9 +228,77 @@ describe("clean-room conversation composition", () => {
     await db.concepts.put(learned);
     await db.conversationSessions.put(session);
 
-    const reacted = await answerConversation(session.id, { id: "no", label: "違う", effect: "deny" }, now + 1);
+    const reacted = await answerConversation(session.id, answer, now + 1);
     expect(reacted.phase).toBe("closing");
     expect(reacted.history.at(-1)?.page).toContain("違うんですね");
     expect(reacted.pendingQuestion).toBeUndefined();
+  });
+
+  it("stores only the asked word in preference answer memory", async () => {
+    await db.open();
+    await db.transaction("rw", db.tables, async () => {
+      for (const table of db.tables) await table.clear();
+    });
+    const food = createUserConcept({ surface: "星形クッキー", category: "food_drink" }, now, "preference-food");
+    const place = createUserConcept({ surface: "広場", category: "place" }, now, "preference-place");
+    const proposition = {
+      wordIds: [food.id, place.id],
+      frameId: "test.preference.target",
+      relationType: "scene_hypothesis" as const,
+      relationText: "「広場」で「星形クッキー」を楽しむ場面",
+      evidence: "scene_frame" as const,
+      confidence: 0.55,
+      questionIntent: "preference_question" as const
+    };
+    const answer = {
+      id: "preference_neutral",
+      label: "ふつう",
+      effect: "curious" as const,
+      answerEffect: {
+        semanticEffect: "preference_neutral" as const,
+        navigationEffect: "none" as const,
+        memoryEffect: "update_preference" as const
+      }
+    };
+    const session: ConversationSession = {
+      schemaVersion: 2,
+      id: "session_preference_target",
+      phase: "awaiting_answer",
+      intent: "ask_preference",
+      locationId: "room",
+      templateIds: ["test_preference"],
+      slotConceptIds: { food: food.id, place: place.id },
+      topicWordIds: proposition.wordIds,
+      proposition,
+      questionIntent: "preference_question",
+      history: [],
+      queuedTurns: [],
+      pendingQuestion: {
+        id: "question_preference_target",
+        prompt: "「星形クッキー」のこと、好きですかっ！？",
+        choices: [answer],
+        questionIntent: "preference_question",
+        answerSchema: [answer],
+        proposition
+      },
+      absurdityCount: 0,
+      randomSeed: 3,
+      validationErrors: [],
+      startedAt: now,
+      updatedAt: now
+    };
+    await db.character.put(character);
+    await db.concepts.bulkPut([food, place]);
+    await db.conversationSessions.put(session);
+
+    await answerConversation(session.id, answer, now + 1);
+    const choiceMemory = await db.memories.where("type").equals("player_choice").first();
+    const storedFood = await db.concepts.get(food.id);
+    const storedPlace = await db.concepts.get(place.id);
+
+    expect(choiceMemory?.conceptIds).toEqual([food.id]);
+    expect(choiceMemory?.payload.questionIntent).toBe("preference_question");
+    expect(storedFood?.preference).toBe(0);
+    expect(storedPlace?.preference).toBeUndefined();
   });
 });

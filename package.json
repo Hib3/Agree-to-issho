@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit",
     "validate:data": "tsx scripts/validate-data.ts",
     "verify:cleanroom": "tsx scripts/verify-cleanroom.ts",
+    "verify:pwa": "tsx scripts/verify-pwa-build.ts",
     "test": "vitest run",
+    "test:dialogue": "vitest run src/tests/semanticComposition.test.ts src/tests/conversationQuality.test.ts src/tests/aguriVoice.test.ts",
     "test:e2e": "playwright test",
-    "build": "npm run validate:data && npm run verify:cleanroom && tsc --noEmit && vite build",
+    "build": "npm run validate:data && npm run verify:cleanroom && tsc --noEmit && vite build && npm run verify:pwa",
     "preview": "vite preview"
   },
   "dependencies": {

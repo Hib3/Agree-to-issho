@@ -1,74 +1,223 @@
 import type { ResponsePattern } from "../../data/schema/dialogue";
 import type { CharacterState } from "../model/character";
-import type { ConversationIntent, ConversationSession, DialogueTurn, PendingQuestion } from "../model/conversation";
+import type { CompositionProposition, ConversationIntent, ConversationSession, DialogueTurn, PendingQuestion } from "../model/conversation";
+import type { Concept } from "../model/concept";
+import type { ConceptRelation } from "../model/relation";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
-import { realize, splitJapanesePages } from "../grammar/japaneseRealizer";
+import { realize, splitJapanesePages, displayConcept } from "../grammar/japaneseRealizer";
+import { applyAguriVoice } from "../voice/aguriVoice";
 import { controlledPremise } from "./absurdityController";
 import type { ScoredCandidate } from "./scorer";
-import { displayConcept } from "../grammar/japaneseRealizer";
+import { answerSchemaFor, composeProposition, questionForProposition } from "./semanticComposition";
+import { validateConversationSession, validateStylePreservation } from "./dialogueValidator";
 
 export function realizeCandidate(
   candidate: ScoredCandidate,
   responsePatterns: ResponsePattern[],
+  relations: ConceptRelation[],
   character: CharacterState,
   locationId: string,
   now: number,
-  random: RandomSource
+  random: RandomSource,
+  randomSeed = 0
 ): ConversationSession {
   const variant = pickOne(candidate.template.variants, random) ?? candidate.template.variants[0] ?? "今日は静かですね。";
-  const absurdity = controlledPremise(candidate);
-  const realized = realize(variant, candidate.slots);
-  if (/\{[^}]+\}/u.test(realized)) throw new Error(`未解決の会話スロットがあります: ${candidate.template.id}`);
-  const focus = Object.values(candidate.slots).find((concept) => concept.source === "user") ?? Object.values(candidate.slots)[0];
-  if (!focus) throw new Error(`会話に使える言葉がありません: ${candidate.template.id}`);
+  const rendered = realize(variant, candidate.slots);
+  if (/\{[^}]+\}/u.test(rendered)) throw new Error("未解決の会話スロットがあります: " + candidate.template.id);
+  const configuredPattern = responsePatterns.find((pattern) =>
+    (candidate.template.responsePatternIds ?? []).includes(pattern.id)
+  );
+  const proposition = composeProposition({
+    template: candidate.template,
+    slots: candidate.slots,
+    relations,
+    renderedText: rendered,
+    hasResponse: Boolean(configuredPattern)
+  });
+  const allConcepts = Object.values(candidate.slots);
+  const usedConcepts = proposition.wordIds
+    .map((id) => allConcepts.find((concept) => concept.id === id))
+    .filter((concept): concept is Concept => Boolean(concept));
+  const focus = usedConcepts.find((concept) => concept.source === "user") ?? usedConcepts[0];
+  if (!focus) throw new Error("会話に使える言葉がありません: " + candidate.template.id);
+
   const topicIntroduction = focus.source === "user"
-    ? `この前教えてもらった「${displayConcept(focus)}」、ノートでまた見つけましたっ。`
-    : `今日は「${displayConcept(focus)}」のことを考えていたんです。`;
-  const pages = [topicIntroduction, absurdity.premise, ...splitJapanesePages(realized)]
-    .filter(Boolean)
-    .slice(0, 5);
-  const conceptIds = Object.values(candidate.slots).map((concept) => concept.id);
-  const history: DialogueTurn[] = [];
-  const conversationEmotion = emotionForIntent(candidate.template.intent, character);
-  const queuedTurns = pages.map((page, index): DialogueTurn => ({
-    id: `turn_${crypto.randomUUID()}`,
-    speaker: "aguri",
-    page,
-    emotion: index === 0 && conversationEmotion === "confused" ? "curious" : conversationEmotion,
-    conceptIds,
-    createdAt: now + index
-  }));
-  const patternId = pickOne(candidate.template.responsePatternIds ?? [], random);
-  const responsePattern = responsePatterns.find((pattern) => pattern.id === patternId);
+    ? "この前教えてもらった「" + displayConcept(focus) + "」、ノートでまた見つけましたっ。"
+    : "今日は「" + displayConcept(focus) + "」のことを考えていたんです。";
+  const bodyPages = pagesForProposition(proposition, rendered, candidate);
+  const pages = [topicIntroduction, ...bodyPages].flatMap((page) => splitJapanesePages(page)).filter(Boolean).slice(0, 5);
+  const emotion = emotionForIntent(candidate.template.intent, character);
+  const wordSurfaces = usedConcepts.map(displayConcept);
+  const queuedTurns = pages.map((page, index) =>
+    createTurn({
+      page,
+      emotion: index === 0 && emotion === "confused" ? "curious" : emotion,
+      proposition,
+      templateId: candidate.template.id,
+      semanticKey: candidate.template.semanticFrame,
+      wordSurfaces,
+      now: now + index
+    })
+  );
+
+  const answerSchema = answerSchemaFor(proposition);
+  const questionPrompt = questionForProposition(proposition, allConcepts);
+  const questionStyleErrors = questionPrompt
+    ? validateStylePreservation(
+        questionPrompt,
+        applyAguriVoice(questionPrompt, emotion),
+        wordSurfaces,
+        proposition.questionIntent
+      )
+    : [];
   let pendingQuestion: PendingQuestion | undefined;
-  if (responsePattern) {
-    const surfaces = Object.values(candidate.slots).slice(0, 2).map(displayConcept);
-    const subject = surfaces.length > 1 ? `「${surfaces[0]}」と「${surfaces[1]}」` : `「${surfaces[0]}」`;
-    const choices = [...responsePattern.choices];
-    if (!choices.some((choice) => choice.effect === "affirm")) {
-      choices.unshift({ id: `affirm_${crypto.randomUUID()}`, label: "その組み合わせでいい", effect: "affirm" });
-    }
-    if (!choices.some((choice) => choice.effect === "deny")) {
-      choices.push({ id: `deny_${crypto.randomUUID()}`, label: "その組み合わせは違う", effect: "deny" });
-    }
+  if (questionPrompt && answerSchema.length > 0) {
     pendingQuestion = {
-      id: `question_${crypto.randomUUID()}`,
-      prompt: questionForIntent(candidate.template.intent, subject),
-      choices
+      id: "question_" + crypto.randomUUID(),
+      prompt: questionPrompt,
+      choices: answerSchema,
+      questionIntent: proposition.questionIntent,
+      answerSchema,
+      proposition,
+      ...(proposition.wordIds.length >= 2 && proposition.questionIntent.startsWith("relation_")
+        ? {
+            relationDraft: {
+              fromConceptId: proposition.wordIds[0]!,
+              toConceptId: proposition.wordIds[1]!,
+              type: "associated_with"
+            }
+          }
+        : {})
     };
   }
-  return {
-    id: `session_${crypto.randomUUID()}`,
+
+  const session: ConversationSession = {
+    schemaVersion: 2,
+    id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: candidate.template.intent,
     locationId,
     templateIds: [candidate.template.id],
     slotConceptIds: Object.fromEntries(Object.entries(candidate.slots).map(([key, value]) => [key, value.id])),
-    history,
+    topicWordIds: proposition.wordIds,
+    proposition,
+    questionIntent: proposition.questionIntent,
+    history: [],
     queuedTurns,
     ...(pendingQuestion ? { pendingQuestion } : {}),
-    absurdityCount: absurdity.count,
+    absurdityCount: proposition.relationType === "drift_hypothesis" ? 1 : 0,
+    randomSeed,
+    validationErrors: [...queuedTurns.flatMap((turn) => turn.validationErrors), ...questionStyleErrors],
+    startedAt: now,
+    updatedAt: now
+  };
+  const structuralErrors = validateConversationSession(session);
+  if (structuralErrors.length > 0 || session.validationErrors.length > 0) {
+    return safeFallbackSession(focus, candidate, character, locationId, now, randomSeed, [
+      ...structuralErrors,
+      ...session.validationErrors
+    ]);
+  }
+  return session;
+}
+
+function pagesForProposition(proposition: CompositionProposition, rendered: string, candidate: ScoredCandidate) {
+  const concepts = proposition.wordIds
+    .map((id) => Object.values(candidate.slots).find((concept) => concept.id === id))
+    .filter((concept): concept is Concept => Boolean(concept));
+  if (proposition.relationType === "relation_discovery") {
+    const words = concepts.slice(0, 2).map((concept) => "「" + displayConcept(concept) + "」").join("と");
+    return [words + "の間には、まだ教わったつながりがありませんっ。"];
+  }
+  if (proposition.relationType === "confirmed_relation" && candidate.template.grounding === "relation_required") {
+    return [proposition.relationText + "と覚えていますっ。"];
+  }
+  if (proposition.relationType === "drift_hypothesis") {
+    const absurdity = controlledPremise(candidate);
+    return [absurdity.premise, rendered].filter(Boolean);
+  }
+  return [rendered];
+}
+
+function createTurn(input: {
+  page: string;
+  emotion: DialogueTurn["emotion"];
+  proposition: CompositionProposition;
+  templateId: string;
+  semanticKey: string;
+  wordSurfaces: string[];
+  now: number;
+}): DialogueTurn {
+  const styledPreview = applyAguriVoice(input.page, input.emotion);
+  const validationErrors = validateStylePreservation(
+    input.page,
+    styledPreview,
+    input.wordSurfaces,
+    input.proposition.questionIntent
+  );
+  return {
+    id: "turn_" + crypto.randomUUID(),
+    speaker: "aguri",
+    page: input.page,
+    emotion: input.emotion,
+    conceptIds: input.proposition.wordIds,
+    requiresAnswer: false,
+    answerSchema: [],
+    semanticKey: input.semanticKey,
+    templateId: input.templateId,
+    usedWordIds: input.proposition.wordIds,
+    styleBasePage: input.page,
+    styledPreview,
+    validationErrors,
+    createdAt: input.now
+  };
+}
+
+function safeFallbackSession(
+  focus: Concept,
+  candidate: ScoredCandidate,
+  character: CharacterState,
+  locationId: string,
+  now: number,
+  randomSeed: number,
+  validationErrors: string[]
+): ConversationSession {
+  const proposition: CompositionProposition = {
+    wordIds: [focus.id],
+    frameId: "safe.single_word",
+    relationType: "single_word",
+    relationText: "",
+    evidence: "none",
+    confidence: focus.understanding,
+    questionIntent: "none"
+  };
+  const page = "「" + displayConcept(focus) + "」のことを、いったん一つずつ考え直しますっ。";
+  const turn = createTurn({
+    page,
+    emotion: emotionForIntent(candidate.template.intent, character),
+    proposition,
+    templateId: "safe_single_word",
+    semanticKey: "safe.single_word",
+    wordSurfaces: [displayConcept(focus)],
+    now
+  });
+  return {
+    schemaVersion: 2,
+    id: "session_" + crypto.randomUUID(),
+    phase: "opening",
+    intent: "small_talk",
+    locationId,
+    templateIds: ["safe_single_word"],
+    slotConceptIds: { focus: focus.id },
+    topicWordIds: [focus.id],
+    proposition,
+    questionIntent: "none",
+    history: [],
+    queuedTurns: [turn],
+    absurdityCount: 0,
+    randomSeed,
+    validationErrors: [...new Set(validationErrors)],
     startedAt: now,
     updatedAt: now
   };
@@ -80,14 +229,4 @@ function emotionForIntent(intent: ConversationIntent, character: CharacterState)
   if (["recall_memory", "ask_preference"].includes(intent)) return "happy" as const;
   if (intent === "quiet_moment") return character.energy < 35 ? "sleepy" as const : "calm" as const;
   return "curious" as const;
-}
-
-function questionForIntent(intent: ConversationIntent, subject: string) {
-  if (intent === "ask_preference") return `${subject}の話、好きな感じですかっ？`;
-  if (intent === "ask_meaning") return `${subject}の意味の置き方、これで近いですかっ？`;
-  if (intent === "recall_memory") return `${subject}のこと、前にもこんな感じで話しましたかっ？`;
-  if (intent === "misunderstanding") return `${subject}を同じ線で結んだんですけど、ここは違いますかっ？`;
-  if (intent === "warning") return `${subject}のとき、気をつける所はありますかっ？`;
-  if (intent === "invitation") return `${subject}の組み合わせで出かけたら、楽しそうですかっ？`;
-  return `${subject}をこんなふうに組み合わせても、変じゃないですかっ？`;
 }

@@ -26,6 +26,7 @@ doko-demo-issyo/**
 
 docs/research/generated/
 docs/assets/generated/
+HibikiMade/
 __pycache__/
 *.pyc
 

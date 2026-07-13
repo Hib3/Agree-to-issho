@@ -4,10 +4,12 @@ import { planConversation } from "../../domain/conversation/planner";
 import { applyResponse } from "../../domain/conversation/responseBranching";
 import type { ConversationPhase, DialogueChoice, DialogueHistoryEntry } from "../../domain/model/conversation";
 import { createMemory } from "../../domain/memory/memoryService";
-import { systemRandom } from "../../infrastructure/random/random";
+import { SeededRandom } from "../../infrastructure/random/random";
 import { db } from "../../infrastructure/db/database";
 import { buildIntentBias } from "../../domain/conversation/intentPolicy";
 import { locations } from "../../data/locations/locations";
+import { isCurrentConversationSession, migrateConversationSession } from "../../domain/conversation/sessionMigration";
+import { validateConversationSession } from "../../domain/conversation/dialogueValidator";
 
 export async function startConversation(now = Date.now(), initiatedByUser = true) {
   const [concepts, relations, recentSessions, character] = await Promise.all([
@@ -21,9 +23,14 @@ export async function startConversation(now = Date.now(), initiatedByUser = true
   ]);
   if (!character) throw new Error("アグリちゃんの状態を読み込めません。");
   const active = recentSessions.find((session) => session.phase !== "completed");
-  if (active) return active;
+  if (active) {
+    const validationErrors = isCurrentConversationSession(active) ? validateConversationSession(active) : ["legacy_session"];
+    if (validationErrors.length === 0) return active;
+    await db.conversationSessions.put(migrateConversationSession(active, now, validationErrors));
+  }
   const completedSessions = recentSessions.filter((item) => item.phase === "completed");
   const location = locations.find((item) => item.id === character.currentLocationId) ?? locations[0]!;
+  const randomSeed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
   const session = planConversation({
     templates: dialogueTemplates,
     responsePatterns,
@@ -33,7 +40,8 @@ export async function startConversation(now = Date.now(), initiatedByUser = true
     character,
     locationId: character.currentLocationId,
     now,
-    random: systemRandom,
+    random: new SeededRandom(randomSeed),
+    randomSeed,
     intentBias: buildIntentBias({ concepts, recentSessions: completedSessions, character, location, now })
   });
   await db.conversationSessions.put(session);
@@ -43,6 +51,12 @@ export async function startConversation(now = Date.now(), initiatedByUser = true
 export async function advanceConversation(sessionId: string, now = Date.now(), initiatedByUser = true) {
   const session = await db.conversationSessions.get(sessionId);
   if (!session) throw new Error("会話を再開できませんでした。");
+  const validationErrors = isCurrentConversationSession(session) ? validateConversationSession(session) : ["legacy_session"];
+  if (validationErrors.length > 0) {
+    const recovered = migrateConversationSession(session, now, validationErrors);
+    await db.conversationSessions.put(recovered);
+    return recovered;
+  }
   if (session.phase === "awaiting_answer") return session;
   const [next, ...remaining] = session.queuedTurns;
   if (next) {
@@ -100,24 +114,50 @@ export async function answerConversation(sessionId: string, choice: DialogueChoi
     db.concepts.toArray()
   ]);
   if (!session || !character || session.phase !== "awaiting_answer") throw new Error("この質問には今は答えられません。");
+  if (!session.pendingQuestion?.answerSchema.some((option) => option.id === choice.id)) {
+    throw new Error("この質問の選択肢ではありません。");
+  }
   const result = applyResponse(session, choice, character, relations, concepts, now);
   const updatedCharacter = { ...result.character, lastUserInteractionAt: now };
-  const memory = createMemory({
+  const answerConceptIds = result.session.queuedTurns.at(-1)?.conceptIds ?? session.topicWordIds;
+  const memory = result.shouldRecordMemory ? createMemory({
     type: "player_choice",
-    conceptIds: Object.values(session.slotConceptIds),
+    conceptIds: answerConceptIds,
     locationId: session.locationId,
     emotion: updatedCharacter.emotion,
     importance: 0.7,
-    payload: { choiceId: choice.id, effect: choice.effect },
+    payload: { choiceId: choice.id, effect: choice.effect, answerEffect: result.answer, questionIntent: session.questionIntent },
     now
-  });
+  }) : null;
   await db.transaction("rw", db.conversationSessions, db.character, db.relations, db.concepts, db.memories, async () => {
     await db.conversationSessions.put(result.session);
     await db.character.put(updatedCharacter);
     await db.relations.bulkPut(result.relations);
     await db.concepts.bulkPut(result.concepts);
-    await db.memories.put(memory);
+    if (memory) await db.memories.put(memory);
   });
   // A submitted answer is itself an advance action, so show Aguri's reaction immediately.
   return advanceConversation(result.session.id, now, true);
+}
+
+export async function closeConversation(sessionId: string, now = Date.now()) {
+  const session = await db.conversationSessions.get(sessionId);
+  if (!session) return;
+  const { pendingQuestion, ...sessionWithoutQuestion } = session;
+  void pendingQuestion;
+  await db.conversationSessions.put({
+    ...sessionWithoutQuestion,
+    phase: "completed",
+    questionIntent: "none",
+    proposition: { ...session.proposition, questionIntent: "none" },
+    queuedTurns: [],
+    completedAt: now,
+    updatedAt: now
+  });
+}
+
+export async function invalidateConversationSession(sessionId: string, errors: string[], now = Date.now()) {
+  const session = await db.conversationSessions.get(sessionId);
+  if (!session) return;
+  await db.conversationSessions.put(migrateConversationSession(session, now, errors));
 }

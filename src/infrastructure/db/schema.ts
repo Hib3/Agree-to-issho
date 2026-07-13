@@ -1,5 +1,5 @@
 export const CLEANROOM_DB_NAME = "aguri-cleanroom-v1";
-export const CLEANROOM_SCHEMA_VERSION = 1;
+export const CLEANROOM_SCHEMA_VERSION = 2;
 export const LEGACY_DB_NAME = "with-agree-db";
 
 export type MigrationLog = {

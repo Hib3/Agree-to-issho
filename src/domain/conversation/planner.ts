@@ -19,6 +19,7 @@ export function planConversation(input: {
   locationId: string;
   now: number;
   random: RandomSource;
+  randomSeed?: number;
   intentBias?: IntentBias;
 }) {
   const candidates = buildCandidates(input);
@@ -27,5 +28,14 @@ export function planConversation(input: {
   const top = candidates.filter((candidate) => candidate.score >= bestScore - 8).slice(0, 8);
   const selected = pickOne(top, input.random) ?? candidates[0];
   if (!selected) throw new Error("会話候補を選べませんでした。");
-  return realizeCandidate(selected, input.responsePatterns, input.character, input.locationId, input.now, input.random);
+  return realizeCandidate(
+    selected,
+    input.responsePatterns,
+    input.relations,
+    input.character,
+    input.locationId,
+    input.now,
+    input.random,
+    input.randomSeed
+  );
 }

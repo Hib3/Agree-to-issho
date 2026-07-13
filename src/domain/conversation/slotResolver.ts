@@ -1,8 +1,10 @@
 import type { DialogueTemplate, TemplateSlot } from "../../data/schema/dialogue";
 import type { Concept } from "../model/concept";
 import type { ConversationSession } from "../model/conversation";
+import type { ConceptRelation } from "../model/relation";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
+import { isConfirmedRelation } from "./semanticComposition";
 
 function roleFits(concept: Concept, slot: TemplateSlot) {
   if (!slot.categories.includes(concept.userCategory)) return false;
@@ -22,6 +24,7 @@ function roleFits(concept: Concept, slot: TemplateSlot) {
 export function resolveSlots(
   template: DialogueTemplate,
   concepts: Concept[],
+  relations: ConceptRelation[],
   recentSessions: ConversationSession[],
   random: RandomSource
 ): Record<string, Concept> | undefined {
@@ -31,7 +34,32 @@ export function resolveSlots(
   const used = new Set<string>();
   const userCount = active.filter((concept) => concept.source === "user").length;
   let userIncluded = false;
-  for (const slot of template.slots) {
+  let startIndex = 0;
+  const firstSlot = template.slots[0];
+  const secondSlot = template.slots[1];
+  if (firstSlot && secondSlot) {
+    const confirmed = relations
+      .filter(isConfirmedRelation)
+      .sort((a, b) => b.confidence - a.confidence)
+      .flatMap((relation) => [
+        [relation.fromConceptId, relation.toConceptId],
+        [relation.toConceptId, relation.fromConceptId]
+      ]);
+    for (const [firstId, secondId] of confirmed) {
+      const first = active.find((concept) => concept.id === firstId);
+      const second = active.find((concept) => concept.id === secondId);
+      if (!first || !second || !roleFits(first, firstSlot) || !roleFits(second, secondSlot)) continue;
+      result[firstSlot.name] = first;
+      result[secondSlot.name] = second;
+      used.add(first.id);
+      used.add(second.id);
+      userIncluded = first.source === "user" || second.source === "user";
+      startIndex = 2;
+      break;
+    }
+  }
+
+  for (const slot of template.slots.slice(startIndex)) {
     let pool = active.filter((concept) => !used.has(concept.id) && roleFits(concept, slot) && !recentIds.has(concept.id));
     if (userCount > 0 && !userIncluded) {
       const userPool = pool.filter((concept) => concept.source === "user");

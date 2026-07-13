@@ -35,12 +35,12 @@
 表示するキャラクターは、ユーザー提供画像を正とする人間の少女「アグリちゃん」です。
 
 - 承認済み通常立ち絵: `public/assets/characters/main/fullbody/approved/aguri_normal.png`
-- 承認済み差分: `aguri_talk_happy.png`, `aguri_thinking.png`, `aguri_confused.png`, `aguri_sleepy.png`
-- 感情に応じて立ち絵を切り替え、発話中・喜び・困惑・眠気はCSSの小さな動きも重ねます。
+- 承認済み差分: 通常会話、まばたき、喜び、驚き、照れ、寂しさ、得意げ、考え中、困惑、眠気
+- 感情と発話状態に応じて1体の立ち絵を切り替え、CSSの小さな動きを重ねます。
 - 生成失敗画像、未承認画像、原作画像は公開領域へ置きません。
 - 発話は全てアグリちゃん用の口調レイヤーを通します。学習語や否定・疑問の意味を残しながら、高いテンションと崩し敬語を適用します。
 
-背景は本作向けに生成・検査した部屋の日中・夕方・夜、商店街、屋上を使用します。会話紙、選択紙、主ボタン布も専用生成テクスチャです。未生成の追加差分は、1画像1ファイルのプロンプトを `docs/assets/imagegen-prompts/` に用意しています。
+背景は本作向けに生成・検査した部屋の日中・夕方・夜・雨、商店街、屋上を使用します。会話紙、選択紙、主ボタン布も専用生成テクスチャです。追加素材のグリーン背景除去は `tools/assets/prepare_hibiki_assets.py` で再現でき、元画像を公開領域やGitへ入れず、検査済みの変換結果だけを使用します。
 
 ## Development
 
@@ -56,6 +56,7 @@ npm run lint
 npm run typecheck
 npm run validate:data
 npm run verify:cleanroom
+npm run verify:pwa
 npm run test
 npm run build
 ```

@@ -1,14 +1,26 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
+import { execSync } from "node:child_process";
+
+const gitSha = process.env.GITHUB_SHA ?? (() => {
+  try {
+    return execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
+})();
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? "/Agree-to-issho/",
+  define: {
+    "import.meta.env.VITE_BUILD_ID": JSON.stringify(gitSha.slice(0, 12)),
+    "import.meta.env.VITE_GIT_SHA": JSON.stringify(gitSha)
+  },
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["assets/**/*.{png,webp}"],
       manifest: {
         name: "アグリといっしょ",
         short_name: "アグリといっしょ",
@@ -31,11 +43,12 @@ export default defineConfig({
       workbox: {
         navigateFallback: "index.html",
         globPatterns: ["**/*.{js,css,html,png,webp,json,woff2}"],
+        globIgnores: ["assets/characters/main/fullbody/approved/aguri_normal.png"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === "image",
             handler: "CacheFirst",
-            options: { cacheName: "aguri-approved-assets-v2" }
+            options: { cacheName: "aguri-approved-assets-v3" }
           }
         ]
       }

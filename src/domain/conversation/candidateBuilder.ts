@@ -21,7 +21,7 @@ export function buildCandidates(input: {
   const candidates: ScoredCandidate[] = [];
   for (const template of input.templates) {
     if (!template.locations.includes(input.locationId)) continue;
-    const slots = resolveSlots(template, input.concepts, input.recentSessions, input.random);
+    const slots = resolveSlots(template, input.concepts, input.relations, input.recentSessions, input.random);
     if (!slots) continue;
     candidates.push(
       scoreCandidate(template, slots, input.locationId, input.relations, input.recentSessions, input.character, input.intentBias)

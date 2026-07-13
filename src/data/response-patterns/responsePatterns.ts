@@ -22,9 +22,9 @@ export const responsePatterns: ResponsePattern[] = Array.from({ length: 160 }, (
       id: `response_${index}`,
       kind: "focus",
       choices: [
-        { id: `focus_${index}`, label: `${focus}が気になる`, effect: "curious" },
-        { id: `continue_${index}`, label: "続きを聞きたい", effect: "affirm" },
-        { id: `later_${index}`, label: "あとで考える", effect: "later" }
+        { id: `focus_${index}`, label: `${focus}が近い`, effect: "curious" },
+        { id: `agree_${index}`, label: "その理解で合ってる", effect: "affirm" },
+        { id: `deny_${index}`, label: "そこは違う", effect: "deny" }
       ]
     };
   }
@@ -42,8 +42,9 @@ export const responsePatterns: ResponsePattern[] = Array.from({ length: 160 }, (
     id: `response_${index}`,
     kind: "continue",
     choices: [
-      { id: `ask_${index}`, label: `${focus}をもう少し聞く`, effect: "curious" },
-      { id: `close_${index}`, label: "今日はここまで", effect: "later" }
+      { id: `agree_${index}`, label: "その理解で合ってる", effect: "affirm" },
+      { id: `deny_${index}`, label: "そこは違う", effect: "deny" },
+      { id: `unknown_${index}`, label: "まだ分からない", effect: "curious" }
     ]
   };
 });

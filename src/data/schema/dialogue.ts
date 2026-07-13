@@ -15,6 +15,7 @@ export type TemplateSlot = {
 export type DialogueTemplate = {
   id: string;
   semanticFrame: string;
+  grounding: "scene_frame" | "relation_required";
   intent: ConversationIntent;
   phase: ConversationPhase;
   locations: string[];

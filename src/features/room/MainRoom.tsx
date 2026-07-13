@@ -12,7 +12,9 @@ import { CharacterStage } from "../../ui/components/CharacterStage";
 import { ChoiceButtons } from "../../ui/components/ChoiceButtons";
 import { DialogueBox } from "../../ui/components/DialogueBox";
 import { ArchiveRestore, BookOpenText, CircleHelp, DoorOpen, MapPinned, MessageCircle, NotebookTabs, Settings, Sparkles } from "lucide-react";
-import { advanceConversation, answerConversation, startConversation } from "../conversation/conversationService";
+import { advanceConversation, answerConversation, closeConversation, invalidateConversationSession, startConversation } from "../conversation/conversationService";
+import { validateConversationSession } from "../../domain/conversation/dialogueValidator";
+import { isCurrentConversationSession } from "../../domain/conversation/sessionMigration";
 
 export function MainRoom({ player, character, settings, concepts, sessions, saving, onNavigate, onChanged }: {
   player: PlayerProfile;
@@ -24,17 +26,33 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
   onNavigate: (screen: AppScreen) => void;
   onChanged: () => Promise<void>;
 }) {
-  const active = [...sessions].reverse().find((session) => session.phase !== "completed");
-  const [selected, setSelected] = useState("");
+  const rawActive = useMemo(
+    () => [...sessions].reverse().find((session) => session.phase !== "completed"),
+    [sessions]
+  );
+  const activeErrors = useMemo(
+    () =>
+      rawActive
+        ? isCurrentConversationSession(rawActive)
+          ? validateConversationSession(rawActive)
+          : ["legacy_session"]
+        : [],
+    [rawActive]
+  );
+  const active = rawActive && activeErrors.length === 0 ? rawActive : undefined;
+  const [selection, setSelection] = useState({ questionId: "", value: "" });
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [clock, setClock] = useState(() => Date.now());
   const timerRef = useRef<number | null>(null);
   const location = locations.find((item) => item.id === character.currentLocationId) ?? locations[0]!;
   const timeOfDay = getTimeOfDay(clock);
+  const weather = Math.floor(clock / 86_400_000) % 5 === 0 ? "rain" : "clear";
   const userWordCount = concepts.filter((concept) => concept.source === "user").length;
   const lastTurn = active?.history.at(-1);
-  const dialogueText = active?.phase === "awaiting_answer" && active.pendingQuestion
+  const dialogueText = rawActive && activeErrors.length > 0
+    ? "会話メモを整え直しましたっ。もう一度、話しかけてくださいっ！"
+    : active?.phase === "awaiting_answer" && active.pendingQuestion
     ? active.pendingQuestion.prompt
     : lastTurn?.page ?? `まァっ、${player.callName}っ！ 今日はどんな話をしましょうかっ？`;
   const hasNext = Boolean(active && active.phase !== "awaiting_answer" && active.phase !== "completed");
@@ -60,6 +78,11 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
       window.removeEventListener("offline", updateOnline);
     };
   }, []);
+
+  useEffect(() => {
+    if (!rawActive || activeErrors.length === 0) return;
+    void invalidateConversationSession(rawActive.id, activeErrors).then(onChanged);
+  }, [activeErrors, onChanged, rawActive]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 60_000);
@@ -94,8 +117,8 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
   }, [active, busy, character, location, saving, settings.autonomousSpeech, speak]);
 
   async function submitAnswer() {
-    if (!active?.pendingQuestion || !selected) return;
-    const choice = active.pendingQuestion.choices.find((item) => item.id === selected);
+    if (!active?.pendingQuestion || selection.questionId !== active.pendingQuestion.id || !selection.value) return;
+    const choice = active.pendingQuestion.choices.find((item) => item.id === selection.value);
     if (!choice) return;
     setBusy(true);
     try {
@@ -106,16 +129,30 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     }
   }
 
+  async function closeQuestion() {
+    if (!active) return;
+    setSelection({ questionId: "", value: "" });
+    setBusy(true);
+    try {
+      await closeConversation(active.id);
+      await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const answerOptions = useMemo(
     () => active?.pendingQuestion?.choices.map((choice) => ({ value: choice.id, label: choice.label })) ?? [],
     [active?.pendingQuestion]
   );
-  const currentSelection = answerOptions.some((option) => option.value === selected) ? selected : "";
+  const currentSelection = selection.questionId === active?.pendingQuestion?.id && answerOptions.some((option) => option.value === selection.value)
+    ? selection.value
+    : "";
 
   return (
     <main className={`room-screen location-shell-${location.id}`}>
       <section className={`room-composition${active?.phase === "awaiting_answer" ? " answering" : ""}`}>
-        <CharacterStage emotion={lastTurn?.emotion ?? character.emotion} locationId={location.id} timeOfDay={timeOfDay} reducedMotion={settings.reducedMotion} isSpeaking={Boolean(active)} />
+        <CharacterStage emotion={lastTurn?.emotion ?? character.emotion} locationId={location.id} timeOfDay={timeOfDay} weather={weather} reducedMotion={settings.reducedMotion} isSpeaking={hasNext} />
         <header className="room-topbar">
           <div className="place-chip"><strong>{timeLabels[timeOfDay]}</strong><span>{location.name}</span></div>
           <div className="room-status"><span>{online ? "端末内保存" : "オフライン"}</span><span>言葉 {userWordCount}こ</span><button className="icon-button" type="button" aria-label="設定" title="設定" onClick={() => onNavigate("settings")}><Settings aria-hidden="true" /></button></div>
@@ -124,8 +161,15 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
 
         {active?.phase === "awaiting_answer" && active.pendingQuestion ? (
           <section className="answer-panel">
-            <ChoiceButtons options={answerOptions} value={currentSelection} disabled={busy} onChoose={setSelected} label="返事" />
+            <ChoiceButtons
+              options={answerOptions}
+              value={currentSelection}
+              disabled={busy}
+              onChoose={(value) => setSelection({ questionId: active.pendingQuestion!.id, value })}
+              label="返事"
+            />
             <button className="primary" type="button" disabled={!currentSelection || busy} onClick={() => void submitAnswer()}>この返事にする</button>
+            <button className="quiet answer-navigation" type="button" disabled={busy} onClick={() => void closeQuestion()}>答えず話を閉じる</button>
           </section>
         ) : null}
         <div className="main-actions">

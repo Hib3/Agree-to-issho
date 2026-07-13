@@ -7,6 +7,22 @@ import type { GameSettings, PlayerProfile } from "../../domain/model/player";
 import type { ConceptRelation } from "../../domain/model/relation";
 import type { LearningSession } from "../../domain/learning/learningMachine";
 import { CLEANROOM_DB_NAME, type ImportBackupRecord, type MigrationLog } from "./schema";
+import { migrateConversationSession } from "../../domain/conversation/sessionMigration";
+
+const stores = {
+  player: "id",
+  character: "id, currentLocationId, updatedAt",
+  concepts: "id, source, normalized, userCategory, learnedAt, active",
+  relations: "id, fromConceptId, toConceptId, type, reinforcedAt",
+  memories: "id, type, locationId, createdAt, *conceptIds",
+  conversationSessions: "id, phase, intent, locationId, updatedAt",
+  dialogueHistory: "id, sessionId, intent, locationId, createdAt, *conceptIds",
+  diaries: "id, date, createdAt",
+  settings: "id",
+  learningSessions: "id, state, updatedAt",
+  importBackups: "id, createdAt",
+  migrationLogs: "id, legacyDatabase, importedAt"
+};
 
 export class AguriDatabase extends Dexie {
   player!: EntityTable<PlayerProfile, "id">;
@@ -24,20 +40,15 @@ export class AguriDatabase extends Dexie {
 
   constructor(name = CLEANROOM_DB_NAME) {
     super(name);
-    this.version(1).stores({
-      player: "id",
-      character: "id, currentLocationId, updatedAt",
-      concepts: "id, source, normalized, userCategory, learnedAt, active",
-      relations: "id, fromConceptId, toConceptId, type, reinforcedAt",
-      memories: "id, type, locationId, createdAt, *conceptIds",
-      conversationSessions: "id, phase, intent, locationId, updatedAt",
-      dialogueHistory: "id, sessionId, intent, locationId, createdAt, *conceptIds",
-      diaries: "id, date, createdAt",
-      settings: "id",
-      learningSessions: "id, state, updatedAt",
-      importBackups: "id, createdAt",
-      migrationLogs: "id, legacyDatabase, importedAt"
-    });
+    this.version(1).stores(stores);
+    this.version(2).stores(stores).upgrade((transaction) =>
+      transaction
+        .table<ConversationSession>("conversationSessions")
+        .toCollection()
+        .modify((session) => {
+          Object.assign(session, migrateConversationSession(session));
+        })
+    );
   }
 }
 

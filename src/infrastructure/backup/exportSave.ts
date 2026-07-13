@@ -1,5 +1,6 @@
 import { db } from "../db/database";
 import { checksum } from "./checksum";
+import { BUILD_ID } from "../../app/buildInfo";
 
 export async function createExportData(now = Date.now()) {
   const [player, character, concepts, relations, memories, conversationSessions, dialogueHistory, diaries, settings] =
@@ -16,7 +17,8 @@ export async function createExportData(now = Date.now()) {
     ]);
   const unsigned = {
     appId: "aguri-cleanroom" as const,
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
+    buildId: BUILD_ID,
     exportedAt: now,
     player: player ?? null,
     character: character ?? null,

@@ -4,6 +4,7 @@ import type { ConversationSession } from "../model/conversation";
 import type { ConceptRelation } from "../model/relation";
 import type { DialogueTemplate } from "../../data/schema/dialogue";
 import type { IntentBias } from "./intentPolicy";
+import { isConfirmedRelation } from "./semanticComposition";
 
 export const SCORE = {
   contextMatch: 35,
@@ -50,7 +51,7 @@ export function scoreCandidate(
     reasons.push("location");
   }
   score += template.slots.length * SCORE.categoryFit;
-  if (relations.some((relation) => ids.includes(relation.fromConceptId) && ids.includes(relation.toConceptId))) {
+  if (relations.some((relation) => isConfirmedRelation(relation) && ids.includes(relation.fromConceptId) && ids.includes(relation.toConceptId))) {
     score += SCORE.relationFit;
     reasons.push("relation");
   }

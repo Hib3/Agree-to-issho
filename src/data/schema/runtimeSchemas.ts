@@ -20,11 +20,27 @@ const grammarSchema = z.object({
 });
 
 const characterEmotionSchema = z.enum(["calm", "curious", "happy", "excited", "embarrassed", "confused", "lonely", "sleepy"]);
+const questionIntentSchema = z.enum([
+  "relation_discovery",
+  "relation_confirmation",
+  "category_confirmation",
+  "situation_question",
+  "preference_question",
+  "correction_request",
+  "conversation_navigation",
+  "none"
+]);
+const answerEffectSchema = z.object({
+  semanticEffect: z.enum(["confirm", "reject", "unknown", "preference_like", "preference_neutral", "preference_dislike", "none"]),
+  navigationEffect: z.enum(["continue", "close", "stay", "none"]),
+  memoryEffect: z.enum(["link_words", "unlink_words", "update_preference", "update_category", "none"])
+});
 
 const dialogueChoiceSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  effect: z.enum(["affirm", "deny", "curious", "later"])
+  effect: z.enum(["affirm", "deny", "curious", "later"]),
+  answerEffect: answerEffectSchema.optional()
 });
 
 const dialogueTurnSchema = z.object({
@@ -34,13 +50,34 @@ const dialogueTurnSchema = z.object({
   emotion: characterEmotionSchema,
   conceptIds: z.array(z.string()),
   choices: z.array(dialogueChoiceSchema).optional(),
+  requiresAnswer: z.boolean().optional(),
+  answerSchema: z.array(dialogueChoiceSchema).optional(),
+  semanticKey: z.string().optional(),
+  templateId: z.string().optional(),
+  usedWordIds: z.array(z.string()).optional(),
+  styleBasePage: z.string().optional(),
+  styledPreview: z.string().optional(),
+  validationErrors: z.array(z.string()).optional(),
   createdAt: z.number()
+});
+
+const propositionSchema = z.object({
+  wordIds: z.array(z.string()),
+  frameId: z.string(),
+  relationType: z.enum(["confirmed_relation", "scene_hypothesis", "relation_discovery", "single_word", "drift_hypothesis"]),
+  relationText: z.string(),
+  evidence: z.enum(["confirmed_relation", "scene_frame", "category_only", "none"]),
+  confidence: z.number(),
+  questionIntent: questionIntentSchema
 });
 
 const pendingQuestionSchema = z.object({
   id: z.string().min(1),
   prompt: z.string().min(1),
   choices: z.array(dialogueChoiceSchema).min(1),
+  questionIntent: questionIntentSchema.optional(),
+  answerSchema: z.array(dialogueChoiceSchema).optional(),
+  proposition: propositionSchema.optional(),
   relationDraft: z.object({
     fromConceptId: z.string().min(1),
     toConceptId: z.string().min(1),
@@ -123,16 +160,22 @@ const memorySchema = z.object({
 });
 
 const conversationSessionSchema = z.object({
+  schemaVersion: z.literal(2).optional(),
   id: z.string().min(1),
   phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
   intent: z.enum(conversationIntents),
   locationId: z.string().min(1),
   templateIds: z.array(z.string()),
   slotConceptIds: z.record(z.string(), z.string()),
+  topicWordIds: z.array(z.string()).optional(),
+  proposition: propositionSchema.optional(),
+  questionIntent: questionIntentSchema.optional(),
   history: z.array(dialogueTurnSchema),
   queuedTurns: z.array(dialogueTurnSchema),
   pendingQuestion: pendingQuestionSchema.optional(),
   absurdityCount: z.number().int().min(0).max(1),
+  randomSeed: z.number().optional(),
+  validationErrors: z.array(z.string()).optional(),
   startedAt: z.number(),
   updatedAt: z.number(),
   completedAt: z.number().optional()
@@ -169,6 +212,7 @@ const settingsSchema = z.object({
 export const dialogueTemplateSchema = z.object({
   id: z.string().min(1),
   semanticFrame: z.string().min(1),
+  grounding: z.enum(["scene_frame", "relation_required"]),
   intent: z.enum(conversationIntents),
   phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
   locations: z.array(z.string()).min(1),
@@ -183,7 +227,8 @@ export const dialogueTemplateSchema = z.object({
 export const backupSchema = z
   .object({
     appId: z.literal("aguri-cleanroom"),
-    schemaVersion: z.literal(1),
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    buildId: z.string().optional(),
     exportedAt: z.number(),
     checksum: z.string(),
     player: playerSchema.nullable(),

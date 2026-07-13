@@ -26,6 +26,15 @@ const frames: Frame[] = [
   { id: "object_container_daydream", slots: [slot("object", [...objects, "food_drink"], "object"), slot("container", ["usable_object", "place"], "container")], text: "「{container}」の中に「{object}」があったら、開ける前から少しわくわくしますっ。" }
 ];
 
+const relationRequiredFrames = new Set([
+  "person_food_observation",
+  "person_object_rumor",
+  "time_feeling_memory",
+  "wearable_person_comparison",
+  "idea_comparison",
+  "music_person_memory"
+]);
+
 const intentOpeners: Record<ConversationIntent, string> = {
   small_talk: "そういえばっ、",
   ask_meaning: "言葉の輪郭を考えていたら、",
@@ -48,6 +57,7 @@ export const dialogueTemplates: DialogueTemplate[] = conversationIntents.flatMap
   frames.map((frame, frameIndex) => ({
     id: `dialogue_${intent}_${frame.id}`,
     semanticFrame: `${intent}.${frame.id}`,
+    grounding: relationRequiredFrames.has(frame.id) ? "relation_required" as const : "scene_frame" as const,
     intent,
     phase: "premise" as const,
     locations: rotateLocations(intentIndex + frameIndex),

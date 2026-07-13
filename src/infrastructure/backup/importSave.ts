@@ -5,6 +5,7 @@ import { createExportData } from "./exportSave";
 import type { Concept } from "../../domain/model/concept";
 import type { ConversationSession, DialogueHistoryEntry } from "../../domain/model/conversation";
 import type { MemoryEvent } from "../../domain/model/memory";
+import { migrateConversationSession } from "../../domain/conversation/sessionMigration";
 
 export type ImportMode = "replace" | "merge";
 export type ImportPreview = {
@@ -71,7 +72,9 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
     await db.concepts.bulkPut(data.concepts as Concept[]);
     await db.relations.bulkPut(data.relations);
     await db.memories.bulkPut(data.memories as MemoryEvent[]);
-    await db.conversationSessions.bulkPut(data.conversationSessions as ConversationSession[]);
+    await db.conversationSessions.bulkPut(
+      (data.conversationSessions as ConversationSession[]).map((session) => migrateConversationSession(session, now))
+    );
     await db.dialogueHistory.bulkPut(data.dialogueHistory as DialogueHistoryEntry[]);
     await db.diaries.bulkPut(data.diaries);
     if (data.settings) await db.settings.put(data.settings);
