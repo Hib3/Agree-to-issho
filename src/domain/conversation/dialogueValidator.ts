@@ -5,6 +5,7 @@ import type {
   DialogueTurn,
   QuestionIntent
 } from "../model/conversation";
+import { CURRENT_DIALOGUE_REVISION } from "../model/conversation";
 
 const exposedValues = /\{[^}]+\}|undefined|null|NaN|\[object Object\]/u;
 const bareReferences = /(こんなふうに|こんな風に|このように|このつながり|この組み合わせ|この二つ|この三つ|^(これ|それ|あれ)[はをが])/u;
@@ -24,7 +25,7 @@ export function validateDialogueTurn(turn: DialogueTurn, proposition: Compositio
 export function validateConversationSession(session: ConversationSession) {
   const errors: string[] = [];
   if (session.schemaVersion !== 2) errors.push("legacy_schema");
-  if (session.dialogueRevision !== 2) errors.push("legacy_dialogue_revision");
+  if (session.dialogueRevision !== CURRENT_DIALOGUE_REVISION) errors.push("legacy_dialogue_revision");
   if (!session.proposition) errors.push("missing_proposition");
   if (session.topicWordIds.join("|") !== session.proposition.wordIds.join("|")) errors.push("topic_words_mismatch");
   if (session.questionIntent !== session.proposition.questionIntent) errors.push("question_intent_mismatch");

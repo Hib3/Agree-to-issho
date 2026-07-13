@@ -140,7 +140,7 @@ describe("clean-room conversation composition", () => {
     };
     const session: ConversationSession = {
       schemaVersion: 2,
-      dialogueRevision: 2,
+      dialogueRevision: 3,
       id: "session_phase_order",
       phase: "premise",
       intent: "ask_relation",
@@ -200,7 +200,7 @@ describe("clean-room conversation composition", () => {
     };
     const session: ConversationSession = {
       schemaVersion: 2,
-      dialogueRevision: 2,
+      dialogueRevision: 3,
       id: "session_answer_reaction",
       phase: "awaiting_answer",
       intent: "ask_relation",
@@ -264,7 +264,7 @@ describe("clean-room conversation composition", () => {
     };
     const session: ConversationSession = {
       schemaVersion: 2,
-      dialogueRevision: 2,
+      dialogueRevision: 3,
       id: "session_preference_target",
       phase: "awaiting_answer",
       intent: "ask_preference",

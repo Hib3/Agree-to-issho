@@ -100,9 +100,11 @@ export type PendingQuestion = {
   relationDraft?: { fromConceptId: string; toConceptId: string; type: string };
 };
 
+export const CURRENT_DIALOGUE_REVISION = 3 as const;
+
 export type ConversationSession = {
   schemaVersion: 2;
-  dialogueRevision: 2;
+  dialogueRevision: typeof CURRENT_DIALOGUE_REVISION;
   id: string;
   phase: ConversationPhase;
   intent: ConversationIntent;

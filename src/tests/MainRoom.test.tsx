@@ -65,7 +65,7 @@ const proposition: CompositionProposition = {
 const answers = answerSchemaFor(proposition);
 const session: ConversationSession = {
   schemaVersion: 2,
-  dialogueRevision: 2,
+  dialogueRevision: 3,
   id: "room_semantic_session",
   phase: "awaiting_answer",
   intent: "ask_relation",

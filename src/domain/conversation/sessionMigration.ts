@@ -3,15 +3,17 @@ import type {
   ConversationSession,
   DialogueTurn
 } from "../model/conversation";
+import { CURRENT_DIALOGUE_REVISION } from "../model/conversation";
 
-type LegacySession = Partial<ConversationSession> & {
+type LegacySession = Omit<Partial<ConversationSession>, "dialogueRevision"> & {
+  dialogueRevision?: number;
   history?: Array<Partial<DialogueTurn>>;
   queuedTurns?: Array<Partial<DialogueTurn>>;
 };
 
 export function isCurrentConversationSession(session: ConversationSession) {
   const candidate = session as LegacySession;
-  return candidate.schemaVersion === 2 && candidate.dialogueRevision === 2 && Boolean(candidate.proposition) && Array.isArray(candidate.topicWordIds);
+  return candidate.schemaVersion === 2 && candidate.dialogueRevision === CURRENT_DIALOGUE_REVISION && Boolean(candidate.proposition) && Array.isArray(candidate.topicWordIds);
 }
 
 export function migrateConversationSession(
@@ -56,7 +58,7 @@ export function migrateConversationSession(
 
   return {
     schemaVersion: 2,
-    dialogueRevision: 2,
+    dialogueRevision: CURRENT_DIALOGUE_REVISION,
     id: legacy.id ?? "legacy_session_" + crypto.randomUUID(),
     phase: "completed",
     intent: legacy.intent ?? "small_talk",

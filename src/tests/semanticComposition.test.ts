@@ -212,6 +212,8 @@ describe("semantic composition regression", () => {
 
   it("invalidates a legacy session without replaying its queued question", () => {
     const legacy = {
+      schemaVersion: 2,
+      dialogueRevision: 2,
       id: "legacy_broken",
       phase: "awaiting_answer",
       intent: "ask_relation",
@@ -228,6 +230,7 @@ describe("semantic composition regression", () => {
     const migrated = migrateConversationSession(legacy, now + 1);
 
     expect(migrated.phase).toBe("completed");
+    expect(migrated.dialogueRevision).toBe(3);
     expect(migrated.queuedTurns).toEqual([]);
     expect(migrated.pendingQuestion).toBeUndefined();
     expect(migrated.validationErrors).toContain("legacy_session_invalidated");

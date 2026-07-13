@@ -171,7 +171,7 @@ const memorySchema = z.object({
 
 const conversationSessionSchema = z.object({
   schemaVersion: z.literal(2).optional(),
-  dialogueRevision: z.literal(2).optional(),
+  dialogueRevision: z.union([z.literal(2), z.literal(3)]).optional(),
   id: z.string().min(1),
   phase: z.enum(["opening", "premise", "question", "awaiting_answer", "reaction", "twist", "closing", "completed"]),
   intent: z.enum(conversationIntents),

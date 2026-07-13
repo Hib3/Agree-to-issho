@@ -7,6 +7,7 @@ import type {
   DialogueTurn,
   PendingQuestion
 } from "../model/conversation";
+import { CURRENT_DIALOGUE_REVISION } from "../model/conversation";
 import type { Concept } from "../model/concept";
 import type { ConceptRelation } from "../model/relation";
 import type { RandomSource } from "../../infrastructure/random/random";
@@ -100,7 +101,7 @@ export function realizeCandidate(
 
   const session: ConversationSession = {
     schemaVersion: 2,
-    dialogueRevision: 2,
+    dialogueRevision: CURRENT_DIALOGUE_REVISION,
     id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: candidate.template.intent,
@@ -195,7 +196,7 @@ function safeFallbackSession(
   });
   return {
     schemaVersion: 2,
-    dialogueRevision: 2,
+    dialogueRevision: CURRENT_DIALOGUE_REVISION,
     id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: "small_talk",
