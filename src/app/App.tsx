@@ -11,14 +11,41 @@ import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { BackupScreen } from "../features/backup/BackupScreen";
 import { ManualScreen } from "../features/settings/ManualScreen";
 import { resetGameData } from "./bootstrap";
+import { NewsScreen } from "../features/news/NewsScreen";
+import { refreshNews, shouldRefreshNews } from "../infrastructure/news/newsService";
 
 export function App() {
   const store = useGameStore();
   const initialize = store.initialize;
+  const settings = store.settings;
+  const refresh = store.refresh;
 
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (!settings?.newsEnabled || settings.newsFeeds.length === 0) return;
+    let running = false;
+    const update = async () => {
+      if (running || !shouldRefreshNews(settings)) return;
+      running = true;
+      try {
+        await refreshNews(settings);
+        await refresh();
+      } finally {
+        running = false;
+      }
+    };
+    void update();
+    const timer = window.setInterval(() => void update(), 60_000);
+    const handleOnline = () => void update();
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [settings, refresh]);
 
   if (store.loading) return <main className="loading-screen">部屋を開いています…</main>;
   if (store.error) return <main className="error-screen"><h1>部屋を開けませんでした</h1><p>{store.error}</p><button type="button" onClick={() => location.reload()}>もう一度</button></main>;
@@ -55,6 +82,7 @@ export function App() {
           settings={store.settings}
           concepts={store.concepts}
           sessions={store.sessions}
+          newsItems={store.newsItems}
           saving={store.saving}
           onNavigate={store.setScreen}
           onChanged={store.refresh}
@@ -73,6 +101,7 @@ export function App() {
       {screen === "diary" ? <DiaryScreen concepts={store.concepts} memories={store.memories} dialogue={store.dialogue} diaries={store.diaries} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
       {screen === "locations" && store.character ? <LocationsScreen character={store.character} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
       {screen === "settings" && store.settings ? <SettingsScreen settings={store.settings} onChanged={store.refresh} onBack={() => store.setScreen("room")} /> : null}
+      {screen === "news" && store.settings ? <NewsScreen items={store.newsItems} concepts={store.concepts} settings={store.settings} onChanged={store.refresh} onOpenSettings={() => store.setScreen("settings")} onBack={() => store.setScreen("room")} /> : null}
       {screen === "backup" ? <BackupScreen onChanged={store.refresh} onBack={() => store.setScreen(store.player ? "room" : "title")} /> : null}
       {screen === "manual" ? <ManualScreen onBack={() => store.setScreen(store.player ? "room" : "title")} /> : null}
     </div>

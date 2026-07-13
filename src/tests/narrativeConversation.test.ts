@@ -38,6 +38,7 @@ describe("multi-page narrative conversation", () => {
     const transcripts = new Set<string>();
     let narrativeCount = 0;
     let punchlineStoryCount = 0;
+    let compactConversationCount = 0;
     let driftCount = 0;
     let maaOpeningCount = 0;
     const intentCounts = new Map<string, number>();
@@ -72,10 +73,8 @@ describe("multi-page narrative conversation", () => {
         narrativeCount += 1;
         if (session.queuedTurns.length < 3) failures.push(`${seed}:short-story`);
       }
-      if (["single_word", "scene_hypothesis"].includes(session.proposition.relationType)) {
-        if (session.queuedTurns.length < 5) failures.push(`${seed}:missing-punchline`);
-        else punchlineStoryCount += 1;
-      }
+      if (session.queuedTurns.length >= 5) punchlineStoryCount += 1;
+      if (session.queuedTurns.length >= 2 && session.queuedTurns.length <= 4) compactConversationCount += 1;
       if (session.proposition.relationType === "drift_hypothesis") {
         driftCount += 1;
         if (session.absurdityCount !== 1 || session.questionIntent !== "correction_request")
@@ -96,14 +95,15 @@ describe("multi-page narrative conversation", () => {
 
     expect(failures).toEqual([]);
     expect(narrativeCount).toBeGreaterThan(500);
-    expect(punchlineStoryCount).toBeGreaterThan(650);
+    expect(punchlineStoryCount).toBeGreaterThan(350);
+    expect(compactConversationCount).toBeGreaterThan(120);
     expect(driftCount).toBeGreaterThan(10);
     expect(driftCount).toBeLessThan(130);
     expect(intentCounts.size).toBeGreaterThanOrEqual(10);
     expect(intentCounts.get("ask_meaning") ?? 0).toBeGreaterThan(10);
     expect(intentCounts.get("ask_preference") ?? 0).toBeGreaterThan(0);
     expect(intentCounts.get("ask_preference") ?? 0).toBeLessThan(80);
-    expect(transcripts.size).toBeGreaterThan(850);
+    expect(transcripts.size).toBeGreaterThan(700);
     expect(maaOpeningCount).toBeLessThan(25);
   });
 

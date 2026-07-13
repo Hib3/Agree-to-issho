@@ -4,12 +4,13 @@ import type { Concept } from "../../domain/model/concept";
 import type { ConversationSession, DialogueHistoryEntry } from "../../domain/model/conversation";
 import type { DiaryEntry, MemoryEvent } from "../../domain/model/memory";
 import type { GameSettings, PlayerProfile } from "../../domain/model/player";
+import type { NewsItem } from "../../domain/model/news";
 import type { ConceptRelation } from "../../domain/model/relation";
 import type { LearningSession } from "../../domain/learning/learningMachine";
 import { CLEANROOM_DB_NAME, type ImportBackupRecord, type MigrationLog } from "./schema";
 import { migrateConversationSession } from "../../domain/conversation/sessionMigration";
 
-const stores = {
+const storesV2 = {
   player: "id",
   character: "id, currentLocationId, updatedAt",
   concepts: "id, source, normalized, userCategory, learnedAt, active",
@@ -22,6 +23,11 @@ const stores = {
   learningSessions: "id, state, updatedAt",
   importBackups: "id, createdAt",
   migrationLogs: "id, legacyDatabase, importedAt"
+};
+
+const storesV3 = {
+  ...storesV2,
+  newsItems: "id, feedId, publishedAt, fetchedAt, discussedAt"
 };
 
 export class AguriDatabase extends Dexie {
@@ -37,11 +43,12 @@ export class AguriDatabase extends Dexie {
   learningSessions!: EntityTable<LearningSession, "id">;
   importBackups!: EntityTable<ImportBackupRecord, "id">;
   migrationLogs!: EntityTable<MigrationLog, "id">;
+  newsItems!: EntityTable<NewsItem, "id">;
 
   constructor(name = CLEANROOM_DB_NAME) {
     super(name);
-    this.version(1).stores(stores);
-    this.version(2).stores(stores).upgrade((transaction) =>
+    this.version(1).stores(storesV2);
+    this.version(2).stores(storesV2).upgrade((transaction) =>
       transaction
         .table<ConversationSession>("conversationSessions")
         .toCollection()
@@ -49,6 +56,7 @@ export class AguriDatabase extends Dexie {
           Object.assign(session, migrateConversationSession(session));
         })
     );
+    this.version(3).stores(storesV3);
   }
 }
 

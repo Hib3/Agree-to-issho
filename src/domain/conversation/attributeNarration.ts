@@ -34,9 +34,9 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${personKinds[String(attributes.personKind)]}として覚えていますっ。`
         : "",
       relativeStatuses[String(attributes.relativeStatus)]
-        ? `${relativeStatuses[String(attributes.relativeStatus)]}の関係だと教わりましたっ。`
+        ? rememberedDetail(concept, `${relativeStatuses[String(attributes.relativeStatus)]}の関係`)
         : familiarities[String(attributes.familiarity)]
-          ? `${familiarities[String(attributes.familiarity)]}だとも教わっていますっ。`
+          ? rememberedDetail(concept, `${familiarities[String(attributes.familiarity)]}な相手`)
           : ""
     ]);
   }
@@ -59,7 +59,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${consumeModes[String(attributes.consumeMode)]}ものとして覚えていますっ。`
         : "",
       mealTimes[String(attributes.mealTime)]
-        ? `${mealTimes[String(attributes.mealTime)]}に楽しむことが多いとも教わりましたっ。`
+        ? rememberedDetail(concept, `${mealTimes[String(attributes.mealTime)]}に楽しむことが多い`)
         : ""
     ]);
   }
@@ -81,7 +81,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${environments[String(attributes.environment)]}の場所として覚えていますっ。`
         : "",
       visits[String(attributes.visitMode)]
-        ? `${visits[String(attributes.visitMode)]}場所だとも教わりましたっ。`
+        ? rememberedDetail(concept, `${visits[String(attributes.visitMode)]}場所`)
         : ""
     ]);
   }
@@ -98,7 +98,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${contexts[String(attributes.actionContext)]}ですることとして覚えていますっ。`
         : "",
       social[String(attributes.socialMode)]
-        ? `${social[String(attributes.socialMode)]}することだとも教わりましたっ。`
+        ? rememberedDetail(concept, `${social[String(attributes.socialMode)]}すること`)
         : ""
     ]);
   }
@@ -132,7 +132,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${useModes[String(attributes.usageMode)]}物として覚えていますっ。`
         : "",
       affordances[String(attributes.affordance)]
-        ? `${affordances[String(attributes.affordance)]}ための物だとも教わりましたっ。`
+        ? rememberedDetail(concept, `${affordances[String(attributes.affordance)]}ための物`)
         : importance[String(attributes.importanceWhenMissing)]
           ? `${importance[String(attributes.importanceWhenMissing)]}物なんですねっ。`
           : ""
@@ -158,7 +158,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${areas[String(attributes.wearArea)]}に身につける物として覚えていますっ。`
         : "",
       contexts[String(attributes.useContext)]
-        ? `${contexts[String(attributes.useContext)]}に使うことが多いとも教わりましたっ。`
+        ? rememberedDetail(concept, `${contexts[String(attributes.useContext)]}に使うことが多い物`)
         : ""
     ]);
   }
@@ -183,7 +183,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${powerModes[String(attributes.powerMode)]}乗り物として覚えていますっ。`
         : "",
       trips[String(attributes.tripContext)]
-        ? `${trips[String(attributes.tripContext)]}に乗ることが多いとも教わりましたっ。`
+        ? rememberedDetail(concept, `${trips[String(attributes.tripContext)]}に乗ることが多い`)
         : ""
     ]);
   }
@@ -206,7 +206,7 @@ function attributeSentences(concept: Concept, word: string) {
         ? `${word}は、${relations[String(attributes.livingRelation)]}として覚えていますっ。`
         : "",
       habitats[String(attributes.habitat)]
-        ? `${habitats[String(attributes.habitat)]}にいることが多いとも教わりましたっ。`
+        ? rememberedDetail(concept, `${habitats[String(attributes.habitat)]}にいることが多い`)
         : ""
     ]);
   }
@@ -238,4 +238,8 @@ function attributeSentences(concept: Concept, word: string) {
 
 function compact(values: string[]) {
   return values.filter(Boolean);
+}
+
+function rememberedDetail(concept: Concept, detail: string) {
+  return concept.source === "user" ? `${detail}と教わりましたっ。` : `${detail}と覚えていますっ。`;
 }

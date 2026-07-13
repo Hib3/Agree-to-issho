@@ -12,7 +12,7 @@ type Props = {
   emotion?: CharacterEmotion;
 };
 
-const speed = { slow: 70, normal: 42, fast: 18 } as const;
+const speed = { slow: 55, normal: 28, fast: 12 } as const;
 
 export function DialogueBox({ speaker, text, textSpeed = "normal", hasNext = false, onNext, emotion = "curious" }: Props) {
   const styledText = useMemo(() => applyAguriVoice(text, emotion), [emotion, text]);

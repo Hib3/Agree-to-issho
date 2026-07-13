@@ -17,7 +17,7 @@ export async function createExportData(now = Date.now()) {
     ]);
   const unsigned = {
     appId: "aguri-cleanroom" as const,
-    schemaVersion: 2 as const,
+    schemaVersion: 3 as const,
     buildId: BUILD_ID,
     exportedAt: now,
     player: player ?? null,

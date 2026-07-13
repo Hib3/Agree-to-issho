@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CharacterState } from "../../domain/model/character";
 import type { Concept } from "../../domain/model/concept";
 import type { ConversationSession } from "../../domain/model/conversation";
+import type { NewsItem } from "../../domain/model/news";
 import type { GameSettings, PlayerProfile } from "../../domain/model/player";
 import { autonomousDelayMs, canScheduleAutonomousSpeech } from "../../domain/schedule/autonomousSpeech";
 import { getTimeOfDay, timeLabels } from "../../domain/schedule/timeOfDay";
@@ -11,17 +12,19 @@ import type { AppScreen } from "../../app/routes";
 import { CharacterStage } from "../../ui/components/CharacterStage";
 import { ChoiceButtons } from "../../ui/components/ChoiceButtons";
 import { DialogueBox } from "../../ui/components/DialogueBox";
-import { ArchiveRestore, BookOpenText, CircleHelp, DoorOpen, MapPinned, MessageCircle, NotebookTabs, Settings, Sparkles } from "lucide-react";
+import { ArchiveRestore, BookOpenText, CircleHelp, DoorOpen, MapPinned, MessageCircle, Newspaper, NotebookTabs, Settings, Sparkles } from "lucide-react";
 import { advanceConversation, answerConversation, closeConversation, invalidateConversationSession, startConversation } from "../conversation/conversationService";
 import { validateConversationSession } from "../../domain/conversation/dialogueValidator";
 import { isCurrentConversationSession } from "../../domain/conversation/sessionMigration";
+import { playGameSound } from "../../infrastructure/audio/gameAudio";
 
-export function MainRoom({ player, character, settings, concepts, sessions, saving, onNavigate, onChanged }: {
+export function MainRoom({ player, character, settings, concepts, sessions, newsItems, saving, onNavigate, onChanged }: {
   player: PlayerProfile;
   character: CharacterState;
   settings: GameSettings;
   concepts: Concept[];
   sessions: ConversationSession[];
+  newsItems: NewsItem[];
   saving: boolean;
   onNavigate: (screen: AppScreen) => void;
   onChanged: () => Promise<void>;
@@ -49,6 +52,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
   const timeOfDay = getTimeOfDay(clock);
   const weather = Math.floor(clock / 86_400_000) % 5 === 0 ? "rain" : "clear";
   const userWordCount = concepts.filter((concept) => concept.source === "user").length;
+  const unreadNewsCount = newsItems.filter((item) => !item.discussedAt).length;
   const lastTurn = active?.history.at(-1);
   const dialogueText = rawActive && activeErrors.length > 0
     ? "会話メモを整え直しましたっ。もう一度、話しかけてくださいっ！"
@@ -59,6 +63,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
 
   const speak = useCallback(async (initiatedByUser = true) => {
     if (busy || saving) return;
+    playGameSound(active ? "page" : initiatedByUser ? "talk" : "notice", settings);
     setBusy(true);
     try {
       if (active) await advanceConversation(active.id, Date.now(), initiatedByUser);
@@ -67,7 +72,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     } finally {
       setBusy(false);
     }
-  }, [active, busy, onChanged, saving]);
+  }, [active, busy, onChanged, saving, settings]);
 
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
@@ -122,6 +127,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     if (!choice) return;
     setBusy(true);
     try {
+      playGameSound("confirm", settings);
       await answerConversation(active.id, choice);
       await onChanged();
     } finally {
@@ -134,6 +140,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
     setSelection({ questionId: "", value: "" });
     setBusy(true);
     try {
+      playGameSound("page", settings);
       await closeConversation(active.id);
       await onChanged();
     } finally {
@@ -182,6 +189,7 @@ export function MainRoom({ player, character, settings, concepts, sessions, savi
         <button type="button" onClick={() => onNavigate("wordbook")}><BookOpenText aria-hidden="true" /><span>単語帳</span></button>
         <button type="button" onClick={() => onNavigate("diary")}><NotebookTabs aria-hidden="true" /><span>日記</span></button>
         <button type="button" onClick={() => onNavigate("locations")}><MapPinned aria-hidden="true" /><span>移動</span></button>
+        {settings.newsEnabled ? <button type="button" onClick={() => onNavigate("news")}><Newspaper aria-hidden="true" /><span>ニュース{unreadNewsCount > 0 ? ` ${unreadNewsCount}` : ""}</span></button> : null}
         <button type="button" onClick={() => onNavigate("backup")}><ArchiveRestore aria-hidden="true" /><span>保存</span></button>
         <button type="button" onClick={() => onNavigate("manual")}><CircleHelp aria-hidden="true" /><span>説明</span></button>
         <button type="button" onClick={() => onNavigate("title")}><DoorOpen aria-hidden="true" /><span>タイトル</span></button>

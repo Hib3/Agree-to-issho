@@ -1,7 +1,7 @@
 import { starterConcepts } from "../data/starter/starterConcepts";
 import { db } from "../infrastructure/db/database";
 import type { CharacterState } from "../domain/model/character";
-import type { GameSettings } from "../domain/model/player";
+import { createDefaultSettings, migrateGameSettings } from "../domain/settings/gameSettings";
 
 export async function bootstrapApp(now = Date.now()) {
   await db.open();
@@ -10,12 +10,17 @@ export async function bootstrapApp(now = Date.now()) {
   const character = await db.character.get("aguri");
   if (!character) await db.character.put(defaultCharacter(now));
   const settings = await db.settings.get("local");
-  if (!settings) await db.settings.put(defaultSettings(now));
+  if (!settings) {
+    await db.settings.put(createDefaultSettings(now));
+  } else {
+    const migrated = migrateGameSettings(settings, now);
+    if (JSON.stringify(migrated) !== JSON.stringify(settings)) await db.settings.put(migrated);
+  }
   return loadSnapshot();
 }
 
 export async function loadSnapshot() {
-  const [player, character, settings, concepts, relations, memories, sessions, dialogue, diaries, learningSession] =
+  const [player, character, settings, concepts, relations, memories, sessions, dialogue, diaries, learningSession, newsItems] =
     await Promise.all([
       db.player.get("local"),
       db.character.get("aguri"),
@@ -26,9 +31,10 @@ export async function loadSnapshot() {
       db.conversationSessions.orderBy("updatedAt").toArray(),
       db.dialogueHistory.orderBy("createdAt").toArray(),
       db.diaries.orderBy("date").toArray(),
-      db.learningSessions.get("active")
+      db.learningSessions.get("active"),
+      db.newsItems.orderBy("publishedAt").reverse().limit(120).toArray()
     ]);
-  return { player: player ?? null, character: character ?? null, settings: settings ?? null, concepts, relations, memories, sessions, dialogue, diaries, learningSession: learningSession ?? null };
+  return { player: player ?? null, character: character ?? null, settings: settings ?? null, concepts, relations, memories, sessions, dialogue, diaries, learningSession: learningSession ?? null, newsItems };
 }
 
 export async function resetGameData(now = Date.now()) {
@@ -54,8 +60,4 @@ function defaultCharacter(now: number): CharacterState {
     lastSpeechAt: now,
     updatedAt: now
   };
-}
-
-function defaultSettings(now: number): GameSettings {
-  return { id: "local", textSpeed: "normal", fontScale: "normal", highContrast: false, reducedMotion: false, volume: 0.7, muted: true, autonomousSpeech: true, updatedAt: now };
 }

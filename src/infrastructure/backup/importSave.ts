@@ -6,6 +6,7 @@ import type { Concept } from "../../domain/model/concept";
 import type { ConversationSession, DialogueHistoryEntry } from "../../domain/model/conversation";
 import type { MemoryEvent } from "../../domain/model/memory";
 import { migrateConversationSession } from "../../domain/conversation/sessionMigration";
+import { migrateGameSettings } from "../../domain/settings/gameSettings";
 
 export type ImportMode = "replace" | "merge";
 export type ImportPreview = {
@@ -63,7 +64,7 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
       json: JSON.stringify(current)
     });
     if (mode === "replace") {
-      for (const table of [db.player, db.character, db.concepts, db.relations, db.memories, db.conversationSessions, db.dialogueHistory, db.diaries, db.settings]) {
+      for (const table of [db.player, db.character, db.concepts, db.relations, db.memories, db.conversationSessions, db.dialogueHistory, db.diaries, db.settings, db.newsItems]) {
         await table.clear();
       }
     }
@@ -77,6 +78,9 @@ export async function applyImport(preview: ImportPreview, mode: ImportMode, now 
     );
     await db.dialogueHistory.bulkPut(data.dialogueHistory as DialogueHistoryEntry[]);
     await db.diaries.bulkPut(data.diaries);
-    if (data.settings) await db.settings.put(data.settings);
+    if (data.settings) {
+      if (mode === "merge") await db.newsItems.clear();
+      await db.settings.put(migrateGameSettings(data.settings, now));
+    }
   });
 }

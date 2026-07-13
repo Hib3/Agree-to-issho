@@ -8,6 +8,7 @@ import type { DiaryEntry, MemoryEvent } from "../domain/model/memory";
 import type { GameSettings, PlayerProfile } from "../domain/model/player";
 import type { ConceptRelation } from "../domain/model/relation";
 import type { LearningSession } from "../domain/learning/learningMachine";
+import type { NewsItem } from "../domain/model/news";
 import { bootstrapApp, loadSnapshot } from "./bootstrap";
 
 type Snapshot = Awaited<ReturnType<typeof loadSnapshot>>;
@@ -32,7 +33,8 @@ const empty: Snapshot = {
   sessions: [] as ConversationSession[],
   dialogue: [] as DialogueHistoryEntry[],
   diaries: [] as DiaryEntry[],
-  learningSession: null as LearningSession | null
+  learningSession: null as LearningSession | null,
+  newsItems: [] as NewsItem[]
 };
 
 export const useGameStore = create<GameStore>((set) => ({

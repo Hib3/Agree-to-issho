@@ -43,7 +43,12 @@ const settings: GameSettings = {
   reducedMotion: true,
   volume: 0,
   muted: true,
+  audioRevision: 1,
   autonomousSpeech: false,
+  newsEnabled: false,
+  newsRefreshMinutes: 30,
+  newsUseRss2Json: false,
+  newsFeeds: [],
   updatedAt: now
 };
 const adult = createUserConcept({ surface: "おとな", category: "person_descriptor" }, now, "room-test-adult");
@@ -99,6 +104,7 @@ describe("MainRoom semantic answer controls", () => {
         settings={settings}
         concepts={[adult, bonito]}
         sessions={[session]}
+        newsItems={[]}
         saving={false}
         onNavigate={vi.fn()}
         onChanged={vi.fn().mockResolvedValue(undefined)}

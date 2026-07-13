@@ -7,5 +7,6 @@ export type AppScreen =
   | "diary"
   | "locations"
   | "settings"
+  | "news"
   | "backup"
   | "manual";

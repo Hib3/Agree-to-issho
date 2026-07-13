@@ -72,11 +72,15 @@ export function resolveSlots(
   }
 
   for (const slot of template.slots.slice(startIndex)) {
-    let pool = active.filter((concept) => !used.has(concept.id) && roleFits(concept, slot) && !recentIds.has(concept.id));
+    const eligible = active.filter((concept) => !used.has(concept.id) && roleFits(concept, slot));
+    let pool = eligible.filter((concept) => !recentIds.has(concept.id));
     if (userCount > 0 && !userIncluded) {
-      const userPool = pool.filter((concept) => concept.source === "user");
-      if (userPool.length > 0) pool = userPool;
+      const freshUserPool = pool.filter((concept) => concept.source === "user");
+      const allUserPool = eligible.filter((concept) => concept.source === "user");
+      if (freshUserPool.length > 0) pool = freshUserPool;
+      else if (allUserPool.length > 0) pool = allUserPool;
     }
+    if (pool.length === 0) pool = eligible;
     const selected = pickOne(pool, random);
     if (!selected) {
       if (slot.required) return undefined;

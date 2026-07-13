@@ -1,0 +1,27 @@
+import { describe, expect, it } from "vitest";
+import { parseRss2Json, parseRssXml } from "../domain/news/rssParser";
+
+const now = 1_700_000_000_000;
+
+describe("RSS parsing", () => {
+  it("reads RSS without retaining article-sized HTML", () => {
+    const description = `<p>${"長い説明".repeat(100)}</p>`;
+    const parsed = parseRssXml(`<?xml version="1.0"?><rss version="2.0"><channel><title>町の通信</title><item><title>駅前に新しい時計</title><link>https://example.com/news/1</link><guid>one</guid><pubDate>Tue, 14 Nov 2023 12:00:00 GMT</pubDate><description><![CDATA[${description}]]></description></item></channel></rss>`, "feed_one", "https://example.com/feed.xml", now);
+    expect(parsed.title).toBe("町の通信");
+    expect(parsed.items[0]?.title).toBe("駅前に新しい時計");
+    expect(parsed.items[0]?.summary).not.toContain("<p>");
+    expect(Array.from(parsed.items[0]?.summary ?? "").length).toBeLessThanOrEqual(240);
+  });
+
+  it("reads Atom alternate links", () => {
+    const parsed = parseRssXml(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>科学便り</title><entry><id>tag:example,1</id><title>宇宙観測を更新</title><link rel="alternate" href="https://example.com/space"/><updated>2026-07-13T00:00:00Z</updated><summary>新しい観測結果を公開した。</summary></entry></feed>`, "feed_atom", "https://example.com/atom.xml", now);
+    expect(parsed.items[0]?.url).toBe("https://example.com/space");
+    expect(parsed.items[0]?.summary).toBe("新しい観測結果を公開した。");
+  });
+
+  it("accepts the documented RSS-to-JSON response shape", () => {
+    const parsed = parseRss2Json({ status: "ok", feed: { title: "交通情報" }, items: [{ guid: "x", title: "列車の運行情報", link: "https://example.com/train", description: "一部区間の運行を確認中。", pubDate: "2026-07-13 09:00:00" }] }, "feed_json", "https://example.com/feed", now);
+    expect(parsed.items[0]?.sourceName).toBe("交通情報");
+    expect(parsed.items[0]?.title).toBe("列車の運行情報");
+  });
+});

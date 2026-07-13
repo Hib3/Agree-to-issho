@@ -216,7 +216,25 @@ const settingsSchema = z.object({
   reducedMotion: z.boolean(),
   volume: z.number(),
   muted: z.boolean(),
+  audioRevision: z.literal(1).optional(),
   autonomousSpeech: z.boolean(),
+  newsEnabled: z.boolean().optional(),
+  newsRefreshMinutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(180)]).optional(),
+  newsUseRss2Json: z.boolean().optional(),
+  newsFeeds: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        url: z.string().url(),
+        enabled: z.boolean(),
+        addedAt: z.number(),
+        lastCheckedAt: z.number().optional(),
+        lastSuccessAt: z.number().optional(),
+        lastError: z.string().optional()
+      })
+    )
+    .optional(),
   updatedAt: z.number()
 });
 
@@ -238,7 +256,7 @@ export const dialogueTemplateSchema = z.object({
 export const backupSchema = z
   .object({
     appId: z.literal("aguri-cleanroom"),
-    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     buildId: z.string().optional(),
     exportedAt: z.number(),
     checksum: z.string(),

@@ -27,8 +27,8 @@ export function buildNarrativePages(input: {
     return [
       `${names.join("と")}を、同じページで見つけましたっ。`,
       learnedAttributeBeat,
-      `${names.join("と")}の間には、教わった関係がまだありませんっ。`
-    ].filter(Boolean);
+      `${names.join("と")}の間には、確かな関係をまだ覚えていませんっ。`
+    ].filter(isText);
   }
 
   if (
@@ -43,7 +43,7 @@ export function buildNarrativePages(input: {
         `${input.proposition.relationText}と覚えていますっ。`,
         input.rendered,
         outcomeForFrame(input.candidate, input.random)
-      ].filter(Boolean);
+      ].filter(isText);
     }
     return [
       openingForIntent(input.candidate.template.intent, focus),
@@ -54,24 +54,26 @@ export function buildNarrativePages(input: {
 
   if (input.proposition.relationType === "single_word") {
     const frameId = input.candidate.template.semanticFrame.split(".").at(-1) ?? "";
-    const storyArc = renderStoryArc({ focus, random: input.random });
+    const storyArc = usesStoryArc(input.candidate.template.intent)
+      ? renderStoryArc({ focus, random: input.random })
+      : null;
     if (frameId === "single_topic") {
       return [
         openingForIntent(input.candidate.template.intent, focus),
         learnedAttributeBeat,
         memoryBeat(focus),
-        storyArc.turn,
-        storyArc.punchline
-      ].filter(Boolean);
+        storyArc?.turn,
+        storyArc?.punchline
+      ].filter(isText);
     }
     return [
       openingForIntent(input.candidate.template.intent, focus),
       learnedAttributeBeat,
       input.rendered,
       outcomeForFrame(input.candidate, input.random),
-      storyArc.turn,
-      storyArc.punchline
-    ].filter(Boolean);
+      storyArc?.turn,
+      storyArc?.punchline
+    ].filter(isText);
   }
 
   const opening = openingForIntent(input.candidate.template.intent, focus);
@@ -84,14 +86,18 @@ export function buildNarrativePages(input: {
       premise,
       input.rendered,
       `${names}の使い方は、アグリの想像が飛びすぎたかもしれませんっ。`
-    ].filter(Boolean);
+    ].filter(isText);
   }
 
   const outcome = outcomeForFrame(input.candidate, input.random);
-  const storyArc = renderStoryArc({ focus, random: input.random });
-  return [opening, learnedAttributeBeat, input.rendered, outcome, storyArc.turn, storyArc.punchline].filter(
-    Boolean
-  );
+  const storyArc = usesStoryArc(input.candidate.template.intent)
+    ? renderStoryArc({ focus, random: input.random })
+    : null;
+  return [opening, learnedAttributeBeat, input.rendered, outcome, storyArc?.turn, storyArc?.punchline].filter(isText);
+}
+
+function isText(value: string | undefined): value is string {
+  return Boolean(value);
 }
 
 function openingForIntent(intent: ConversationIntent, focus: Concept) {
@@ -101,7 +107,9 @@ function openingForIntent(intent: ConversationIntent, focus: Concept) {
     ask_meaning: `${word}の覚え方を、もう一度確かめたいですっ。`,
     ask_preference: `${word}のこと、もっと知りたいですっ。`,
     ask_relation: `${word}から伸びるノートの線を見直していますっ。`,
-    recall_memory: `前に教えてもらった${word}を、ノートで見つけましたっ。`,
+    recall_memory: focus.source === "user"
+      ? `前に教えてもらった${word}を、ノートで見つけましたっ。`
+      : `前から知っている${word}を、ノートで見つけましたっ。`,
     rumor: `${word}が出てくる、ちょっとした噂の小話を考えましたっ。`,
     observation: `${word}を見ていたら、一つ気づきましたっ。`,
     warning: `${word}のことで、気をつけたい場面がありますっ。`,
@@ -118,6 +126,7 @@ function openingForIntent(intent: ConversationIntent, focus: Concept) {
 
 function memoryBeat(concept: Concept) {
   const word = quoted(concept);
+  if (concept.source !== "user") return `${word}は、前から知っている生活語ですっ。`;
   if (concept.preference !== undefined && concept.preference >= 2)
     return `${word}は好きだと教わっていますっ！`;
   if (concept.preference !== undefined && concept.preference <= -2)
@@ -126,6 +135,10 @@ function memoryBeat(concept: Concept) {
     return `${word}は、まだ覚え方が少しふわふわしていますっ。`;
   if (concept.usageCount === 0) return `${word}を話に使うのは、今日が初めてですっ！`;
   return `${word}は前より少し、迷わず使えるようになりましたっ。`;
+}
+
+function usesStoryArc(intent: ConversationIntent) {
+  return ["small_talk", "rumor", "invitation", "discovery", "daydream", "outing_report"].includes(intent);
 }
 
 function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
@@ -250,13 +263,19 @@ function objectMissingOutcome(candidate: ScoredCandidate) {
   const word = quoted(object);
   const importance = String(object.attributes.importanceWhenMissing ?? "unknown");
   if (importance === "essential") {
-    return [`${word}がないととても困ると教わったから、出かける前に必ず確かめますっ。`];
+    return [conceptReason(object, `${word}がないととても困る`, "出かける前に必ず確かめますっ。")];
   }
   if (importance === "troublesome") {
     return [`${word}がないと少し困るから、代わりを探す時間も考えておきますっ。`];
   }
   if (importance === "replaceable") {
-    return [`${word}が見つからない日は、教わった通り代わりの物を使いますっ。`];
+    return [conceptReason(object, `${word}が見つからなくても代わりを使える`, "代わりの物を探しますっ。")];
   }
   return [`${word}が見つからない時にどのくらい困るか、まだアグリは知りませんっ。`];
+}
+
+function conceptReason(concept: Concept, detail: string, action: string) {
+  return concept.source === "user"
+    ? `${detail}と教わったから、${action}`
+    : `${detail}と覚えているから、${action}`;
 }

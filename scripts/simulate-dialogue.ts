@@ -28,6 +28,7 @@ let drift = 0;
 let questions = 0;
 let attributeGrounded = 0;
 let punchlineStories = 0;
+let compactConversations = 0;
 
 const character: CharacterState = {
   id: "aguri",
@@ -77,6 +78,7 @@ for (let seed = 1; seed <= 1000; seed += 1) {
   ) {
     punchlineStories += 1;
   }
+  if (session.queuedTurns.length >= 2 && session.queuedTurns.length <= 4) compactConversations += 1;
   if (samples.length < 5 && session.queuedTurns.length >= 3) {
     samples.push({
       seed,
@@ -104,6 +106,7 @@ console.log(
       questions,
       attributeGrounded,
       punchlineStories,
+      compactConversations,
       intentCounts,
       samples
     },

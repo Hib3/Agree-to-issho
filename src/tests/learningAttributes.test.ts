@@ -8,6 +8,7 @@ import { attributeQuestionsForCategory } from "../domain/learning/attributeQuest
 import { createUserConcept } from "../domain/learning/conceptFactory";
 import { createLearningSession, transitionLearning } from "../domain/learning/learningMachine";
 import type { CharacterState } from "../domain/model/character";
+import { starterConcepts } from "../data/starter/starterConcepts";
 import { SeededRandom } from "../infrastructure/random/random";
 
 const now = 1_700_000_000_000;
@@ -120,6 +121,12 @@ describe("typed learning attributes", () => {
     expect(transcript).toContain("記録ペン");
     expect(transcript).toContain("手で使う");
     expect(transcript).toContain("見つから");
+  });
+
+  it("does not claim that built-in life words were taught by the player", () => {
+    const starter = starterConcepts.find((concept) => Object.keys(concept.attributes).length > 0);
+    expect(starter).toBeDefined();
+    expect(attributeMemoryBeat(starter!)).not.toContain("教わ");
   });
 
   it("asks about a stored attribute and clears only the rejected claim", () => {

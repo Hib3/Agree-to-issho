@@ -1,3 +1,5 @@
+import type { NewsFeedConfig } from "./news";
+
 export type PlayerProfile = {
   id: "local";
   name: string;
@@ -14,6 +16,11 @@ export type GameSettings = {
   reducedMotion: boolean;
   volume: number;
   muted: boolean;
+  audioRevision: 1;
   autonomousSpeech: boolean;
+  newsEnabled: boolean;
+  newsRefreshMinutes: 15 | 30 | 60 | 180;
+  newsUseRss2Json: boolean;
+  newsFeeds: NewsFeedConfig[];
   updatedAt: number;
 };
