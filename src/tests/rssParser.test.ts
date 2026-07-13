@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRss2Json, parseRssXml } from "../domain/news/rssParser";
+import { parseReaderMarkdown, parseRss2Json, parseRssXml } from "../domain/news/rssParser";
 
 const now = 1_700_000_000_000;
 
@@ -23,5 +23,12 @@ describe("RSS parsing", () => {
     const parsed = parseRss2Json({ status: "ok", feed: { title: "交通情報" }, items: [{ guid: "x", title: "列車の運行情報", link: "https://example.com/train", description: "一部区間の運行を確認中。", pubDate: "2026-07-13 09:00:00" }] }, "feed_json", "https://example.com/feed", now);
     expect(parsed.items[0]?.sourceName).toBe("交通情報");
     expect(parsed.items[0]?.title).toBe("列車の運行情報");
+  });
+
+  it("reads only compact headline metadata from Reader markdown", () => {
+    const parsed = parseReaderMarkdown(`Title: 主要ニュース\nURL Source: https://news.example.test/feed.xml\nMarkdown Content:\n### [交通情報を更新](https://news.example.test/articles/one)\n[https://news.example.test/articles/one](https://news.example.test/articles/one)\nMon, 13 Jul 2026 01:00:00 GMT\n短い概要です。\n\n### [天気の見通し](https://news.example.test/articles/two)\nTue, 14 Jul 2026 01:00:00 GMT`, "feed_reader", "https://news.example.test/feed.xml", now);
+    expect(parsed.title).toBe("主要ニュース");
+    expect(parsed.items).toHaveLength(2);
+    expect(parsed.items[0]).toMatchObject({ title: "交通情報を更新", summary: "短い概要です。", url: "https://news.example.test/articles/one" });
   });
 });

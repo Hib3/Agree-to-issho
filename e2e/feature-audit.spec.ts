@@ -58,6 +58,15 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("settings-controlled sound and RSS news work through the player UI", async ({ page }) => {
+  await page.route("https://science.example.test/", async (route) => route.abort("failed"));
+  await page.route("https://feedsearch.dev/api/v1/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify([{ url: "https://news.example.test/feed.xml", title: "科学便り", score: 10 }])
+    });
+  });
   await page.route("https://news.example.test/feed.xml", async (route) => {
     await route.fulfill({
       status: 200,
@@ -78,8 +87,9 @@ test("settings-controlled sound and RSS news work through the player UI", async 
   await expect(preview).toBeDisabled();
   await mute.uncheck();
 
-  await page.getByRole("textbox", { name: "RSS URL" }).fill("https://news.example.test/feed.xml");
-  await page.getByRole("button", { name: "追加" }).click();
+  await page.getByRole("checkbox", { name: "直接読めないRSSの取得補助を使う" }).check();
+  await page.getByRole("textbox", { name: "サイトまたはRSSのURL" }).fill("https://science.example.test/");
+  await page.getByRole("button", { name: "探して追加" }).click();
   await expect(page.getByRole("status")).toContainText("新しいニュースを1件保存しました");
   await page.getByRole("button", { name: "部屋へ戻る" }).click();
 
@@ -92,6 +102,33 @@ test("settings-controlled sound and RSS news work through the player UI", async 
   if (await reveal.isVisible()) await reveal.click();
   await expect(page.getByText(/背景や真偽までは決められません/u)).toBeVisible();
   await expect(page.getByRole("link", { name: "元の記事を開く" })).toHaveAttribute("href", "https://news.example.test/articles/space-1");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("character remains bright, layered correctly, and large while teaching", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await enterRoom(page);
+
+  const stage = page.locator(".character-stage").first();
+  const character = stage.locator(".character");
+  const lighting = await character.evaluate((element) => ({
+    filter: getComputedStyle(element).filter,
+    zIndex: Number(getComputedStyle(element).zIndex),
+    overlayZIndex: Number(getComputedStyle(element.parentElement?.querySelector(".scene-light") as Element).zIndex)
+  }));
+  const brightness = Number(lighting.filter.match(/brightness\(([^)]+)\)/u)?.[1] ?? 0);
+  expect(brightness).toBeGreaterThanOrEqual(1);
+  expect(lighting.zIndex).toBeGreaterThan(lighting.overlayZIndex);
+  const stageBox = await stage.boundingBox();
+  const characterBox = await character.boundingBox();
+  expect((characterBox?.height ?? 0) / (stageBox?.height ?? 1)).toBeGreaterThan(0.5);
+
+  await page.getByRole("button", { name: "言葉を教える" }).click();
+  const compactStage = page.locator(".character-stage.compact");
+  await expect(compactStage.locator(".character")).toBeVisible();
+  const compactStageBox = await compactStage.boundingBox();
+  const compactCharacterBox = await compactStage.locator(".character").boundingBox();
+  expect((compactCharacterBox?.height ?? 0) / (compactStageBox?.height ?? 1)).toBeGreaterThan(0.65);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -110,6 +147,12 @@ test("secondary screens remain reachable without trapping the player", async ({ 
     await page.getByRole("button", { name: "部屋へ戻る" }).click();
     await expect(page.getByRole("button", { name: "話す" })).toBeVisible();
   }
+
+  await page.getByRole("button", { name: "設定" }).click();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "部屋へ戻る" }).click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
 
 test("JSON backup can be exported, validated, and imported", async ({ page }) => {

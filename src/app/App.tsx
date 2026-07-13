@@ -19,10 +19,15 @@ export function App() {
   const initialize = store.initialize;
   const settings = store.settings;
   const refresh = store.refresh;
+  const screen = !store.player && store.screen !== "onboarding" ? "onboarding" : store.screen;
 
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [screen]);
 
   useEffect(() => {
     if (!settings?.newsEnabled || settings.newsFeeds.length === 0) return;
@@ -51,7 +56,6 @@ export function App() {
   if (store.error) return <main className="error-screen"><h1>部屋を開けませんでした</h1><p>{store.error}</p><button type="button" onClick={() => location.reload()}>もう一度</button></main>;
 
   const userWordCount = store.concepts.filter((concept) => concept.source === "user").length;
-  const screen = !store.player && store.screen !== "onboarding" ? "onboarding" : store.screen;
   const rootClass = [store.settings?.highContrast ? "high-contrast" : "", store.settings ? `font-${store.settings.fontScale}` : ""].filter(Boolean).join(" ");
 
   async function startNewGame() {

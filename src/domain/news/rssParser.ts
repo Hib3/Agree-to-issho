@@ -48,6 +48,34 @@ export function parseRss2Json(data: unknown, feedId: string, feedUrl: string, fe
   return { title: feedTitle, items };
 }
 
+export function parseReaderMarkdown(markdown: string, feedId: string, feedUrl: string, fetchedAt = Date.now()): ParsedFeed {
+  const feedTitle = cleanText(markdown.match(/^Title:\s*(.+)$/imu)?.[1] ?? "", 80) || hostName(feedUrl);
+  const headingPattern = /^#{2,4}\s+\[([^\]\r\n]+)\]\((https?:\/\/[^)\s]+)\)\s*$/gimu;
+  const headings = Array.from(markdown.matchAll(headingPattern)).slice(0, 20);
+  const items = headings.flatMap((heading, index) => {
+    const title = cleanText(heading[1] ?? "", 140);
+    const url = safeArticleUrl(heading[2] ?? "", feedUrl);
+    if (!title || !url) return [];
+    const chunkStart = (heading.index ?? 0) + heading[0].length;
+    const chunkEnd = headings[index + 1]?.index ?? markdown.length;
+    const lines = markdown.slice(chunkStart, chunkEnd).split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+    const dateLine = lines.find((line) => Number.isFinite(Date.parse(line)));
+    const summaryLine = lines.find((line) => isReaderSummaryLine(line, dateLine));
+    return [{
+      id: newsId(feedId, url),
+      feedId,
+      sourceName: feedTitle,
+      title,
+      summary: cleanText(stripMarkdownLink(summaryLine ?? ""), 240),
+      url,
+      publishedAt: parseDate(dateLine ?? "", fetchedAt),
+      fetchedAt
+    } satisfies NewsItem];
+  });
+  if (items.length === 0) throw new Error("取得補助から読める見出しがありませんでした。");
+  return { title: feedTitle, items };
+}
+
 function parseEntry(entry: Element, atom: boolean, feedId: string, feedTitle: string, feedUrl: string, fetchedAt: number) {
   const title = cleanText(textOf(entry, "title"), 140);
   const linkElement = elements(entry, "link").find((link) => !link.getAttribute("rel") || link.getAttribute("rel") === "alternate");
@@ -122,4 +150,16 @@ function newsId(feedId: string, sourceId: string) {
 
 function scalarText(value: unknown) {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function isReaderSummaryLine(line: string, dateLine: string | undefined) {
+  if (line === dateLine) return false;
+  if (/^(?:Title|URL Source|Markdown Content):/iu.test(line)) return false;
+  if (/^https?:\/\//iu.test(line)) return false;
+  if (/^\[[^\]]+\]\(https?:\/\/[^)]+\)$/iu.test(line)) return false;
+  return true;
+}
+
+function stripMarkdownLink(value: string) {
+  return value.replace(/\[([^\]]+)\]\([^)]+\)/gu, "$1");
 }

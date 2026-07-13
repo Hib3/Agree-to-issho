@@ -1,10 +1,14 @@
 import type { NewsFeedConfig, NewsRefreshReport } from "../../domain/model/news";
 import type { GameSettings } from "../../domain/model/player";
-import { parseRss2Json, parseRssXml } from "../../domain/news/rssParser";
+import { parseReaderMarkdown, parseRss2Json, parseRssXml } from "../../domain/news/rssParser";
 import { db } from "../db/database";
 
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_FEED_BYTES = 1_000_000;
+const FEEDSEARCH_ENDPOINT = "https://feedsearch.dev/api/v1/search";
+const READER_ENDPOINT = "https://r.jina.ai/";
+const FEED_ACCEPT = "application/rss+xml, application/atom+xml, application/xml, text/xml, application/json";
+const DISCOVERY_ACCEPT = `${FEED_ACCEPT}, text/html`;
 
 export function createNewsFeed(urlText: string, now = Date.now()): NewsFeedConfig {
   const url = publicFeedUrl(urlText);
@@ -15,6 +19,46 @@ export function createNewsFeed(urlText: string, now = Date.now()): NewsFeedConfi
     enabled: true,
     addedAt: now
   };
+}
+
+export async function discoverNewsFeed(urlText: string, useHelper: boolean, now = Date.now()): Promise<NewsFeedConfig> {
+  const input = publicFeedUrl(urlText);
+  let directError: unknown;
+  let directDocumentRead = false;
+
+  try {
+    const response = await fetchWithTimeout(input.href, DISCOVERY_ACCEPT);
+    const text = await limitedText(response);
+    directDocumentRead = true;
+    try {
+      const parsed = parseRssXml(text, `discovery_${hashText(input.href)}`, input.href, now);
+      return { ...createNewsFeed(input.href, now), name: parsed.title };
+    } catch {
+      const discovered = extractFeedLinks(text, input.href);
+      if (discovered[0]) return createNewsFeed(discovered[0], now);
+      directError = new Error("このページからRSSを見つけられませんでした。");
+    }
+  } catch (error) {
+    directError = error;
+  }
+
+  if (!directDocumentRead && looksLikeFeedUrl(input)) return createNewsFeed(input.href, now);
+
+  if (useHelper) {
+    try {
+      const discovered = await discoverWithFeedsearch(input.href);
+      if (discovered) return { ...createNewsFeed(discovered.url, now), name: discovered.title || new URL(discovered.url).hostname };
+    } catch (error) {
+      if (!looksLikeFeedUrl(input)) {
+        throw new Error(`RSS検索に失敗しました。${readableError(error)}`);
+      }
+    }
+  }
+
+  if (!useHelper && !directDocumentRead) {
+    throw new Error("サイトを直接確認できませんでした。取得補助を有効にするとRSSを探せる場合があります。");
+  }
+  throw directError instanceof Error ? directError : new Error("このURLからRSSを見つけられませんでした。");
 }
 
 export function shouldRefreshNews(settings: GameSettings, now = Date.now()) {
@@ -92,13 +136,63 @@ async function fetchFeed(feed: NewsFeedConfig, useRss2Json: boolean, now: number
     return parseRssXml(text, feed.id, feed.url, now);
   } catch (directError) {
     if (!useRss2Json) throw directError;
-    const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
-    const response = await fetchWithTimeout(endpoint);
-    return parseRss2Json(JSON.parse(await limitedText(response)), feed.id, feed.url, now);
+    let rss2JsonError: unknown;
+    try {
+      const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
+      const response = await fetchWithTimeout(endpoint, "application/json");
+      return parseRss2Json(JSON.parse(await limitedText(response)), feed.id, feed.url, now);
+    } catch (error) {
+      rss2JsonError = error;
+    }
+    try {
+      const response = await fetchWithTimeout(`${READER_ENDPOINT}${feed.url}`, "text/plain");
+      return parseReaderMarkdown(await limitedText(response), feed.id, feed.url, now);
+    } catch (readerError) {
+      throw new Error(`直接取得と取得補助の両方に失敗しました。rss2json: ${readableError(rss2JsonError)} / Reader: ${readableError(readerError)}`);
+    }
   }
 }
 
-async function fetchWithTimeout(url: string) {
+async function discoverWithFeedsearch(siteUrl: string) {
+  const endpoint = `${FEEDSEARCH_ENDPOINT}?url=${encodeURIComponent(siteUrl)}&info=true&favicon=false&opml=false`;
+  const response = await fetchWithTimeout(endpoint, "application/json");
+  const data: unknown = JSON.parse(await limitedText(response));
+  const candidates = feedsearchCandidates(data)
+    .filter((candidate) => {
+      try {
+        publicFeedUrl(candidate.url);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .sort((left, right) => Number(sameHost(right.url, siteUrl)) - Number(sameHost(left.url, siteUrl)) || right.score - left.score);
+  if (!candidates[0]) throw new Error("取得補助でもRSSが見つかりませんでした。");
+  return candidates[0];
+}
+
+export function extractFeedLinks(html: string, baseUrl: string) {
+  const document = new DOMParser().parseFromString(html, "text/html");
+  const selectors = [
+    'link[rel~="alternate"][type="application/rss+xml"]',
+    'link[rel~="alternate"][type="application/atom+xml"]',
+    'link[rel~="alternate"][type="application/feed+json"]',
+    'a[type="application/rss+xml"]',
+    'a[type="application/atom+xml"]'
+  ];
+  const links = selectors.flatMap((selector) => Array.from(document.querySelectorAll<HTMLLinkElement | HTMLAnchorElement>(selector)));
+  return [...new Set(links.flatMap((link) => {
+    const href = link.getAttribute("href");
+    if (!href) return [];
+    try {
+      return [publicFeedUrl(new URL(href, baseUrl).href).href];
+    } catch {
+      return [];
+    }
+  }))];
+}
+
+async function fetchWithTimeout(url: string, accept = FEED_ACCEPT) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -107,12 +201,42 @@ async function fetchWithTimeout(url: string) {
       credentials: "omit",
       cache: "no-store",
       referrerPolicy: "no-referrer",
-      headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, application/json" }
+      headers: { Accept: accept }
     });
     if (!response.ok) throw new Error(`取得先がHTTP ${response.status}を返しました。`);
     return response;
   } finally {
     window.clearTimeout(timer);
+  }
+}
+
+function feedsearchCandidates(data: unknown) {
+  const records = Array.isArray(data)
+    ? data
+    : data && typeof data === "object" && Array.isArray((data as { result?: unknown }).result)
+      ? (data as { result: unknown[] }).result
+      : [];
+  return records.flatMap((record) => {
+    if (!record || typeof record !== "object") return [];
+    const candidate = record as { url?: unknown; title?: unknown; score?: unknown };
+    if (typeof candidate.url !== "string") return [];
+    return [{
+      url: candidate.url,
+      title: typeof candidate.title === "string" ? candidate.title.slice(0, 80) : "",
+      score: typeof candidate.score === "number" ? candidate.score : 0
+    }];
+  });
+}
+
+function looksLikeFeedUrl(url: URL) {
+  return /(?:\.(?:xml|rss|atom)(?:$|[?#])|\/(?:rss(?:_?2(?:\.0)?)?|atom)(?:\/|$)|[?&]feed=(?:rss|rss2|atom))/iu.test(url.href);
+}
+
+function sameHost(left: string, right: string) {
+  try {
+    return new URL(left).hostname === new URL(right).hostname;
+  } catch {
+    return false;
   }
 }
 

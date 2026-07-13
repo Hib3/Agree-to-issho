@@ -3,7 +3,7 @@ import { Plus, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import type { GameSettings } from "../../domain/model/player";
 import { playGameSound } from "../../infrastructure/audio/gameAudio";
 import { db } from "../../infrastructure/db/database";
-import { createNewsFeed, refreshNews, removeNewsFeed } from "../../infrastructure/news/newsService";
+import { discoverNewsFeed, refreshNews, removeNewsFeed } from "../../infrastructure/news/newsService";
 import { ScreenHeader } from "../../ui/components/ScreenHeader";
 import { StorageStatus } from "../../ui/components/StorageStatus";
 
@@ -31,18 +31,22 @@ export function SettingsScreen({ settings: persistedSettings, onBack, onChanged 
   }
 
   async function addFeed() {
-    setNewsStatus("");
+    setNewsStatus("RSSを探しています…");
+    setRefreshing(true);
     try {
-      const feed = createNewsFeed(feedUrl);
+      const now = Date.now();
+      const feed = { ...await discoverNewsFeed(feedUrl, settings.newsUseRss2Json, now), lastCheckedAt: now };
       if (settings.newsFeeds.some((item) => item.url === feed.url)) {
         setNewsStatus("このRSSは登録済みです。");
         return;
       }
       const next = await patch({ newsEnabled: true, newsFeeds: [...settings.newsFeeds, feed] });
       setFeedUrl("");
-      await refreshFeeds(next, true);
+      await refreshFeeds({ ...next, newsFeeds: [feed] }, true);
     } catch (error) {
       setNewsStatus(error instanceof Error ? error.message : "RSSを登録できませんでした。");
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -105,11 +109,11 @@ export function SettingsScreen({ settings: persistedSettings, onBack, onChanged 
           <label>自動更新<select value={settings.newsRefreshMinutes} onChange={(event) => void patch({ newsRefreshMinutes: Number(event.target.value) as GameSettings["newsRefreshMinutes"] })}><option value={15}>15分ごと</option><option value={30}>30分ごと</option><option value={60}>1時間ごと</option><option value={180}>3時間ごと</option></select></label>
           <p className="settings-help">アプリを開いている間と、オンラインへ戻った時に更新を確認します。</p>
           <form className="rss-add-row" onSubmit={(event) => { event.preventDefault(); void addFeed(); }}>
-            <label>RSS URL<input type="url" value={feedUrl} placeholder="https://example.com/feed.xml" onChange={(event) => setFeedUrl(event.target.value)} /></label>
-            <button className="quiet" type="submit" disabled={!feedUrl.trim() || refreshing}><Plus aria-hidden="true" />追加</button>
+            <label>サイトまたはRSSのURL<input type="url" value={feedUrl} placeholder="https://example.com/" onChange={(event) => setFeedUrl(event.target.value)} /></label>
+            <button className="quiet" type="submit" disabled={!feedUrl.trim() || refreshing}><Plus aria-hidden="true" />探して追加</button>
           </form>
           <label className="toggle-row"><input type="checkbox" checked={settings.newsUseRss2Json} onChange={(event) => void patch({ newsUseRss2Json: event.target.checked })} />直接読めないRSSの取得補助を使う</label>
-          <p className="settings-help">取得補助を有効にすると、登録したRSS URLだけが rss2json.com へ送られます。記事全文は保存しません。</p>
+          <p className="settings-help">取得補助を有効にすると、RSS URLは rss2json.com または jina.ai、RSSを探すサイトURLは feedsearch.dev へ送られます。保存するのは見出しと短い説明だけです。<br /><a href="https://feedsearch.dev" target="_blank" rel="noreferrer">RSS検索: Feedsearch</a> / <a href="https://jina.ai/reader/" target="_blank" rel="noreferrer">取得補助: Reader</a></p>
           {settings.newsFeeds.length > 0 ? (
             <ul className="rss-feed-list">
               {settings.newsFeeds.map((feed) => (
