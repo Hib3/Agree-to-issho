@@ -47,7 +47,8 @@ async function advanceToChoice(page: Page, choiceName: string) {
 
 test("CORS consent leads into a reload-safe normal news conversation", async ({ page }) => {
   const feedUrl = "https://news.example.test/news.xml";
-  const articleUrl = "https://news.example.test/articles/train-display";
+  const articleUrl = "https://news.example.test/pickup/train-display";
+  const fullArticleUrl = "https://news.example.test/articles/train-display";
   await page.route(feedUrl, async (route) =>
     route.fulfill({
       status: 200,
@@ -57,19 +58,32 @@ test("CORS consent leads into a reload-safe normal news conversation", async ({ 
     })
   );
   await page.route(articleUrl, (route) => route.abort("failed"));
-  await page.route("https://r.jina.ai/**", async (route) =>
-    route.fulfill({
+  await page.route("https://r.jina.ai/**", async (route) => {
+    const isFullArticle = route.request().url().includes("/articles/train-display");
+    await route.fulfill({
       status: 200,
       contentType: "text/plain",
       headers: { "access-control-allow-origin": "*" },
-      body: [
-        "Title: 三つの駅で案内表示を試験",
-        "Markdown Content:",
-        "交通局は三つの駅で銀河案内板を試すと発表しました。試験は七月から始まり、利用者の反応を確認します。",
-        "新しい表示は日本語と英語に対応し、迷いやすい改札付近から順番に設置される予定です。"
-      ].join("\n")
-    })
-  );
+      body: isFullArticle
+        ? [
+            "Title: 三つの駅で案内表示を試験",
+            "Markdown Content:",
+            "# 三つの駅で銀河案内板を試験",
+            "コメント 12 件",
+            "交通局は三つの駅で銀河案内板を試すと発表しました。試験は七月から始まり、利用者の反応を確認します。",
+            "新しい表示は日本語と英語に対応し、迷いやすい改札付近から順番に設置される予定です。",
+            "記事に関する報告",
+            "ランキングの記事をもっと見る。"
+          ].join("\n")
+        : [
+            "Title: ニュース一覧",
+            "Markdown Content:",
+            "Yahoo! JAPAN ヘルプ ウェブ検索 マイページの記事一覧です。",
+            `[記事全文を読む](${fullArticleUrl})`,
+            "ランキングの記事をもっと見る。"
+          ].join("\n")
+    });
+  });
 
   await enterRoom(page);
   await registerFeed(page, feedUrl);
@@ -81,7 +95,8 @@ test("CORS consent leads into a reload-safe normal news conversation", async ({ 
   await page.getByRole("button", { name: "今回だけ許可" }).click();
 
   await expect(page.getByText("ニュースの記事について会話中")).toBeVisible();
-  await expect(page.getByRole("link", { name: "元記事" })).toHaveAttribute("href", articleUrl);
+  await expect(page.getByRole("link", { name: "元記事" })).toHaveAttribute("href", fullArticleUrl);
+  await expect(page.locator(".dialogue-box")).not.toContainText(/Yahoo! JAPAN|ランキング|記事全文/u);
   await advanceToChoice(page, "少し違うと思う");
   await page.getByRole("button", { name: "少し違うと思う" }).click();
   await page.getByRole("button", { name: "この返事にする" }).click();

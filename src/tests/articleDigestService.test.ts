@@ -3,7 +3,8 @@ import type { NewsItem } from "../domain/model/news";
 import {
   assessArticleText,
   buildFeedDigest,
-  fetchArticleDigest
+  fetchArticleDigest,
+  findReaderArticleUrl
 } from "../infrastructure/news/articleDigestService";
 
 const now = 1_700_000_000_000;
@@ -118,6 +119,120 @@ describe("article digest service", () => {
     expect(result.digest.contentLevel).toBe("article_extract");
     expect(result.needsHelperConsent).toBe(false);
     expect(result.trace.attempts.filter((attempt) => attempt.method === "fallback_headline")).toHaveLength(0);
+  });
+
+  it("follows one explicit full-article link and excludes portal strings", async () => {
+    const pickupUrl = "https://news.example.test/pickup/123";
+    const articleUrl = "https://news.example.test/articles/full-123";
+    const pickup = [
+      "Title: ニュース一覧",
+      `URL Source: ${pickupUrl}`,
+      "Markdown Content:",
+      "Yahoo! JAPAN ヘルプ ウェブ検索 マイページの記事一覧です。",
+      `[別の記事](https://news.example.test/articles/unrelated)`,
+      `[記事全文を読む](${articleUrl})`,
+      "ランキングの記事をもっと見る。ニュース一覧を更新しました。"
+    ].join("\n");
+    const article = [
+      `Title: ${item.title}`,
+      `URL Source: ${articleUrl}`,
+      "Markdown Content:",
+      `# ${item.title}`,
+      "コメント 23 件",
+      "交通局は七月から三つの駅で新しい表示を試し、利用者の反応を調べると発表しました。[【写真で見る】駅の表示](https://images.example.test/gallery)",
+      "試験結果は九月に市の会議で詳しく報告され、利用者の意見を踏まえて今後の設置場所を決める予定です。",
+      "この記事はいかがでしたか？",
+      "関連記事のランキングを表示します。"
+    ].join("\n");
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(pickup, { status: 200 }))
+      .mockResolvedValueOnce(new Response(article, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchArticleDigest(
+      { ...item, url: pickupUrl },
+      {
+        useArticleHelper: true,
+        attemptDirect: false,
+        now
+      }
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, `https://r.jina.ai/${pickupUrl}`, expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, `https://r.jina.ai/${articleUrl}`, expect.any(Object));
+    expect(result.digest.contentLevel).toBe("article_extract");
+    expect(result.digest.sourceUrl).toBe(articleUrl);
+    const facts = result.digest.keyFacts.map((fact) => fact.text).join(" ");
+    expect(facts).toContain("七月");
+    expect(facts).not.toMatch(
+      /Yahoo|ランキング|記事全文|写真で見る|https?:|Markdown Content|\[object Object\]/u
+    );
+    expect(result.trace.attempts.filter((attempt) => attempt.method === "reader_helper")).toHaveLength(2);
+  });
+
+  it("does not follow an unrelated article link from a landing page", () => {
+    const markdown = [
+      "Markdown Content:",
+      "[注目の記事](https://example.com/unrelated)",
+      "記事の一覧だけを表示しています。"
+    ].join("\n");
+    expect(findReaderArticleUrl(markdown, item.url)).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: "GIGAZINE-like article",
+      markdown: [
+        `Title: ${item.title}`,
+        "Markdown Content:",
+        `# ${item.title}`,
+        "![Image 18](https://images.example.test/news.jpg)",
+        "交通局は三つの駅で新しい案内表示を試すことを発表しました。利用者の反応を七月から確認します。",
+        "**[発表資料](https://example.test/source)**",
+        "市は試験の結果を九月に詳しく公表し、利用者の意見を踏まえて次の設置場所を検討する予定です。"
+      ].join("\n")
+    },
+    {
+      name: "Lifehacker-like article",
+      markdown: [
+        `Title: ${item.title}`,
+        "Markdown Content:",
+        "* [](https://social.example.test/share)",
+        `# ${item.title}`,
+        "Buy PR",
+        "2026.07.14 lastupdate",
+        "Advertisement",
+        "* [](https://social.example.test/share-again)",
+        "新しい案内表示を気軽に使いたい人へ向けて、交通局が三つの駅で試験を始めると発表しました。",
+        "表示は日本語と英語に対応し、七月から利用者の反応を確認して今後の設置場所を検討する予定です。"
+      ].join("\n")
+    }
+  ])("extracts prose from $name without markdown or sharing strings", async ({ markdown }) => {
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(markdown, { status: 200 })));
+    const result = await fetchArticleDigest(item, { useArticleHelper: true, attemptDirect: false, now });
+    const facts = result.digest.keyFacts.map((fact) => fact.text).join(" ");
+    expect(result.digest.contentLevel).toBe("article_extract");
+    expect(facts).toContain("交通局");
+    expect(facts).not.toMatch(/Advertisement|Buy PR|https?:|\*\*|Image 18/u);
+  });
+
+  it("rejects reader output made only of navigation and internal strings", async () => {
+    const markdown = [
+      "Title: ニュースポータル",
+      "URL Source: https://portal.example.test/",
+      "Markdown Content:",
+      "Yahoo! JAPAN ヘルプ ウェブ検索 マイページの記事一覧です。",
+      "ランキングのニュース記事をもっと見る。ニュース一覧を更新しました。",
+      "[object Object] undefined"
+    ].join("\n");
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(markdown, { status: 200 })));
+    const result = await fetchArticleDigest(item, { useArticleHelper: true, attemptDirect: false, now });
+    expect(result.digest.contentLevel).toBe("feed_summary");
+    expect(result.trace.attempts).toContainEqual(
+      expect.objectContaining({ method: "reader_helper", result: "too_short" })
+    );
+    expect(JSON.stringify(result.digest)).not.toMatch(/\[object Object\]|undefined|Yahoo! JAPAN/u);
   });
 
   it("keeps the fallback and records a helper HTTP failure", async () => {

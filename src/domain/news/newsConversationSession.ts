@@ -58,7 +58,7 @@ export function createNewsConversationSession(input: {
       type: "news",
       newsItemId: item.id,
       articleDigest: compactDigest(digest),
-      sourceUrl: item.url,
+      sourceUrl: digest.sourceUrl,
       contentLevel: digest.contentLevel,
       fetchTrace,
       selectedIssueIds: plan.selectedIssueIds,

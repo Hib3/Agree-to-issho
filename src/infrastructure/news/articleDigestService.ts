@@ -155,37 +155,63 @@ export async function fetchArticleDigest(
     );
   }
 
-  const helperStartedAt = Date.now();
-  try {
-    const response = await fetchArticleText(`${READER_ENDPOINT}${item.url}`, "text/plain", options.signal);
-    const text = extractReaderText(response.text);
-    const assessment = assessArticleText(text, item.title);
-    trace.attempts.push({
-      method: "reader_helper",
-      startedAt: helperStartedAt,
-      finishedAt: Date.now(),
-      result: assessment.useful ? "success" : "too_short",
-      statusCode: response.statusCode,
-      contentType: response.contentType,
-      extractedCharacters: Array.from(text).length,
-      ...(!assessment.useful ? { detail: assessment.reason } : {})
-    });
-    if (assessment.useful)
-      return finishArticleFetch(digestFromArticle(item, text, item.url, now), trace, false);
-    directFailure = assessment.reason;
-  } catch (error) {
-    if (options.signal?.aborted) throw error;
-    const failure = articleAttemptFailure(error);
-    directFailure = failure.detail;
-    trace.attempts.push({
-      method: "reader_helper",
-      startedAt: helperStartedAt,
-      finishedAt: Date.now(),
-      result: failure.result,
-      ...(failure.statusCode ? { statusCode: failure.statusCode } : {}),
-      ...(failure.contentType ? { contentType: failure.contentType } : {}),
-      detail: failure.detail
-    });
+  let helperTarget = item.url;
+  for (let hop = 0; hop < 2; hop += 1) {
+    const helperStartedAt = Date.now();
+    try {
+      const response = await fetchArticleText(
+        `${READER_ENDPOINT}${helperTarget}`,
+        "text/plain",
+        options.signal
+      );
+      const resolvedArticleUrl = hop === 0 ? findReaderArticleUrl(response.text, item.url) : undefined;
+      if (resolvedArticleUrl && resolvedArticleUrl !== helperTarget) {
+        const landingText = extractReaderText(response.text, item.title);
+        trace.attempts.push({
+          method: "reader_helper",
+          startedAt: helperStartedAt,
+          finishedAt: Date.now(),
+          result: "too_short",
+          statusCode: response.statusCode,
+          contentType: response.contentType,
+          extractedCharacters: Array.from(landingText).length,
+          detail: "記事一覧ページから、明示された本文リンクを確認しました。"
+        });
+        helperTarget = resolvedArticleUrl;
+        continue;
+      }
+
+      const text = extractReaderText(response.text, item.title);
+      const assessment = assessArticleText(text, item.title);
+      trace.attempts.push({
+        method: "reader_helper",
+        startedAt: helperStartedAt,
+        finishedAt: Date.now(),
+        result: assessment.useful ? "success" : "too_short",
+        statusCode: response.statusCode,
+        contentType: response.contentType,
+        extractedCharacters: Array.from(text).length,
+        ...(!assessment.useful ? { detail: assessment.reason } : {})
+      });
+      if (assessment.useful)
+        return finishArticleFetch(digestFromArticle(item, text, helperTarget, now), trace, false);
+      directFailure = assessment.reason;
+      break;
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      const failure = articleAttemptFailure(error);
+      directFailure = failure.detail;
+      trace.attempts.push({
+        method: "reader_helper",
+        startedAt: helperStartedAt,
+        finishedAt: Date.now(),
+        result: failure.result,
+        ...(failure.statusCode ? { statusCode: failure.statusCode } : {}),
+        ...(failure.contentType ? { contentType: failure.contentType } : {}),
+        detail: failure.detail
+      });
+      break;
+    }
   }
 
   return finishArticleFetch(
@@ -327,6 +353,8 @@ export function assessArticleText(text: string, headline: string) {
   if (characters < 80) return { useful: false as const, reason: "本文として使える文字数が足りません。" };
   if (isNearDuplicate(cleaned, headline))
     return { useful: false as const, reason: "見出しとほぼ同じ内容だけでした。" };
+  if (/(?:\[object Object\]|Markdown Content:|URL Source:|(?:^|\s)undefined(?:\s|$))/iu.test(cleaned))
+    return { useful: false as const, reason: "記事ではない内部文字列が含まれていました。" };
   const segments = cleaned
     .split(/(?<=[。！？!?])\s*/u)
     .map((part) => part.trim())
@@ -457,20 +485,78 @@ function extractArticleText(source: string, contentType: string) {
   return limitArticleText(paragraphs);
 }
 
-function extractReaderText(markdown: string) {
-  const lines = markdown
-    .split(/\r?\n/u)
-    .map((line) =>
-      line
-        .replace(/^#{1,6}\s+/u, "")
-        .replace(/!\[[^\]]*\]\([^)]+\)/gu, "")
-        .replace(/\[([^\]]+)\]\([^)]+\)/gu, "$1")
-        .trim()
+export function findReaderArticleUrl(markdown: string, sourceUrl: string) {
+  const content = markdown.split(/^Markdown Content:\s*$/imu).at(-1) ?? markdown;
+  const links = Array.from(content.matchAll(/\[([^\]\r\n]+)\]\((https:\/\/[^)\s]+)\)/giu));
+  const explicit = links.find((match) =>
+    /^(?:(?:記事の?)?全文(?:を読む|はこちら|へ)|続きを読む|続き(?:を読む|はこちら))$/u.test(
+      match[1]?.trim() ?? ""
     )
-    .filter(
-      (line) => line.length >= 20 && !/^(?:Title|URL Source|Published Time|Markdown Content):/iu.test(line)
+  );
+  const target = explicit?.[2];
+  if (!target) return undefined;
+  try {
+    const resolved = new URL(target);
+    const source = new URL(sourceUrl);
+    if (resolved.protocol !== "https:" || resolved.username || resolved.password) return undefined;
+    if (resolved.href === source.href) return undefined;
+    return resolved.href;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractReaderText(markdown: string, headline: string) {
+  const metadataTitle = markdown.match(/^Title:\s*(.+)$/imu)?.[1]?.trim() ?? "";
+  const content = markdown.split(/^Markdown Content:\s*$/imu).at(-1) ?? markdown;
+  const rawLines = content.split(/\r?\n/u);
+  const headingIndex = rawLines.findIndex((line) => {
+    const heading = sanitizeArticlePart(line.replace(/^#{1,6}\s+/u, ""));
+    return (
+      heading.length >= 8 && (isNearDuplicate(heading, headline) || isNearDuplicate(heading, metadataTitle))
     );
-  return limitArticleText(lines);
+  });
+  const candidates = rawLines.slice(headingIndex >= 0 ? headingIndex + 1 : 0);
+  const selected: string[] = [];
+  for (const raw of candidates) {
+    const text = sanitizeArticlePart(raw.replace(/^#{1,6}\s+/u, ""));
+    if (isReaderSectionEnd(text)) {
+      if (selected.length > 0) break;
+      continue;
+    }
+    if (!isReaderProseLine(text, headline, metadataTitle)) continue;
+    selected.push(text);
+  }
+  return limitArticleText(selected);
+}
+
+function isReaderSectionEnd(text: string) {
+  return /^(?:この記事はいかがでしたか|記事に関する報告|関連記事|【関連記事】|こんな記事も読まれています|おすすめ|ランキング|コメント|最終更新)/u.test(
+    text
+  );
+}
+
+function isReaderProseLine(text: string, headline: string, metadataTitle: string) {
+  if (text.length < 20 || isNearDuplicate(text, headline) || isNearDuplicate(text, metadataTitle))
+    return false;
+  if (
+    /^(?:Yahoo! JAPAN|トップ|速報|ライブ|エキスパート|オリジナル|みんなの意見|マイページ|購入履歴|ヘルプ|ウェブ検索|ログイン)/iu.test(
+      text
+    )
+  )
+    return false;
+  if (
+    /(?:記事全文を読む|この記事を非表示|シェアする|配信社から|無断転載|Copyright|All Rights Reserved)/iu.test(
+      text
+    )
+  )
+    return false;
+  if (/(?:\[object Object\]|Markdown Content:|URL Source:|(?:^|\s)undefined(?:\s|$))/iu.test(text))
+    return false;
+  const navigationLinks = (text.match(/(?:ニュース|記事|一覧|トップ|ランキング|もっと見る)/gu) ?? []).length;
+  const hasSentenceEnding = /[。！？!?]/u.test(text);
+  const hasJapanese = /[ぁ-んァ-ヶ一-龠]/u.test(text);
+  return hasJapanese && hasSentenceEnding && navigationLinks < 3;
 }
 
 function limitArticleText(parts: string[]) {
@@ -478,7 +564,7 @@ function limitArticleText(parts: string[]) {
   const selected: string[] = [];
   let characters = 0;
   for (const raw of parts) {
-    const text = cleanFeedText(raw, 1_200);
+    const text = sanitizeArticlePart(raw);
     if (!text || seen.has(text)) continue;
     seen.add(text);
     const remaining = MAX_ARTICLE_CHARACTERS - characters;
@@ -488,6 +574,22 @@ function limitArticleText(parts: string[]) {
     characters += Array.from(clipped).length;
   }
   return selected.join("\n");
+}
+
+function sanitizeArticlePart(raw: string) {
+  if (/^\s*[{[][^\r\n]{0,120}["']?\w+["']?\s*:/u.test(raw)) return "";
+  return cleanFeedText(
+    raw
+      .replace(/!\[[^\]]*\]\([^)]+\)/gu, "")
+      .replace(/\[(?:【[^】]*(?:写真|画像|動画|図)[^】]*】|写真で見る|画像を見る)[^\]]*\]\([^)]+\)/gu, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/gu, "$1")
+      .replace(/https?:\/\/\S+/giu, "")
+      .replace(/<[^>]+>/gu, " ")
+      .replace(/[*_`~]{1,3}/gu, "")
+      .replace(/(?:\[object Object\]|(?:^|\s)undefined(?=\s|$))/giu, " ")
+      .replace(/^\s*(?:[-*+]|>)+\s*/u, ""),
+    1_200
+  );
 }
 
 async function fetchArticleText(url: string, accept: string, parentSignal?: AbortSignal) {
