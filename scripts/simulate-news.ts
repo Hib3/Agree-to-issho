@@ -39,6 +39,7 @@ let sensitiveImagination = 0;
 let headlineBodyClaims = 0;
 let genericInterest = 0;
 let sourceLinkPrompt = 0;
+let specificGroundedFacts = 0;
 
 for (let index = 0; index < sampleCount; index += 1) {
   const sensitive = index % 4 === 3;
@@ -126,6 +127,7 @@ for (let index = 0; index < sampleCount; index += 1) {
     headlineBodyClaims += 1;
   genericInterest += (transcript.match(/気になります/gu) ?? []).length;
   sourceLinkPrompt += (transcript.match(/元の記事/gu) ?? []).length;
+  if (plan.pages.some((page) => /ことを確認できます/u.test(page.text))) specificGroundedFacts += 1;
   if (plan.pages.length < 3 || plan.pages.length > 6) failures.push(`${index}:page-count`);
   if (plan.pages.some((page) => !page.source || !page.text)) failures.push(`${index}:missing-grounding`);
   if (/undefined|null|\[object Object\]/u.test(transcript)) failures.push(`${index}:artifact`);
@@ -138,6 +140,7 @@ if (sensitiveImagination > 0) failures.push(`sensitive-imagination:${sensitiveIm
 if (headlineBodyClaims > 0) failures.push(`headline-body-claims:${headlineBodyClaims}`);
 if (transcripts.size !== sampleCount)
   failures.push(`duplicate-transcripts:${sampleCount - transcripts.size}`);
+if (specificGroundedFacts < 300) failures.push(`specific-grounded-facts:${specificGroundedFacts}`);
 if (failures.length > 0) throw new Error(`news simulation failed: ${failures.slice(0, 20).join(" | ")}`);
 
 console.log(
@@ -156,7 +159,8 @@ console.log(
       sensitiveImagination,
       headlineBodyClaims,
       genericInterestRate: genericInterest / sampleCount,
-      sourceLinkPromptRate: sourceLinkPrompt / sampleCount
+      sourceLinkPromptRate: sourceLinkPrompt / sampleCount,
+      specificGroundedFactRate: specificGroundedFacts / sampleCount
     },
     null,
     2

@@ -10,9 +10,11 @@ import { buildNewsConversationPlan } from "../domain/news/newsExplanation";
 import {
   buildNewsDiscourseFrame,
   newsResponseSubject,
+  realizeHeadlineUnderstanding,
   realizeNewsOpening,
   realizeNewsOpinion,
   realizeNewsUnderstanding,
+  realizeNewsUncertainty,
   validateNewsJapanese
 } from "../domain/news/newsJapaneseNlg";
 
@@ -176,6 +178,28 @@ describe("600-viewpoint Japanese news generation", () => {
     const frame = buildNewsDiscourseFrame(item, digest, digest.issues);
 
     expect(realizeNewsOpening(frame)).toContain("『音声認識API「SpeechAnalyzer」を更新』");
+    expect(realizeHeadlineUnderstanding({ ...frame, contentLevel: "headline_only" })).toContain(
+      "『音声認識API「SpeechAnalyzer」を更新』"
+    );
+  });
+
+  it.each(contentLevels)("varies the %s evidence boundary without changing its meaning", (level) => {
+    const outputs = new Set(
+      [0, 1, 2, 3].map((variant) =>
+        realizeNewsUncertainty({
+          headline: "地域の更新",
+          topicKey: "general",
+          topicLabel: "地域",
+          contentLevel: level,
+          tone: "neutral",
+          sensitive: false,
+          focusLabel: "要点",
+          variant
+        })
+      )
+    );
+    expect(outputs.size).toBe(4);
+    expect([...outputs].every((text) => validateNewsJapanese(text).length === 0)).toBe(true);
   });
 
   it("uses topic-specific comparison and opinion language", () => {

@@ -40,6 +40,20 @@ describe("typed learning attributes", () => {
     expect(attributeMemoryBeat(letter!)).toContain("取り組める");
   });
 
+  it("keeps land snails out of the aquatic habitat memory", () => {
+    const snail = createDebugLearnedConcepts(100, now).find((concept) => concept.surface === "かたつむり");
+    expect(snail?.attributes.habitat).toBe("land");
+    expect(attributeMemoryBeat(snail!)).toContain("地面や野原");
+    expect(attributeMemoryBeat(snail!)).not.toContain("水の中や水辺");
+  });
+
+  it("varies attribute recall wording without changing the learned meaning", () => {
+    const letter = createDebugLearnedConcepts(100, now).find((concept) => concept.surface === "手紙")!;
+    const variants = [0, 1, 2].map((usageCount) => attributeMemoryBeat({ ...letter, usageCount }));
+    expect(new Set(variants).size).toBe(3);
+    expect(variants.every((text) => text.includes("家や屋内") && text.includes("取り組める"))).toBe(true);
+  });
+
   it("defines multiple category-specific questions", () => {
     expect(attributeQuestionsForCategory("person_name").map((item) => item.id)).toEqual([
       "honorific",

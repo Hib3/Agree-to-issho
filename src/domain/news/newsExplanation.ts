@@ -15,6 +15,7 @@ import { displayConcept } from "../grammar/japaneseRealizer";
 import {
   buildNewsDiscourseFrame,
   realizeNewsImagination,
+  realizeHeadlineUnderstanding,
   realizeNewsInterpretation,
   realizeNewsOpening,
   realizeNewsOpinion,
@@ -198,14 +199,9 @@ function buildUnderstanding(
     );
   }
   return [
-    beat(
-      item,
-      "understanding",
-      "headline",
-      "confused",
-      `今確認できる事実は、「${item.title}」という見出しが配信されたことまでです。`,
-      [`${item.id}_headline`]
-    )
+    beat(item, "understanding", "headline", "confused", realizeHeadlineUnderstanding(discourse), [
+      `${item.id}_headline`
+    ])
   ];
 }
 

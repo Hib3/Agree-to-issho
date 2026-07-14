@@ -10,6 +10,7 @@ import type {
   NewsItem
 } from "../../domain/model/news";
 import { cleanFeedText } from "../../domain/news/rssParser";
+import { extractGroundedNewsFact } from "../../domain/news/newsFactFrame";
 
 const ARTICLE_TIMEOUT_MS = 12_000;
 const MAX_ARTICLE_BYTES = 1_000_000;
@@ -288,7 +289,11 @@ function digestFromEvidence(
   }));
   const combined = evidence.map((entry) => entry.text).join(" ");
   const tone = classifyTone(combined);
-  const topics = classifyTopics(combined);
+  const topics = classifyTopics(
+    combined,
+    headline,
+    usableFacts.map((entry) => entry.text)
+  );
   const numericalFacts = evidence
     .flatMap((entry) =>
       Array.from(
@@ -395,15 +400,22 @@ function extractArticleIssues(
 ): ArticleIssue[] {
   const issues: ArticleIssue[] = facts.map((fact, index) => {
     const kind = issueKind(fact.text);
+    const hasGroundedFrame = Boolean(extractGroundedNewsFact(fact.text));
     return {
       id: `${itemId}_issue_${index}`,
       label: issueLabel(kind),
       summary: fact.text,
       evidenceIds: [fact.id, fact.evidenceId],
       kind,
-      importance: Math.min(1, 0.58 + (/(重要|影響|被害|変更|開始|停止|決定)/u.test(fact.text) ? 0.18 : 0)),
+      importance: Math.min(
+        1,
+        0.58 +
+          (/(重要|影響|被害|変更|開始|停止|決定)/u.test(fact.text) ? 0.18 : 0) +
+          (hasGroundedFrame ? 0.14 : 0)
+      ),
       relevanceToUser: /(生活|利用者|料金|交通|健康|安全|学校|仕事)/u.test(fact.text) ? 0.78 : 0.48,
-      suitabilityForOpinion: kind === "cause" || kind === "uncertainty" ? 0.45 : 0.72
+      suitabilityForOpinion:
+        (kind === "cause" || kind === "uncertainty" ? 0.45 : 0.72) + (hasGroundedFrame ? 0.12 : 0)
     };
   });
   for (const [index, numerical] of numericalFacts.entries()) {
@@ -736,7 +748,7 @@ function classifyTone(text: string): ArticleTone {
   return text ? "neutral" : "unknown";
 }
 
-function classifyTopics(text: string) {
+function classifyTopics(text: string, headline = "", facts: string[] = []) {
   const definitions: Array<[RegExp, string, string]> = [
     [/(原発|原子力|発電|電力|エネルギー)/u, "energy_environment", "エネルギーと環境"],
     [/(天気|気温|台風|大雨|地震|災害|雪|猛暑)/u, "weather_safety", "天気と安全"],
@@ -762,9 +774,25 @@ function classifyTopics(text: string) {
     [/(電車|鉄道|道路|交通|空港|運休|駅)/u, "transport", "交通"]
   ];
   const matched = definitions
-    .filter(([pattern]) => pattern.test(text))
-    .map(([, key, label]) => ({ key, label }));
+    .map(([pattern, key, label], index) => ({
+      key,
+      label,
+      index,
+      score:
+        Math.min(3, topicMatchCount(pattern, headline)) * 5 +
+        Math.min(2, topicMatchCount(pattern, facts[0] ?? "")) * 3 +
+        facts.slice(1).reduce((score, fact) => score + Math.min(2, topicMatchCount(pattern, fact)), 0) +
+        (topicMatchCount(pattern, text) > 0 ? 0.25 : 0)
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map(({ key, label }) => ({ key, label }));
   return matched.length > 0 ? matched.slice(0, 3) : [{ key: "general", label: "世の中の出来事" }];
+}
+
+function topicMatchCount(pattern: RegExp, text: string) {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  return Array.from(text.matchAll(new RegExp(pattern.source, flags))).length;
 }
 
 function extractEntities(text: string) {

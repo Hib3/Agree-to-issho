@@ -25,7 +25,7 @@ describe("grounded news explanation", () => {
     const transcript = pages.join("\n");
     expect(transcript).toContain(item.title);
     expect(transcript).toContain("科学と技術");
-    expect(transcript).toContain("RSSの短い説明まで");
+    expect(transcript).toMatch(/RSSの短い説明|配信された要約/u);
     expect(transcript).not.toContain(`「${item.summary}」`);
     expect(transcript).not.toMatch(/undefined|null|まァっ、|記事全体の背景/u);
   });

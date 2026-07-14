@@ -31,7 +31,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       personKinds[String(attributes.personKind)]
-        ? `${word}は、${personKinds[String(attributes.personKind)]}として覚えていますっ。`
+        ? rememberedDefinition(concept, word, personKinds[String(attributes.personKind)]!)
         : "",
       relativeStatuses[String(attributes.relativeStatus)]
         ? rememberedDetail(concept, `${relativeStatuses[String(attributes.relativeStatus)]}の関係`)
@@ -56,7 +56,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       consumeModes[String(attributes.consumeMode)]
-        ? `${word}は、${consumeModes[String(attributes.consumeMode)]}ものとして覚えていますっ。`
+        ? rememberedDefinition(concept, word, `${consumeModes[String(attributes.consumeMode)]}もの`)
         : "",
       mealTimes[String(attributes.mealTime)]
         ? rememberedDetail(concept, `${mealTimes[String(attributes.mealTime)]}に楽しむことが多い`)
@@ -78,7 +78,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       environments[String(attributes.environment)]
-        ? `${word}は、${environments[String(attributes.environment)]}の場所として覚えていますっ。`
+        ? rememberedDefinition(concept, word, `${environments[String(attributes.environment)]}の場所`)
         : "",
       visits[String(attributes.visitMode)]
         ? rememberedDetail(concept, `${visits[String(attributes.visitMode)]}場所`)
@@ -95,7 +95,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       contexts[String(attributes.actionContext)]
-        ? `${word}は、${contexts[String(attributes.actionContext)]}で行うこととして覚えていますっ。`
+        ? rememberedDefinition(concept, word, `${contexts[String(attributes.actionContext)]}で行うこと`)
         : "",
       social[String(attributes.socialMode)]
         ? rememberedDetail(concept, social[String(attributes.socialMode)]!)
@@ -129,7 +129,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       useModes[String(attributes.usageMode)]
-        ? `${word}は、${useModes[String(attributes.usageMode)]}物として覚えていますっ。`
+        ? rememberedDefinition(concept, word, `${useModes[String(attributes.usageMode)]}物`)
         : "",
       affordances[String(attributes.affordance)]
         ? rememberedDetail(concept, `${affordances[String(attributes.affordance)]}ための物`)
@@ -155,7 +155,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       areas[String(attributes.wearArea)]
-        ? `${word}は、${areas[String(attributes.wearArea)]}に身につける物として覚えていますっ。`
+        ? rememberedDefinition(concept, word, `${areas[String(attributes.wearArea)]}に身につける物`)
         : "",
       contexts[String(attributes.useContext)]
         ? rememberedDetail(concept, `${contexts[String(attributes.useContext)]}に使うことが多い物`)
@@ -180,7 +180,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       powerModes[String(attributes.powerMode)]
-        ? `${word}は、${powerModes[String(attributes.powerMode)]}乗り物として覚えていますっ。`
+        ? rememberedDefinition(concept, word, `${powerModes[String(attributes.powerMode)]}乗り物`)
         : "",
       trips[String(attributes.tripContext)]
         ? rememberedDetail(concept, `${trips[String(attributes.tripContext)]}に乗ることが多い`)
@@ -203,7 +203,7 @@ function attributeSentences(concept: Concept, word: string) {
     };
     return compact([
       relations[String(attributes.livingRelation)]
-        ? `${word}は、${relations[String(attributes.livingRelation)]}として覚えていますっ。`
+        ? rememberedDefinition(concept, word, relations[String(attributes.livingRelation)]!)
         : "",
       habitats[String(attributes.habitat)]
         ? rememberedDetail(concept, `${habitats[String(attributes.habitat)]}にいることが多い`)
@@ -222,7 +222,7 @@ function attributeSentences(concept: Concept, word: string) {
     other: "ほかの方法で楽しむ"
   };
   if (experienceModes[String(attributes.experienceMode)]) {
-    return [`${word}は、${experienceModes[String(attributes.experienceMode)]}ものとして覚えていますっ。`];
+    return [rememberedDefinition(concept, word, `${experienceModes[String(attributes.experienceMode)]}もの`)];
   }
 
   const tones: Record<string, string> = {
@@ -232,7 +232,7 @@ function attributeSentences(concept: Concept, word: string) {
     neutral: "落ち着いた時"
   };
   return tones[String(attributes.feelingTone)]
-    ? [`${word}は、${tones[String(attributes.feelingTone)]}に近い言葉として覚えていますっ。`]
+    ? [rememberedDefinition(concept, word, `${tones[String(attributes.feelingTone)]}に近い言葉`)]
     : [];
 }
 
@@ -241,5 +241,16 @@ function compact(values: string[]) {
 }
 
 function rememberedDetail(concept: Concept, detail: string) {
-  return concept.source === "user" ? `${detail}と教わりましたっ。` : `${detail}と覚えていますっ。`;
+  if (concept.source !== "user") return `${detail}と覚えていますっ。`;
+  const variant = concept.usageCount % 3;
+  if (variant === 1) return `アグリのメモには、${detail}とありますっ。`;
+  if (variant === 2) return `${detail}と教えてもらったことを覚えていますっ。`;
+  return `${detail}と教わりましたっ。`;
+}
+
+function rememberedDefinition(concept: Concept, word: string, description: string) {
+  const variant = concept.usageCount % 3;
+  if (variant === 1) return `アグリのメモでは、${word}は${description}ですっ。`;
+  if (variant === 2) return `${word}の欄には、${description}と書いてありますっ。`;
+  return `${word}は、${description}として覚えていますっ。`;
 }

@@ -1,4 +1,5 @@
 import type { ArticleContentLevel, ArticleDigest, ArticleIssue, ArticleTone, NewsItem } from "../model/news";
+import { extractGroundedNewsFact, realizeGroundedNewsFact } from "./newsFactFrame";
 
 export type NewsDiscourseFrame = {
   headline: string;
@@ -49,8 +50,15 @@ export function buildNewsDiscourseFrame(
 export function realizeNewsOpening(frame: NewsDiscourseFrame) {
   const articleWord = frame.contentLevel === "headline_only" ? "見出し" : "記事";
   const headline = quoteHeadline(frame.headline);
-  if (frame.sensitive)
-    return `${headline}という${articleWord}が届いています。内容を軽く扱わず、落ち着いて読みます。`;
+  if (frame.sensitive) {
+    const sensitiveOpenings = [
+      `内容を軽く扱わず、落ち着いて読みます。`,
+      `まず、確認できる事実だけを静かに見ていきます。`,
+      `大切な話かもしれないので、推測を足さずに読みます。`,
+      `急いで感想を決めず、分かる範囲から確かめます。`
+    ];
+    return `${headline}という${articleWord}が届いています。${sensitiveOpenings[frame.variant]}`;
+  }
   const endings = [
     `まずは、${frame.focusLabel}を見てみます。`,
     `アグリは、${frame.focusLabel}を確かめたいです。`,
@@ -63,6 +71,12 @@ export function realizeNewsOpening(frame: NewsDiscourseFrame) {
 export function realizeNewsUnderstanding(frame: NewsDiscourseFrame, issue: ArticleIssue, index: number) {
   const source = sourcePhrase(frame.contentLevel);
   const nounPhrase = issueNounPhrase(frame.topicLabel, issue.kind, frame.topicKey);
+  const groundedFact = issue.kind === "number" ? undefined : extractGroundedNewsFact(issue.summary);
+  if (groundedFact) {
+    const lead = index === 0 ? source : "同じ情報から、";
+    const fact = realizeGroundedNewsFact(groundedFact, lead);
+    return frame.sensitive ? `${fact}確認できた範囲だけを扱います。` : fact;
+  }
   if (frame.sensitive) {
     const sensitiveFocus = issue.kind === "number" ? `${frame.topicLabel}に関わる具体的な情報` : nounPhrase;
     return `${source}${sensitiveFocus}が主な論点です。確認できた範囲だけを扱います。`;
@@ -102,13 +116,44 @@ export function realizeNewsOpinion(frame: NewsDiscourseFrame, issue?: ArticleIss
 }
 
 export function realizeNewsUncertainty(frame: NewsDiscourseFrame) {
-  if (frame.contentLevel === "headline_only")
-    return `今読めたのは見出しだけです。理由や結果は、本文を読めるまで決めません。`;
-  if (frame.contentLevel === "feed_summary")
-    return `今読めたのはRSSの短い説明までです。省かれた経緯があるかもしれないので、断定はしません。`;
-  if (frame.contentLevel === "feed_content")
-    return `RSSに入っている本文は読めましたが、記事全体の経緯までは分かりません。`;
-  return `本文の一部は読めました。ただ、記事だけでは分からない背景もあるので、断定せずに話します。`;
+  const variants: Record<ArticleContentLevel, string[]> = {
+    headline_only: [
+      "今読めたのは見出しだけです。理由や結果は、本文を読めるまで決めません。",
+      "見出しから想像できることはありますが、理由や結果としては扱いません。",
+      "本文を読めていないので、誰が何をしたかはまだ決めません。",
+      "分かっている範囲が見出しだけなので、続きを推測で埋めないでおきます。"
+    ],
+    feed_summary: [
+      "今読めたのはRSSの短い説明までです。省かれた経緯があるかもしれないので、断定はしません。",
+      "RSSの説明は読めましたが、途中の経緯までは分かりません。",
+      "短い配信文だけでは、原因と結果をまだ結び付けられません。",
+      "配信された要約には限りがあります。書かれていない部分は保留にします。"
+    ],
+    feed_content: [
+      "RSSに入っている本文は読めましたが、記事全体の経緯までは分かりません。",
+      "RSS本文の範囲は確認できました。前後の背景はまだ保留です。",
+      "配信本文にある事実は使えますが、記事全体を読んだとは言いません。",
+      "RSS本文だけでは省かれている事情もあるので、結論を急がないでおきます。"
+    ],
+    article_extract: [
+      "本文の一部は読めました。ただ、記事だけでは分からない背景もあるので、断定せずに話します。",
+      "記事から具体的な事実は拾えましたが、書かれていない背景は保留です。",
+      "本文を確認できた範囲で話しています。記事の外にある事情までは決めません。",
+      "記事の一部は読めました。事実と、まだ分からないことを分けておきます。"
+    ]
+  };
+  return variants[frame.contentLevel][frame.variant] ?? variants[frame.contentLevel][0]!;
+}
+
+export function realizeHeadlineUnderstanding(frame: NewsDiscourseFrame) {
+  const headline = quoteHeadline(frame.headline);
+  const variants = [
+    `今確認できるのは、${headline}という見出しが配信されたことまでです。`,
+    `届いた情報は${headline}という見出しだけで、本文の事実はまだ確認できません。`,
+    `現時点で確かめられるのは、${headline}という見出しの存在だけです。`,
+    `${headline}という見出しは読めましたが、出来事の中身はまだ不明です。`
+  ];
+  return variants[frame.variant] ?? variants[0]!;
 }
 
 export function realizeNewsImagination(frame: NewsDiscourseFrame) {

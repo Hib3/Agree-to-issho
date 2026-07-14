@@ -81,6 +81,59 @@ describe("article digest service", () => {
     expect(topicKeys).not.toContain("science_technology");
   });
 
+  it("weights the headline and first fact above a later incidental keyword", async () => {
+    const politicsArticle = [
+      "政府・与党は国会の会期延長を検討しています。関連法案について協議を続けています。",
+      "修正案には災害時の機能分散についても記載されています。今後、国会で審議される予定です。"
+    ].join("");
+    const result = await fetchArticleDigest(
+      {
+        ...item,
+        title: "政府 国会会期の延長を検討",
+        summary: "",
+        feedContent: politicsArticle
+      },
+      { useArticleHelper: false, now }
+    );
+
+    expect(result.digest.topics[0]?.key).toBe("society_politics");
+    expect(result.digest.topics.map((topic) => topic.key)).toContain("weather_safety");
+  });
+
+  it("prefers repeated AI evidence over an incidental economist keyword", async () => {
+    const result = await fetchArticleDigest(
+      {
+        ...item,
+        title: "AIによる雇用への影響について経済学者らが声明",
+        summary: "",
+        feedContent: [
+          "デジタル経済研究所がAIの雇用への影響を扱う声明を発表しました。AI研究者と経済学者が参加しています。",
+          "声明は今後のAI政策について検討を求めています。研究所は利用者と企業への影響を調査する予定です。"
+        ].join("")
+      },
+      { useArticleHelper: false, now }
+    );
+
+    expect(result.digest.topics[0]?.key).toBe("science_technology");
+  });
+
+  it("ranks a structurally grounded product trial above introductory anecdotes", async () => {
+    const result = await fetchArticleDigest(
+      {
+        ...item,
+        title: "自動圧縮できる旅行用バッグを試す",
+        summary: "",
+        feedContent: [
+          "旅行の前夜に荷物が入らず、困った経験がある人は多いでしょう。圧縮できれば準備の時間を減らせそうです。",
+          "今回、旅行用バッグに5泊分の服を詰め、商品を実際に使ってみました。販売会社は使い方と容量を公開しており、利用者が確認できます。"
+        ].join("")
+      },
+      { useArticleHelper: false, now }
+    );
+
+    expect(result.digest.issues[0]?.summary).toContain("実際に使ってみました");
+  });
+
   it("continues to article fetch when RSS content nearly duplicates the headline", async () => {
     const html = `<article><p>${usefulArticle}</p></article>`;
     const fetchMock = vi
