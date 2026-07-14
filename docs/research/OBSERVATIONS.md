@@ -1,6 +1,7 @@
 # PS1 Data Observations
 
 ## 1. 解析対象ファイル一覧
+
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` size=623327040 bytes ext=.bin
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.CUE` size=76 bytes ext=.cue
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` ISO9660=True sector=2352 payload_offset=24 file_count=9
@@ -15,6 +16,7 @@
 - 確認済み: ISO内 `DUMMY.180` size=27648000 lba=251370 offset=591222264
 
 ## 2. 実行したコマンド
+
 - 確認済み: `git status --short`
 - 確認済み: `.gitignore` のPS1イメージ除外設定確認
 - 確認済み: `python tools/inspect_ps1/inspect_disc_image.py "C:\dev\With_Agree\doko-demo-issyo"`
@@ -36,9 +38,11 @@
 - 確認済み: `python tools/inspect_ps1/summarize_findings.py`
 
 ## 3. 文字列候補の概要
+
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` Shift_JIS候補=27755490 短い候補=27290443 ASCII候補=4121695
 
 ## 4. 形式候補
+
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` TIM image candidate count=66994 offsets_sample=[25539, 60731, 60767, 61479, 62159, 63023, 63039, 64323]
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` XA audio sector text marker candidate count=1 offsets_sample=[38680]
 - 確認済み: `C:\dev\With_Agree\doko-demo-issyo\SCPS_10092.BIN` STR video sector marker candidate count=36 offsets_sample=[51901, 52081, 52198, 52314, 52372, 202333, 202348, 202357]
@@ -238,6 +242,7 @@
 - 確認済み: speech slot links direct_links=1 common_callees=21
 
 ## 5. 学習システムに関係しそうな一般的観察
+
 - 確認済み: 入力ファイルのサイズ、拡張子、部分ハッシュ、ISO9660候補を記録した。
 - 確認済み: ISO9660ディレクトリからファイル名、LBA、サイズを記録した。
 - 確認済み: `DOKODEMO.417` は先頭`CNA`の内部アーカイブ候補として、630件のエントリ表を持つ。
@@ -259,6 +264,7 @@
 - 確認済み: 画像・音声・動画は抽出していない。
 
 ## 6. 不明点
+
 - 不明: `CNA`および`LPF`候補の正式な仕様名と各フィールドの意味。
 - 不明: 個別データ領域の正式なファイル形式。
 - 不明: 学習単語、カテゴリ、質問、日記、イベントの実データ構造。
@@ -271,6 +277,7 @@
 - 不明: `LOAD`候補2件が保存データ復元、内部リソースロード、または表示状態復元のどれに対応するか。
 
 ## 7. 推測
+
 - 推測: 会話ゲームの言葉学習は、入力語、カテゴリ、使用条件、親密度やイベント状態などの抽象属性を分けると再設計しやすい。
 - 推測: 短い文字列候補が密集している領域が見つかった場合、辞書、ラベル、選択肢、UI文言のいずれかである可能性がある。
 - 推測: 長めの文字列候補が連続する領域が見つかった場合、会話テンプレートまたはシナリオ断片である可能性がある。
@@ -288,6 +295,7 @@
 - 推測: 両領域は直接リンクと共通呼び先を持つため、別責務だが連携する学習サブシステムとして扱うのがPWAでは妥当。
 
 ## 8. ファンメイドPWAへ転用してよい抽象設計アイデア
+
 - `learnWord(input)`、`chooseLearningQuestion()`、`applyLearningAnswer()`、`finalizeLearnedWord()` を分ける。
 - `chooseSpeechSlot()`、`pickWordForSpeech()`、`renderSpeech()` を分ける。
 - ユーザー入力語は `surface` と `normalized` を最低限保存する。
@@ -299,12 +307,14 @@
 - 実装時は `docs/research/PWA_MAIN_ALGORITHM_BLUEPRINT.md`、`docs/research/PWA_CORE_ALGORITHM_CONTRACT.md`、`docs/research/PWA_ALGORITHM_TRACEABILITY.md`、`docs/research/PWA_LEARNING_SPEAKING_STATE_MACHINE.md`、`docs/research/SAVE_LOAD_MEMORY_FLOW.md`、`docs/research/SPEECH_SLOT_MODEL.md` を優先し、未確認の原作仕様を追加しない。
 
 ## 9. 転用してはいけない原作固有要素
+
 - 原作の会話文、辞書、固有名詞、キャラ設定、イベント、演出順序。
 - 抽出画像、抽出音声、抽出動画、抽出テキスト全文。
 - 原作データ内の具体的な台詞やシナリオ構造を再現できる量の文字列サンプル。
 - 原作固有のキャラクター口調や関係性をそのまま模倣する設計。
 
 ## 10. 次に手作業で確認すべきこと
+
 - `dokodemo/` に対象の `.cue/.bin/.iso/.img` が置かれているか確認する。
 - 生成JSONの件数、長さ分布、オフセットだけを見て、文字列密集領域の有無を確認する。
 - 原文を読まずに、短い候補の密度や長さ分布から「辞書らしさ」「テンプレートらしさ」を判断する。

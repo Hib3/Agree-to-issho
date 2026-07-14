@@ -172,11 +172,11 @@ function teachWord(input: string, context: TeachContext): TeachResult {
 ```ts
 function pickWordForSlot(slot: WordSlot, state: GameRuntime): LearnedWord | null {
   const candidates = state.save.memory.learnedWords
-    .filter(word => isUsableForSlot(word, slot))
-    .filter(word => !isCoolingDown(word, state.now))
-    .filter(word => word.confidence >= slot.minConfidence);
+    .filter((word) => isUsableForSlot(word, slot))
+    .filter((word) => !isCoolingDown(word, state.now))
+    .filter((word) => word.confidence >= slot.minConfidence);
 
-  const weighted = candidates.map(word => ({
+  const weighted = candidates.map((word) => ({
     word,
     score:
       categoryMatchScore(word, slot) +

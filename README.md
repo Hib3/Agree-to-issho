@@ -1,144 +1,147 @@
 # アグリといっしょ
 
-https://hib3.github.io/Agree-to-issho/
+オリジナル少女キャラクター「アグリちゃん」に言葉を教え、その言葉を後の会話や日記で使う、完全オフライン対応のPWAです。
 
-React + TypeScript + Viteで作る、完全オフライン対応のファンメイド会話ゲームです。メインキャラクターはユーザー提供画像のオリジナル人間少女キャラクター「アグリちゃん」です。
+公開URL: https://hib3.github.io/Agree-to-issho/
 
-既存IPのキャラクター、名称、ロゴ、画像、音声、台詞、辞書、イベント、固有設定は含めません。使うのは「ユーザーが言葉を教え、キャラクターが意味を質問で覚え、会話や日記へ再利用する」という抽象システムだけです。
+## Clean-room v1
+
+`rewrite/cleanroom-v1` は、旧ランタイムを流用せずに作り直した再構築版です。
+
+- ユーザーが教えた言葉を `Concept` として保存
+- 大分類、詳細分類、カテゴリごとの2〜4個の意味属性、好み、任意の読み方を質問
+- 人物の呼び方・関係や、物の用途・目的などを会話用の型付き記憶として保持
+- 文法役割とカテゴリが一致するスロットだけへ言葉を配置
+- 型付き記憶を導入・展開・転換・オチからなる小話へ反映
+- 5拍のNarrativePlanと11種のオチ機構を400通りの小話構成へ割り当て
+- 未確認の組合せは事実として断定せず、仮定または想像として発話
+- 回答で言葉同士の関係を強化、訂正、保留
+- 使用回数と直近会話による連続使用の抑制
+- 会話途中、質問待ち、学習途中をIndexedDBへ保存
+- 実会話と記憶をもとに日記を生成
+- 設定でRSSニュースを有効化し、保存した見出しをアグリちゃんが根拠を限定して説明
+- 会話開始、ページ送り、決定に連動する短い効果音と、実際に機能する音量・ミュート設定
+- JSONバックアップ、検証、置換・統合、旧DBの明示的な読込
+- 20〜60秒の自発会話。回答中、入力中、非表示時などは停止
+
+初期データはすべて本作向けの一般的なオリジナルデータです。
+
+- 基礎概念: 320
+- 会話テンプレート: 79
+- 小話構成: 400
+- 学習導入文: 100
+- 返答パターン: 160
+- 日記テンプレート: 60
+- 記憶呼び出しテンプレート: 60
+- 場所: 3
+- 初回シナリオ: 5
+
+## Character
+
+表示するキャラクターは、ユーザー提供画像を正とする人間の少女「アグリちゃん」です。
+
+- 承認済み通常立ち絵: `public/assets/characters/main/fullbody/approved/aguri_normal.png`
+- 承認済み差分: 通常会話、まばたき、喜び、驚き、照れ、寂しさ、得意げ、考え中、困惑、眠気
+- 感情と発話状態に応じて1体の立ち絵を切り替え、CSSの小さな動きを重ねます。
+- 生成失敗画像、未承認画像、原作画像は公開領域へ置きません。
+- 発話は全てアグリちゃん用の口調レイヤーを通します。学習語や否定・疑問の意味を残しながら、高いテンションと崩し敬語を適用します。
+
+背景は本作向けに生成・検査した部屋の日中・夕方・夜・雨、商店街、屋上を使用します。会話紙、選択紙、主ボタン布も専用生成テクスチャです。追加素材のグリーン背景除去は `tools/assets/prepare_hibiki_assets.py` で再現でき、元画像を公開領域やGitへ入れず、検査済みの変換結果だけを使用します。
 
 ## Development
 
 ```powershell
 npm install
 npm run dev
-npm run typecheck
-npm run test
-npm run build
 ```
 
-## Review Zip
-
-`node_modules/`, `dist/`, PS1データ、未承認/却下素材を含めない確認用zipを作る場合:
+公開前の確認:
 
 ```powershell
-npm run zip:review
+npm run lint
+npm run format:check
+npm run typecheck
+npm run validate:data
+npm run verify:cleanroom
+npm run verify:pwa
+npm run test:dialogue
+npm run test:rss
+npm run test:news
+npm run test
+npm run simulate:dialogue
+npm run simulate:news
+npm run audit:golden
+npm run build
+npm run test:e2e
 ```
 
-## MVP
+## Storage
 
-- TitleScreen / FirstStartWizard / MainRoom
-- CharacterStage / DialogueBox / ChoiceButtons / TextInputPanel
-- TeachWordFlow / WordCategorySelector / MeaningQuestionFlow
-- WordbookScreen / DiaryScreen / SettingsScreen / ImportExportScreen
-- StorageStatusPanel / ManualScreen / おためし準備パネル
-- 保存先: この端末の中のIndexedDB
-- JSON backup/import: `app_id=aguri-word-room`, checksum, preview, backup, replace/merge
-- Service Worker + Web App Manifest
-- Approved standing art: `public/assets/characters/main/fullbody/approved/aguri_normal.png`
-- Original room background: `public/assets/backgrounds/aguri_room_desk.webp`
+- 正本: IndexedDB `aguri-cleanroom-v1`
+- 旧DB `with-agree-db` は変更しません。
+- 旧データの読込はプレビューとユーザー確認後にだけ実行します。
+- JSON読込は形式、`appId`、schema version、checksumを検証します。
+- 読込前に現在のデータを自動バックアップします。
+- RSSから保存するのは見出し、短い説明、出典URL、日時です。記事全文は保存しません。
 
-## UI Direction
+## ニュース機能
 
-- 画面は「アグリちゃんの小さな机の部屋」を基準にします。
-- 木の机、ノート、付箋、やわらかい紙色を中心にし、紫はアクセントに留めます。
-- MainRoomは、背景、立ち絵、会話吹き出し、主ボタンを一体の部屋シーンとして扱います。
-- `話す` と `言葉を教える` を主導線にし、単語帳、日記、保存、説明、タイトルは付箋風の補助操作にします。
-- 会話欄は日本語の折返しと行間を優先し、`onNext` がない時は `▼` を表示しません。
+設定の「ニュース機能を使う」を有効にして、公開HTTPSのサイトURLまたはRSS URLを登録します。更新間隔は15分、30分、1時間、3時間から選べ、アプリを開いている間とオンラインへ戻った時に確認します。アプリを閉じている間のバックグラウンド更新は行いません。
 
-## Sample Words
+- サイトURLではHTMLのフィード情報を確認し、許可された場合だけFeedsearchでRSSを探します。
+- 複数の候補が見つかった場合は、形式・検証結果・最新記事例を見てユーザーが選択します。先頭候補の自動登録はしません。
+- RSSはまずブラウザから直接取得します。
+- 配信元のCORS設定により直接取得できない場合があります。
+- 「RSS探索補助」「RSS取得補助」「記事本文取得補助」は別々の同意です。
+- 許可した機能だけが、サイトURLを `feedsearch.dev`、RSS URLを `rss2json.com` / `r.jina.ai`、記事URLを `r.jina.ai` へ送信します。
+- `rss2json.com` が変換できないRSSはReaderを第2補助として試します。各外部サービスの停止・制限中は取得できません。
+- RSS更新時は見出しと短い配信情報だけを保存します。記事本文は「アグリに話してもらう」を押した時だけ直接取得し、全文を保存しません。
+- 会話には確認範囲を表示し、見出し、RSS、記事本文、記憶、アグリの整理・感想・想像、不明点を別の根拠として扱います。
+- センシティブなニュースでは明るいオチや空想を停止します。
+- ニュース更新には通信が必要です。保存済みの見出しはオフラインでも確認できます。
+- ニュースキャッシュは端末内データであり、JSONバックアップには含めません。
 
-- 単語が0この時は、部屋画面とタイトルのメモに `おためし単語を100こ入れる` ボタンを表示します。
-- おためし単語は汎用的な日常語だけで、既存IPの辞書や固有語は含みません。
-- 追加された単語はこの端末の保存領域に入り、会話、単語帳、日記の動作確認に使えます。
-- 設定で補助パネルを表示している場合も、同じおためし単語投入ボタンを使えます。
+## PWA / GitHub Pages
 
-## Learning System
-
-- `話す` は、単語数、直近会話、低理解語、時間帯、日記有無を見て発話状態を選びます。
-- 単語には、わかった度、記憶、気に入り度、曖昧さ、ズレ度、復習回数を持たせています。
-- 低理解または曖昧な言葉は、復習候補として部屋画面と単語帳から見直せます。
-- 単語帳では、読み、種類、気持ち、場面、メモを直しながら復習できます。
-- ズレた使い方をした時は、部屋画面で修正メモを書いて `直す` / `そのままでいい` を選べます。
-- 日記は、今日の会話ログ、使った言葉、ズレ、修正、復習の情報を優先して生成し、出てきた言葉をチップで表示します。
-- 10語以上ある時、単語帳に読みがつながる `しりとり候補` を軽く表示します。
-- これらは原作仕様の断定ではなく、このPWA用の抽象的な学習会話モデルです。
-
-## Conversation System v3
-
-- 通常会話は `opening → follow_up → awaiting_answer → reaction → closing → completed` の短いセッションとして、この端末の中へ保存します。
-- 複数の学習語を人物、場所、行動、物、感情、時間などの役割へ割り当て、一つの小話として再利用します。
-- ズレ会話は文全体を壊さず、一つの役割または関連だけを取り違えます。回答に応じて単語間リンクを強化または分離します。
-- 会話本文は段階表示し、最初の操作で現在ページを全文表示、次の操作で次ページへ進みます。
-- 質問は好き嫌い、意味の再確認、場面、関連語を扱い、選択回答または60文字以内の短いメモをWordFrameへ反映します。
-- 回答待ちの途中で再読み込みしても、保存済みConversationSessionとDialogueLogから質問へ戻ります。
-- 状態、テンプレート、単語は注入可能な乱数による重み付き抽選です。直近のspeech act、意味キー、テンプレート、単語、カテゴリにはcooldownをかけます。
-- アグリちゃんの口調層は、完成済み本文の単語、否定、疑問を保ったまま、導入または語尾を一部だけ調整します。
-- 自動発話は45〜90秒の範囲で待ち、回答待ち、別画面、非表示タブ、保存処理中には実行しません。
-- `last_user_interaction_at` と `last_character_speech_at` を分離し、留守判定はユーザー操作を基準にします。
-- 日記は当日の実会話、回答、復習、修正、関連語を優先し、原則1日1件です。
-
-## Aguri Voice
-
-- アグリちゃんの口調は、ユーザー提供のstyle-onlyルールから、共感、賞賛、驚き、不確実、丁寧、オチの条件だけを抽象化して実装します。
-- 生成された全ての節を言語スタイルフィルターへ通します。学習語、否定、質問意図、数値などの意味スロットを保持しつつ、高テンションな小さい「っ」と感嘆リズム、短い前置き、丁寧語の崩し、母音伸ばし、限定的な笑いへ変換します。
-- 元投稿やコメント本文、収集JSONはアプリへ同梱せず、Git管理もしません。
-
-## Save Compatibility
-
-- IndexedDBはversion 3です。`conversation_sessions` storeを追加しています。
-- JSON save schemaはversion 3です。会話ログと会話セッションを含みます。
-- schema 1 / 2は読み込み時に不足フィールドを補完します。
-- merge時はDialogueLogとConversationSessionをIDで重複保存しません。
-
-## Research Boundary
-
-`docs/research/` の調査資料は補助情報です。公式仕様ではありません。
-PWA実装に使うのは、キャラクター中心の会話、単語学習、日記/イベントの抽象設計ヒントだけです。
-既存IPのキャラクター名、種族、デザイン、画像、ロゴ、スクリーンショット、UI文言、イベント名、Wiki本文、原作辞書、原作質問文はコードやデータへ入れません。
-
-## GitHub Pages
-
-`vite.config.ts` は `VITE_BASE_PATH` でbase pathを変更できます。
+Viteのbase pathは環境変数で変更できます。
 
 ```powershell
 $env:VITE_BASE_PATH="/Agree-to-issho/"
 npm run build
 ```
 
-Pagesのreload 404対策は、GitHub Pages側でSPA fallbackがない点に注意してください。このMVPはHash Routerを使わず単一画面状態で動くため、公開URLの入口は `index.html` にしてください。
+配備対象ブランチへのpushで `.github/workflows/pages.yml` が品質ゲートとビルドを実行し、GitHub Pagesへ配信します。PR/pushの全ゲートは `quality.yml`、1万会話とゴールデン資料の完全監査は手動の `full-audit.yml` です。アプリ内ルーティングはURLを変更しないため、再読込で個別パスの404は発生しません。
 
-## Offline Check
+オフライン確認:
 
 1. `npm run build`
 2. `npm run preview`
-3. ブラウザで一度開き、Service Worker登録を待つ
-4. DevToolsのNetworkでOfflineにする
-5. reload後、タイトル、会話、単語保存、単語帳、backup/importが動くことを確認する
+3. 一度オンラインで開き、Service Workerの登録完了を待つ
+4. DevToolsでOfflineへ切り替える
+5. 再読込後に会話、学習、単語帳、日記、バックアップを確認する
 
-IndexedDBの永続化は `navigator.storage.persist()` を試します。状態は設定画面のStorageStatusPanelで確認できます。
+## Evidence Boundary
 
-## Clean-room Rules
+プレイ動画やファン資料から使うのは、次の抽象的な観察だけです。
 
-- 原作データ、抽出画像、抽出音声、抽出テキスト全文をcommitしない
-- 原作の会話文、辞書、キャラ設定、画像、音声、UI文言を実装に使わない
-- キャラクターはユーザー提供画像を正とし、実装側で別デザインを作らない
-- `dokodemo/`, `doko-demo-issyo/`, `research_private/`, `docs/research/generated/`, PS1イメージファイルはcommit対象にしない
-- 実装はオリジナルPWAとして、この端末の中にあるユーザー作成データだけを保存・出力する
-- `node_modules/` と `dist/` はgit管理・review zip共有しない
+- 状況に沿って言葉を尋ねる
+- 大分類から追加質問へ進む
+- 教えた言葉を後の短い複数ページ会話で再利用する
+- 一箇所だけ関係を取り違える余地を残し、ユーザーが訂正できる
+- キャラクターが自発的に話し始める
 
-## Character Assets
+今回の動画確認で分けた「確認済み」「推測」「不明」と実装受入条件は、`docs/rebuild/video-observation-implementation-contract.json` に記録しています。動画フレームや文字起こしは保存していません。
 
-- `approved/aguri_normal.png` を現在唯一のゲーム表示用素材にします。
-- 表情差分は正式素材が揃うまで表示しません。
-- Runtimeの `public/` には承認済み素材だけを置きます。
-- 未承認、却下、生成プロンプト、失敗シート、PS1データ、研究用ファイルは `public/` に置きません。
-- 正式素材は透明PNG、全身立ち絵、同一画角、同一余白、同一位置で作ります。
-- 白背景、除去漏れ、ドット欠け、不要アーティファクト、分裂、浮遊パーツがある画像は正式版では使いません。
-- 詳細は `docs/assets/aguri_asset_spec.md` と `docs/assets/aguri_asset_review_checklist.md` を参照します。
+既存IPのキャラクター、名称、画像、音声、台詞、辞書、質問文、イベント、UI、データは実装・配布しません。調査用動画、PS1データ、抽出物、口調調査JSONもGitへ保存しません。不明な原作内部仕様を「確認済み」とは扱いません。
 
-## Background Assets
+## Repository Hygiene
 
-- `public/assets/backgrounds/aguri_room_desk.webp` / `.png` は、アグリちゃんの小さな机の部屋として作成したオリジナル背景素材です。
-- 人物、キャラクター、ロゴ、UI、読める文字は含めません。
-- 既存IPや原作画像は使用していません。
-- アグリちゃん本体は背景へ生成せず、承認済み通常立ち絵だけを重ねて表示します。
+次の内容はGit管理外です。
+
+- `node_modules/`, `dist/`, `.playwright-cli/`
+- `research_private/`, `docs/research/generated/`
+- `dokodemo/`, `doko-demo-issyo/`
+- `*.bin`, `*.iso`, `*.cue`, `*.img`, `*.sub`, `*.ccd`, `*.chd`
+- 調査用JSON、動画、抽出画像、抽出音声、大量文字列dump
+
+再構築前の状態は `archive/pre-zero-rebuild-20260712` ブランチと `pre-zero-rebuild-20260712` タグへ保存しています。

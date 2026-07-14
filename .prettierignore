@@ -1,0 +1,11 @@
+node_modules/
+dist/
+output/
+pet-run/
+test-results/
+playwright-report/
+docs/research/generated/
+docs/assets/generated/
+research_private/
+dokodemo/
+HibikiMade/
