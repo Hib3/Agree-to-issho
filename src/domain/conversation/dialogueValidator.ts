@@ -29,6 +29,15 @@ export function validateConversationSession(session: ConversationSession) {
   const errors: string[] = [];
   if (session.schemaVersion !== 2) errors.push("legacy_schema");
   if (session.dialogueRevision !== CURRENT_DIALOGUE_REVISION) errors.push("legacy_dialogue_revision");
+  if (!session.origin) errors.push("missing_origin");
+  if (session.origin?.type === "news") {
+    if (session.origin.newsItemId !== session.origin.articleDigest.newsItemId)
+      errors.push("news_digest_item_mismatch");
+    if (session.origin.contentLevel !== session.origin.articleDigest.contentLevel)
+      errors.push("news_content_level_mismatch");
+    if (session.origin.fetchTrace.finalContentLevel !== session.origin.contentLevel)
+      errors.push("news_trace_content_level_mismatch");
+  }
   if (!session.proposition) return [...errors, "missing_proposition"];
   if (session.topicWordIds.join("|") !== session.proposition.wordIds.join("|"))
     errors.push("topic_words_mismatch");
@@ -110,6 +119,11 @@ export function validateConversationSession(session: ConversationSession) {
   for (const turn of [...session.history, ...session.queuedTurns]) {
     errors.push(...validateDialogueTurn(turn, session.proposition));
   }
+  const answerChoices = session.pendingQuestion?.answerSchema ?? [];
+  if (session.origin?.type === "news" && answerChoices.some((choice) => !choice.newsResponseIntent))
+    errors.push("news_answer_missing_intent");
+  if (session.origin?.type === "ordinary" && answerChoices.some((choice) => choice.newsResponseIntent))
+    errors.push("ordinary_answer_has_news_intent");
   return [...new Set(errors)];
 }
 

@@ -271,7 +271,8 @@ describe("semantic composition regression", () => {
     const migrated = migrateConversationSession(legacy, now + 1);
 
     expect(migrated.phase).toBe("completed");
-    expect(migrated.dialogueRevision).toBe(4);
+    expect(migrated.dialogueRevision).toBe(5);
+    expect(migrated.origin).toEqual({ type: "ordinary" });
     expect(migrated.queuedTurns).toEqual([]);
     expect(migrated.pendingQuestion).toBeUndefined();
     expect(migrated.validationErrors).toContain("legacy_session_invalidated");

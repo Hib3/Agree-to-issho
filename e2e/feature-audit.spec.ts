@@ -89,7 +89,7 @@ test("settings-controlled sound and RSS news work through the player UI", async 
       status: 200,
       contentType: "text/html",
       headers: { "access-control-allow-origin": "*" },
-      body: `<article><p>研究チームは新しい望遠鏡で宇宙観測を行い、その結果を公開しました。</p><p>観測は三か月続き、複数の地点から得た記録を比較しました。</p></article>`
+      body: `<article><p>研究チームは新しい望遠鏡で宇宙観測を行い、その結果を公開しました。観測は三か月続き、複数の地点から得た記録を比較しました。</p><p>研究所は公開した記録を今後も確認し、別の観測地点で得られた結果との違いを調査する予定です。</p></article>`
     });
   });
   await enterRoom(page);
@@ -116,14 +116,17 @@ test("settings-controlled sound and RSS news work through the player UI", async 
   await expect(page.getByRole("status")).toContainText("新しいニュースを1件保存しました");
   await page.getByRole("button", { name: "部屋へ戻る" }).click();
 
-  await page.getByRole("button", { name: /^ニュース/u }).click();
+  const newsInvitation = page.getByRole("button", { name: "ニュースを見る", exact: true });
+  if (await newsInvitation.isVisible()) await newsInvitation.click();
+  else await page.getByRole("button", { name: /^ニュース(?: \d+)?$/u }).click();
   await expect(page.getByText("宇宙観測の新しい結果", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "アグリに話してもらう" }).click();
-  await expect(page.getByRole("status")).toContainText("取得できた記事本文の一部まで");
-  await expect(page.getByRole("link", { name: "元の記事を開く" })).toHaveAttribute(
+  await page.getByRole("button", { name: "アグリと話す" }).click();
+  await expect(page.getByText("ニュースの記事について会話中")).toBeVisible();
+  await expect(page.getByRole("link", { name: "元記事" })).toHaveAttribute(
     "href",
     "https://news.example.test/articles/space-1"
   );
+  await expect(page.getByRole("button", { name: "会話を続ける" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

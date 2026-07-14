@@ -88,7 +88,21 @@ const dialogueChoiceSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
   effect: z.enum(["affirm", "deny", "curious", "later"]),
-  answerEffect: answerEffectSchema.optional()
+  answerEffect: answerEffectSchema.optional(),
+  newsResponseIntent: z
+    .enum([
+      "agree",
+      "disagree",
+      "interested",
+      "not_interested",
+      "concerned",
+      "surprised",
+      "personal_relevance",
+      "correct_aguri",
+      "ask_more",
+      "close_topic"
+    ])
+    .optional()
 });
 
 const dialogueTurnSchema = z.object({
@@ -192,6 +206,168 @@ const pendingQuestionSchema = z.object({
     .optional()
 });
 
+const articleContentLevelSchema = z.enum([
+  "headline_only",
+  "feed_summary",
+  "feed_content",
+  "article_extract"
+]);
+
+const articleDigestSchema = z.object({
+  newsItemId: z.string().min(1),
+  contentLevel: articleContentLevelSchema,
+  sourceUrl: z.string().url(),
+  extractedAt: z.number(),
+  keyFacts: z.array(z.object({ id: z.string(), text: z.string(), evidenceId: z.string() })),
+  keySentences: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      source: z.enum(["headline", "feed_summary", "feed_content", "article"])
+    })
+  ),
+  entities: z.array(
+    z.object({
+      name: z.string(),
+      kind: z.enum(["person", "place", "organization", "other"])
+    })
+  ),
+  topics: z.array(z.object({ key: z.string(), label: z.string() })),
+  events: z.array(z.object({ id: z.string(), description: z.string(), evidenceId: z.string() })),
+  numericalFacts: z.array(z.object({ value: z.string(), context: z.string(), evidenceId: z.string() })),
+  issues: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      summary: z.string(),
+      evidenceIds: z.array(z.string()),
+      kind: z.enum([
+        "change",
+        "cause",
+        "effect",
+        "benefit",
+        "risk",
+        "conflict",
+        "number",
+        "person",
+        "place",
+        "uncertainty"
+      ]),
+      importance: z.number(),
+      relevanceToUser: z.number(),
+      suitabilityForOpinion: z.number()
+    })
+  ),
+  uncertainties: z.array(z.string()),
+  tone: z.enum(["positive", "negative", "neutral", "mixed", "sensitive", "unknown"]),
+  confidence: z.number().min(0).max(1)
+});
+
+const articleFetchTraceSchema = z.object({
+  articleUrl: z.string().url(),
+  startedAt: z.number(),
+  attempts: z.array(
+    z.object({
+      method: z.enum(["feed_content", "direct_article", "reader_helper", "fallback_headline"]),
+      startedAt: z.number(),
+      finishedAt: z.number(),
+      result: z.enum([
+        "success",
+        "cors_error",
+        "http_error",
+        "timeout",
+        "parse_error",
+        "too_short",
+        "disabled"
+      ]),
+      statusCode: z.number().optional(),
+      contentType: z.string().optional(),
+      extractedCharacters: z.number().optional(),
+      detail: z.string().optional()
+    })
+  ),
+  finalContentLevel: articleContentLevelSchema
+});
+
+const characterOpinionSchema = z.object({
+  id: z.string(),
+  owner: z.enum(["user", "aguri"]),
+  subjectConceptId: z.string().optional(),
+  topicKey: z.string().optional(),
+  polarity: z.number(),
+  curiosity: z.number(),
+  confidence: z.number(),
+  reason: z.enum([
+    "past_reaction",
+    "category_tendency",
+    "learned_attribute",
+    "relationship",
+    "current_emotion",
+    "news_tone",
+    "article_issue",
+    "unknown"
+  ]),
+  createdAt: z.number(),
+  updatedAt: z.number()
+});
+
+const newsResponseIntentSchema = z.enum([
+  "agree",
+  "disagree",
+  "interested",
+  "not_interested",
+  "concerned",
+  "surprised",
+  "personal_relevance",
+  "correct_aguri",
+  "ask_more",
+  "close_topic"
+]);
+
+const conversationOriginSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("ordinary") }),
+  z.object({
+    type: z.literal("news"),
+    newsItemId: z.string().min(1),
+    articleDigest: articleDigestSchema,
+    sourceUrl: z.string().url(),
+    contentLevel: articleContentLevelSchema,
+    fetchTrace: articleFetchTraceSchema,
+    selectedIssueIds: z.array(z.string()),
+    groundedFactIds: z.array(z.string()),
+    conceptIds: z.array(z.string()),
+    memoryIds: z.array(z.string()),
+    discussionState: z.enum(["unread", "prepared", "discussing", "discussed", "dismissed"]),
+    evolvingOpinion: z.object({
+      initialOpinion: characterOpinionSchema,
+      supportingFactIds: z.array(z.string()),
+      uncertaintyIds: z.array(z.string()),
+      userReaction: z
+        .object({ intent: newsResponseIntentSchema, conceptIds: z.array(z.string()) })
+        .optional(),
+      revisedOpinion: characterOpinionSchema.optional(),
+      revisionReason: z
+        .enum([
+          "user_agreement",
+          "user_disagreement",
+          "user_correction",
+          "new_personal_connection",
+          "unchanged"
+        ])
+        .optional()
+    }),
+    userReaction: z
+      .object({
+        intent: newsResponseIntentSchema,
+        conceptIds: z.array(z.string()),
+        recordedAt: z.number()
+      })
+      .optional(),
+    startedAt: z.number(),
+    completedAt: z.number().optional()
+  })
+]);
+
 export const conceptSchema = z.object({
   id: z.string().min(1),
   source: z.enum(["starter", "user"]),
@@ -281,8 +457,9 @@ const memorySchema = z.object({
 const conversationSessionSchema = z
   .object({
     schemaVersion: z.literal(2).optional(),
-    dialogueRevision: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
+    dialogueRevision: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
     id: z.string().min(1),
+    origin: conversationOriginSchema.optional(),
     phase: z.enum([
       "opening",
       "premise",
@@ -311,7 +488,7 @@ const conversationSessionSchema = z
     completedAt: z.number().optional()
   })
   .superRefine((session, context) => {
-    if (session.dialogueRevision !== 4) return;
+    if (session.dialogueRevision !== 4 && session.dialogueRevision !== 5) return;
     const required = [
       [session.schemaVersion, "schemaVersion"],
       [session.topicWordIds, "topicWordIds"],
@@ -322,7 +499,14 @@ const conversationSessionSchema = z
     ] as const;
     for (const [value, key] of required) {
       if (value === undefined)
-        context.addIssue({ code: "custom", path: [key], message: `${key} is required for revision 4` });
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required for revision ${session.dialogueRevision}`
+        });
+    }
+    if (session.dialogueRevision === 5 && session.origin === undefined) {
+      context.addIssue({ code: "custom", path: ["origin"], message: "origin is required for revision 5" });
     }
     for (const [collectionName, turns] of [
       ["history", session.history],
@@ -343,7 +527,7 @@ const conversationSessionSchema = z
             context.addIssue({
               code: "custom",
               path: [collectionName, index, key],
-              message: `${key} is required for revision 4`
+              message: `${key} is required for revision ${session.dialogueRevision}`
             });
         }
       });
@@ -354,7 +538,7 @@ const conversationSessionSchema = z
           context.addIssue({
             code: "custom",
             path: ["pendingQuestion", key],
-            message: `${key} is required for revision 4`
+            message: `${key} is required for revision ${session.dialogueRevision}`
           });
       }
     }

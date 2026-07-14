@@ -61,6 +61,21 @@ describe("150-news grounded corpus", () => {
         ],
         events: [],
         numericalFacts: [],
+        issues:
+          index % 3 === 0
+            ? []
+            : [
+                {
+                  id: `${item.id}_issue`,
+                  label: `${word}の要点`,
+                  summary,
+                  evidenceIds: [`${item.id}_fact`, `${item.id}_detail`],
+                  kind: "change",
+                  importance: 0.7,
+                  relevanceToUser: 0.5,
+                  suitabilityForOpinion: 0.6
+                }
+              ],
         uncertainties: ["記事全体の背景"],
         tone: sensitive ? "sensitive" : "neutral",
         confidence: index % 3 === 0 ? 0.25 : index % 3 === 1 ? 0.5 : 0.78

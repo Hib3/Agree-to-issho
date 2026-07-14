@@ -39,6 +39,7 @@ dist/
 review-*.zip
 .playwright-cli/
 output/
+pet-run/
 test-results/
 playwright-report/
 agreeable_bridge4386_expanded_rules_only.json

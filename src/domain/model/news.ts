@@ -48,7 +48,10 @@ export type NewsItem = {
   dateStatus?: "feed" | "missing" | "invalid" | "future" | undefined;
   fetchedAt: number;
   discussedAt?: number | undefined;
+  discussionState?: NewsDiscussionState | undefined;
 };
+
+export type NewsDiscussionState = "unread" | "prepared" | "discussing" | "discussed" | "dismissed";
 
 export type NewsRefreshReport = {
   checkedFeeds: number;
@@ -70,6 +73,45 @@ export type NewsErrorDetail = {
 
 export type ArticleContentLevel = "headline_only" | "feed_summary" | "feed_content" | "article_extract";
 export type ArticleTone = "positive" | "negative" | "neutral" | "mixed" | "sensitive" | "unknown";
+
+export type ArticleFetchAttempt = {
+  method: "feed_content" | "direct_article" | "reader_helper" | "fallback_headline";
+  startedAt: number;
+  finishedAt: number;
+  result: "success" | "cors_error" | "http_error" | "timeout" | "parse_error" | "too_short" | "disabled";
+  statusCode?: number | undefined;
+  contentType?: string | undefined;
+  extractedCharacters?: number | undefined;
+  detail?: string | undefined;
+};
+
+export type ArticleFetchTrace = {
+  articleUrl: string;
+  startedAt: number;
+  attempts: ArticleFetchAttempt[];
+  finalContentLevel: ArticleContentLevel;
+};
+
+export type ArticleIssue = {
+  id: string;
+  label: string;
+  summary: string;
+  evidenceIds: string[];
+  kind:
+    | "change"
+    | "cause"
+    | "effect"
+    | "benefit"
+    | "risk"
+    | "conflict"
+    | "number"
+    | "person"
+    | "place"
+    | "uncertainty";
+  importance: number;
+  relevanceToUser: number;
+  suitabilityForOpinion: number;
+};
 
 export type ArticleEvidence = {
   id: string;
@@ -94,10 +136,38 @@ export type ArticleDigest = {
   topics: Array<{ key: string; label: string }>;
   events: Array<{ id: string; description: string; evidenceId: string }>;
   numericalFacts: Array<{ value: string; context: string; evidenceId: string }>;
+  issues: ArticleIssue[];
   uncertainties: string[];
   tone: ArticleTone;
   confidence: number;
 };
+
+export type ArticleFetchResult = {
+  digest: ArticleDigest;
+  trace: ArticleFetchTrace;
+  needsHelperConsent: boolean;
+  directFailureReason?: string | undefined;
+};
+
+export type NewsDiscussionPreparation =
+  | { status: "idle" }
+  | { status: "reading_feed"; newsItemId: string }
+  | { status: "reading_article"; newsItemId: string }
+  | {
+      status: "awaiting_helper_consent";
+      newsItemId: string;
+      directFailureReason: string;
+      fallbackDigest: ArticleDigest;
+      trace: ArticleFetchTrace;
+    }
+  | { status: "ready"; newsItemId: string; digest: ArticleDigest; trace: ArticleFetchTrace }
+  | {
+      status: "failed";
+      newsItemId: string;
+      fallbackDigest: ArticleDigest;
+      reason: string;
+      trace: ArticleFetchTrace;
+    };
 
 export type NewsGroundingSource =
   | "headline"
@@ -151,9 +221,37 @@ export type CharacterOpinion = {
     | "relationship"
     | "current_emotion"
     | "news_tone"
+    | "article_issue"
     | "unknown";
   createdAt: number;
   updatedAt: number;
+};
+
+export type NewsResponseIntent =
+  | "agree"
+  | "disagree"
+  | "interested"
+  | "not_interested"
+  | "concerned"
+  | "surprised"
+  | "personal_relevance"
+  | "correct_aguri"
+  | "ask_more"
+  | "close_topic";
+
+export type EvolvingNewsOpinion = {
+  initialOpinion: CharacterOpinion;
+  supportingFactIds: string[];
+  uncertaintyIds: string[];
+  userReaction?: { intent: NewsResponseIntent; conceptIds: string[] } | undefined;
+  revisedOpinion?: CharacterOpinion | undefined;
+  revisionReason?:
+    | "user_agreement"
+    | "user_disagreement"
+    | "user_correction"
+    | "new_personal_connection"
+    | "unchanged"
+    | undefined;
 };
 
 export type NewsConversationPlan = {
@@ -170,7 +268,12 @@ export type NewsConversationPlan = {
   selectedLens: NewsConversationLens;
   emotionCurve: NewsBeat["emotion"][];
   groundedFactIds: string[];
+  selectedIssueIds: string[];
   conceptIds: string[];
   opinions: CharacterOpinion[];
+  responseQuestion: {
+    prompt: string;
+    options: Array<{ intent: NewsResponseIntent; label: string }>;
+  };
   pages: NewsBeat[];
 };

@@ -12,6 +12,7 @@ export function isCurrentConversationSession(session: ConversationSession) {
   return (
     candidate.schemaVersion === 2 &&
     candidate.dialogueRevision === CURRENT_DIALOGUE_REVISION &&
+    Boolean(candidate.origin) &&
     Boolean(candidate.proposition) &&
     Array.isArray(candidate.topicWordIds)
   );
@@ -22,8 +23,47 @@ export function migrateConversationSession(
   now = Date.now(),
   extraErrors: string[] = []
 ): ConversationSession {
-  if (isCurrentConversationSession(session)) return session;
+  if (isCurrentConversationSession(session)) {
+    if (extraErrors.length === 0) return session;
+    const { pendingQuestion, ...withoutQuestion } = session;
+    void pendingQuestion;
+    return {
+      ...withoutQuestion,
+      ...(session.origin.type === "news"
+        ? {
+            origin: {
+              ...session.origin,
+              discussionState: "dismissed" as const,
+              completedAt: now
+            }
+          }
+        : {}),
+      phase: "completed",
+      proposition: { ...session.proposition, questionIntent: "none" },
+      questionIntent: "none",
+      queuedTurns: [],
+      validationErrors: [...new Set([...session.validationErrors, ...extraErrors])],
+      updatedAt: now,
+      completedAt: now
+    };
+  }
   const legacy = session as LegacySession;
+  if (
+    legacy.schemaVersion === 2 &&
+    legacy.dialogueRevision === 4 &&
+    legacy.proposition &&
+    Array.isArray(legacy.topicWordIds) &&
+    Array.isArray(legacy.history) &&
+    Array.isArray(legacy.queuedTurns)
+  ) {
+    return {
+      ...(legacy as ConversationSession),
+      dialogueRevision: CURRENT_DIALOGUE_REVISION,
+      origin: legacy.origin ?? { type: "ordinary" },
+      updatedAt: now,
+      validationErrors: [...new Set([...(legacy.validationErrors ?? []), ...extraErrors])]
+    };
+  }
   const slotIds = Object.values(legacy.slotConceptIds ?? {}).filter(
     (id): id is string => typeof id === "string"
   );
@@ -62,6 +102,7 @@ export function migrateConversationSession(
   return {
     schemaVersion: 2,
     dialogueRevision: CURRENT_DIALOGUE_REVISION,
+    origin: { type: "ordinary" },
     id: legacy.id ?? "legacy_session_" + crypto.randomUUID(),
     phase: "completed",
     intent: legacy.intent ?? "small_talk",

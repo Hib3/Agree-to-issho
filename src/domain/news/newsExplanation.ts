@@ -7,11 +7,11 @@ import type {
   NewsBeat,
   NewsConversationLens,
   NewsConversationPlan,
-  NewsItem
+  NewsItem,
+  NewsResponseIntent
 } from "../model/news";
 import type { ConceptRelation } from "../model/relation";
 import { displayConcept } from "../grammar/japaneseRealizer";
-import { applyAguriVoice } from "../voice/aguriVoice";
 
 type NewsContext = {
   character?: CharacterState | undefined;
@@ -31,6 +31,13 @@ export function buildNewsConversationPlan(
   const topic = digest.topics[0] ?? { key: "general", label: "世の中の出来事" };
   const target = selectSpecificTarget(digest);
   const lens = selectLens(digest, directMatches, context.character);
+  const selectedIssues = selectIssues(
+    digest,
+    lens,
+    directMatches,
+    context.relations ?? [],
+    context.memories ?? []
+  );
   const baseEmotion: NewsBeat["emotion"] = sensitive
     ? "calm"
     : digest.tone === "positive"
@@ -45,7 +52,7 @@ export function buildNewsConversationPlan(
     [`${item.id}_headline`]
   );
 
-  const understanding = buildUnderstanding(item, digest, baseEmotion);
+  const understanding = buildUnderstanding(item, digest, selectedIssues, baseEmotion);
   const memoryConnection = buildMemoryConnection(item, directMatches, context.memories ?? []);
   const aguriInterpretation = beat(
     item,
@@ -58,13 +65,20 @@ export function buildNewsConversationPlan(
     digest.topics.map((entry) => `topic:${entry.key}`)
   );
 
-  const opinions = buildOpinions(item, digest, directMatches, context.character, context.now ?? Date.now());
+  const opinions = buildOpinions(
+    item,
+    digest,
+    selectedIssues,
+    directMatches,
+    context.character,
+    context.now ?? Date.now()
+  );
   const aguriOpinion = beat(
     item,
     "opinion",
     "aguri_opinion",
     sensitive ? "calm" : baseEmotion,
-    opinionText(target, digest, context.character),
+    opinionText(target, digest, selectedIssues, context.character),
     [opinions.find((opinion) => opinion.owner === "aguri")?.id ?? `${item.id}_aguri_opinion`]
   );
 
@@ -85,6 +99,15 @@ export function buildNewsConversationPlan(
     !sensitive && digest.contentLevel !== "headline_only"
       ? beat(item, "imagination", "imagination", "happy", imaginationText(topic.key, target), [])
       : undefined;
+  const responseQuestion = buildResponseQuestion(item, digest, selectedIssues, directMatches.length > 0);
+  const userQuestion = beat(
+    item,
+    "question",
+    digest.contentLevel === "headline_only" ? "unknown" : "inference",
+    sensitive ? "calm" : "curious",
+    responseQuestion.prompt,
+    selectedIssues.flatMap((issue) => issue.evidenceIds)
+  );
 
   const pages = [openingReaction, ...understanding];
   if (memoryConnection) pages.push(memoryConnection);
@@ -102,11 +125,14 @@ export function buildNewsConversationPlan(
     aguriOpinion,
     ...(boundedPages.includes(uncertainty as NewsBeat) ? { uncertainty } : {}),
     ...(boundedPages.includes(imagination as NewsBeat) ? { imagination } : {}),
+    userQuestion,
     selectedLens: lens,
     emotionCurve: boundedPages.map((page) => page.emotion),
     groundedFactIds: digest.keyFacts.map((fact) => fact.id),
+    selectedIssueIds: selectedIssues.map((issue) => issue.id),
     conceptIds: directMatches.map((match) => match.concept.id),
     opinions,
+    responseQuestion,
     pages: boundedPages
   };
 }
@@ -147,16 +173,21 @@ export function findNewsConcepts(item: NewsItem, digest: ArticleDigest, concepts
     .slice(0, 3);
 }
 
-function buildUnderstanding(item: NewsItem, digest: ArticleDigest, emotion: NewsBeat["emotion"]) {
-  const fact = digest.keyFacts[0];
-  if (fact) {
+function buildUnderstanding(
+  item: NewsItem,
+  digest: ArticleDigest,
+  selectedIssues: ArticleDigest["issues"],
+  emotion: NewsBeat["emotion"]
+) {
+  const groundedIssues = selectedIssues.filter((issue) => issue.evidenceIds.length > 0).slice(0, 2);
+  if (groundedIssues.length > 0) {
     const sourceLabel =
       digest.contentLevel === "article_extract"
         ? "取得できた記事本文"
         : digest.contentLevel === "feed_content"
           ? "RSS内の本文"
           : "RSSの短い説明";
-    return [
+    return groundedIssues.map((issue, index) =>
       beat(
         item,
         "understanding",
@@ -166,10 +197,10 @@ function buildUnderstanding(item: NewsItem, digest: ArticleDigest, emotion: News
             ? "feed_content"
             : "feed_summary",
         emotion,
-        `${sourceLabel}では、「${fact.text}」と確認できます。`,
-        [fact.id, fact.evidenceId]
+        `${sourceLabel}${index === 0 ? "" : "の別の箇所"}では、「${issue.summary}」と確認できます。`,
+        issue.evidenceIds
       )
-    ];
+    );
   }
   return [
     beat(
@@ -181,6 +212,99 @@ function buildUnderstanding(item: NewsItem, digest: ArticleDigest, emotion: News
       [`${item.id}_headline`]
     )
   ];
+}
+
+function selectIssues(
+  digest: ArticleDigest,
+  lens: NewsConversationLens,
+  matches: ReturnType<typeof findNewsConcepts>,
+  relations: ConceptRelation[],
+  memories: MemoryEvent[]
+) {
+  const rememberedConceptIds = new Set(memories.flatMap((memory) => memory.conceptIds));
+  const relatedConceptIds = new Set(
+    relations.flatMap((relation) => [relation.fromConceptId, relation.toConceptId])
+  );
+  const lensBonus = (kind: ArticleDigest["issues"][number]["kind"]) => {
+    if (lens === "numbers_and_scale" && kind === "number") return 0.35;
+    if (lens === "people_involved" && (kind === "person" || kind === "place")) return 0.3;
+    if (lens === "practical_change" && ["change", "effect", "benefit", "risk"].includes(kind)) return 0.22;
+    if (lens === "uncertainty" && kind === "uncertainty") return 0.3;
+    return 0;
+  };
+  const personalBonus = (issue: ArticleDigest["issues"][number]) =>
+    matches
+      .filter(({ concept }) =>
+        [concept.surface, concept.reading, ...concept.aliases]
+          .filter((value): value is string => Boolean(value))
+          .some((value) => issue.summary.includes(value))
+      )
+      .reduce(
+        (bonus, { concept }) =>
+          bonus +
+          0.18 +
+          (concept.preference === undefined ? 0 : Math.abs(concept.preference) * 0.05) +
+          (rememberedConceptIds.has(concept.id) ? 0.1 : 0) +
+          (relatedConceptIds.has(concept.id) ? 0.06 : 0),
+        0
+      );
+  return [...digest.issues]
+    .sort(
+      (left, right) =>
+        right.importance +
+        right.relevanceToUser +
+        right.suitabilityForOpinion +
+        lensBonus(right.kind) -
+        (left.importance + left.relevanceToUser + left.suitabilityForOpinion + lensBonus(left.kind)) +
+        personalBonus(right) -
+        personalBonus(left)
+    )
+    .slice(0, digest.issues.length > 1 ? 2 : 1);
+}
+
+function buildResponseQuestion(
+  item: NewsItem,
+  digest: ArticleDigest,
+  issues: ArticleDigest["issues"],
+  hasLearnedWord: boolean
+): NewsConversationPlan["responseQuestion"] {
+  if (digest.contentLevel === "headline_only") {
+    return {
+      prompt: `「${item.title}」は見出しだけ届いています。どこまで話しますか？`,
+      options: [
+        { intent: "interested", label: "見出しだけでも話す" },
+        { intent: "ask_more", label: "元記事で確かめたい" },
+        { intent: "close_topic", label: "今回はやめる" }
+      ]
+    };
+  }
+  const issue = issues[0];
+  const prompt = issue
+    ? `記事の「${issue.label}」について、どう感じますか？`
+    : `「${item.title}」について、どう感じますか？`;
+  const options: Array<{ intent: NewsResponseIntent; label: string }> =
+    digest.tone === "sensitive"
+      ? [
+          { intent: "concerned", label: "心配している" },
+          { intent: "personal_relevance", label: "生活にも関係しそう" },
+          { intent: "ask_more", label: "もう少し確かめたい" },
+          { intent: "close_topic", label: "ここで終える" }
+        ]
+      : issue?.kind === "number"
+        ? [
+            { intent: "surprised", label: "大きな数字だと思う" },
+            { intent: "personal_relevance", label: "生活にも関係しそう" },
+            { intent: "ask_more", label: "数字の理由を知りたい" },
+            { intent: "not_interested", label: "今は気にならない" }
+          ]
+        : [
+            { intent: "agree", label: "アグリの見方に近い" },
+            { intent: "disagree", label: "少し違うと思う" },
+            { intent: "interested", label: "もっと知りたい" },
+            { intent: "not_interested", label: "今は気にならない" },
+            ...(hasLearnedWord ? [{ intent: "correct_aguri" as const, label: "言葉のつながりを直す" }] : [])
+          ];
+  return { prompt, options };
 }
 
 function buildMemoryConnection(
@@ -206,6 +330,7 @@ function buildMemoryConnection(
 function buildOpinions(
   item: NewsItem,
   digest: ArticleDigest,
+  selectedIssues: ArticleDigest["issues"],
   matches: ReturnType<typeof findNewsConcepts>,
   character: CharacterState | undefined,
   now: number
@@ -229,8 +354,17 @@ function buildOpinions(
   );
   const topicKey = digest.topics[0]?.key ?? "general";
   const curiosity = Math.min(1, Math.max(0.2, character?.curiosity ?? 0.6));
+  const leadingIssue = selectedIssues[0];
   const polarity =
-    digest.tone === "positive" ? 0.45 : digest.tone === "negative" || digest.tone === "sensitive" ? -0.35 : 0;
+    leadingIssue?.kind === "benefit"
+      ? 0.35
+      : leadingIssue && ["risk", "conflict"].includes(leadingIssue.kind)
+        ? -0.4
+        : digest.tone === "positive"
+          ? 0.3
+          : digest.tone === "negative" || digest.tone === "sensitive"
+            ? -0.3
+            : 0;
   return [
     ...userOpinions,
     {
@@ -240,20 +374,32 @@ function buildOpinions(
       polarity,
       curiosity,
       confidence: Math.min(0.75, digest.confidence),
-      reason: digest.tone === "unknown" ? "unknown" : "news_tone",
+      reason: leadingIssue ? "article_issue" : digest.tone === "unknown" ? "unknown" : "news_tone",
       createdAt: now,
       updatedAt: now
     }
   ];
 }
 
-function opinionText(target: string, digest: ArticleDigest, character?: CharacterState) {
+function opinionText(
+  target: string,
+  digest: ArticleDigest,
+  selectedIssues: ArticleDigest["issues"],
+  character?: CharacterState
+) {
   if (digest.tone === "sensitive") {
     return `${target}に関わる人の状況を、軽く決めつけずに読みたいです。分からない部分を埋めたふりはしません。`;
   }
   const numerical = digest.numericalFacts[0]?.value;
   if (numerical)
     return `${numerical}という規模が具体的で気になります。数字が誰の生活をどう変えるのかまで確かめたいです。`;
+  const issue = selectedIssues[0];
+  if (issue?.kind === "benefit")
+    return `「${issue.summary}」という利点はうれしいです。ただ、誰にどこまで届くのかも確かめたいです。`;
+  if (issue && ["risk", "conflict"].includes(issue.kind))
+    return `「${issue.summary}」は少し気になります。アグリは安心だと決めず、続きの情報を待ちたいです。`;
+  if (issue?.kind === "effect")
+    return `「${issue.summary}」という影響が、普段の暮らしへどこまで広がるのか気になります。`;
   if (digest.tone === "positive")
     return `${target}が実際にどこまで続く変化なのかに注目したいです。始まった瞬間だけでなく、その後も見たいです。`;
   if (digest.tone === "negative")
@@ -307,7 +453,7 @@ function beat(
     kind,
     source,
     emotion,
-    text: applyAguriVoice(text, emotion),
+    text,
     evidenceIds
   };
 }
@@ -358,6 +504,20 @@ function fallbackDigest(item: NewsItem): ArticleDigest {
     ],
     events: [],
     numericalFacts: [],
+    issues: item.summary
+      ? [
+          {
+            id: `${item.id}_issue_0`,
+            label: "配信された要点",
+            summary: item.summary,
+            evidenceIds: [`${item.id}_fact_0`, `${item.id}_summary`],
+            kind: "change",
+            importance: 0.6,
+            relevanceToUser: 0.45,
+            suitabilityForOpinion: 0.55
+          }
+        ]
+      : [],
     uncertainties: [contentLevel === "headline_only" ? "見出し以外の内容" : "記事全体の背景"],
     tone: sensitiveText(`${item.title} ${item.summary}`) ? "sensitive" : "neutral",
     confidence: contentLevel === "headline_only" ? 0.25 : 0.5

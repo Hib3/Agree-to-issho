@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useGameStore } from "./providers";
 import { TitleScreen } from "../features/onboarding/TitleScreen";
 import { FirstStartWizard } from "../features/onboarding/FirstStartWizard";
@@ -11,14 +11,19 @@ import { SettingsScreen } from "../features/settings/SettingsScreen";
 import { BackupScreen } from "../features/backup/BackupScreen";
 import { ManualScreen } from "../features/settings/ManualScreen";
 import { resetGameData } from "./bootstrap";
-import { NewsScreen } from "../features/news/NewsScreen";
+import { NEWS_PREPARATION_STORAGE_KEY, NewsScreen } from "../features/news/NewsScreen";
 import { refreshNews, shouldRefreshNews } from "../infrastructure/news/newsService";
 
 export function App() {
   const store = useGameStore();
+  const initialRouteRestoredRef = useRef(false);
   const initialize = store.initialize;
   const settings = store.settings;
   const refresh = store.refresh;
+  const setScreen = store.setScreen;
+  const loading = store.loading;
+  const player = store.player;
+  const activeSessionId = store.sessions.find((session) => session.phase !== "completed")?.id;
   const screen = !store.player && store.screen !== "onboarding" ? "onboarding" : store.screen;
 
   useEffect(() => {
@@ -28,6 +33,16 @@ export function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [screen]);
+
+  useEffect(() => {
+    if (initialRouteRestoredRef.current || loading || !player) return;
+    initialRouteRestoredRef.current = true;
+    if (activeSessionId) {
+      setScreen("room");
+      return;
+    }
+    if (sessionStorage.getItem(NEWS_PREPARATION_STORAGE_KEY)) setScreen("news");
+  }, [activeSessionId, loading, player, setScreen]);
 
   useEffect(() => {
     if (!settings?.newsEnabled || settings.newsFeeds.length === 0) return;
@@ -165,12 +180,13 @@ export function App() {
       {screen === "news" && store.settings ? (
         <NewsScreen
           items={store.newsItems}
-          concepts={store.concepts}
-          character={store.character ?? undefined}
-          relations={store.relations}
-          memories={store.memories}
           settings={store.settings}
           onChanged={store.refresh}
+          onRefresh={async () => {
+            await refreshNews(store.settings!, Date.now(), true);
+            await store.refresh();
+          }}
+          onConversationStarted={() => store.setScreen("room")}
           onOpenSettings={() => store.setScreen("settings")}
           onBack={() => store.setScreen("room")}
         />

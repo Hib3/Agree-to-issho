@@ -2,6 +2,10 @@ import type {
   ArticleContentLevel,
   ArticleDigest,
   ArticleEvidence,
+  ArticleFetchAttempt,
+  ArticleFetchResult,
+  ArticleFetchTrace,
+  ArticleIssue,
   ArticleTone,
   NewsItem
 } from "../../domain/model/news";
@@ -14,14 +18,15 @@ const MAX_ARTICLE_PARAGRAPHS = 20;
 const READER_ENDPOINT = "https://r.jina.ai/";
 
 export function buildFeedDigest(item: NewsItem, now = Date.now()): ArticleDigest {
-  const contentLevel: ArticleContentLevel = item.feedContent
+  const usefulFeedContent = item.feedContent && assessArticleText(item.feedContent, item.title).useful;
+  const contentLevel: ArticleContentLevel = usefulFeedContent
     ? "feed_content"
     : item.summary
       ? "feed_summary"
       : "headline_only";
   const evidence: ArticleEvidence[] = [{ id: `${item.id}_headline`, text: item.title, source: "headline" }];
   if (item.summary) evidence.push({ id: `${item.id}_summary`, text: item.summary, source: "feed_summary" });
-  if (item.feedContent)
+  if (usefulFeedContent && item.feedContent)
     evidence.push(
       ...sentences(item.feedContent, 3).map((text, index) => ({
         id: `${item.id}_feed_${index}`,
@@ -43,38 +48,184 @@ export function buildFeedDigest(item: NewsItem, now = Date.now()): ArticleDigest
 
 export async function fetchArticleDigest(
   item: NewsItem,
-  options: { useArticleHelper: boolean; signal?: AbortSignal | undefined; now?: number | undefined }
-): Promise<ArticleDigest> {
+  options: {
+    useArticleHelper: boolean;
+    signal?: AbortSignal | undefined;
+    now?: number | undefined;
+    attemptDirect?: boolean | undefined;
+    previousTrace?: ArticleFetchTrace | undefined;
+  }
+): Promise<ArticleFetchResult> {
   const now = options.now ?? Date.now();
   const fallback = buildFeedDigest(item, now);
-  let directFailure = "";
-  try {
-    const response = await fetchArticleText(
-      item.url,
-      "text/html, application/xhtml+xml, text/plain",
-      options.signal
-    );
-    const text = extractArticleText(response.text, response.contentType);
-    if (text.length >= 40) return digestFromArticle(item, text, response.finalUrl, now);
-    directFailure = "記事本文から十分な文章を取り出せませんでした。";
-  } catch (error) {
-    if (options.signal?.aborted) throw error;
-    directFailure = userArticleFailure(error);
+  const trace: ArticleFetchTrace = options.previousTrace
+    ? {
+        ...options.previousTrace,
+        attempts: options.previousTrace.attempts.filter(
+          (attempt) =>
+            attempt.method !== "fallback_headline" &&
+            !(attempt.method === "reader_helper" && attempt.result === "disabled")
+        )
+      }
+    : { articleUrl: item.url, startedAt: now, attempts: [], finalContentLevel: fallback.contentLevel };
+
+  if (!options.previousTrace) {
+    const feedStartedAt = Date.now();
+    if (fallback.contentLevel === "feed_content") {
+      trace.attempts.push({
+        method: "feed_content",
+        startedAt: feedStartedAt,
+        finishedAt: Date.now(),
+        result: "success",
+        extractedCharacters: item.feedContent ? Array.from(item.feedContent).length : 0
+      });
+      return finishArticleFetch(fallback, trace, false);
+    }
+    trace.attempts.push({
+      method: "feed_content",
+      startedAt: feedStartedAt,
+      finishedAt: Date.now(),
+      result: item.feedContent ? "too_short" : "disabled",
+      extractedCharacters: item.feedContent ? Array.from(item.feedContent).length : 0,
+      detail: item.feedContent ? "RSS本文は本文品質条件を満たしませんでした。" : "RSS本文はありません。"
+    });
   }
 
-  if (options.useArticleHelper) {
+  let directFailure = [...(options.previousTrace?.attempts ?? [])]
+    .reverse()
+    .find((attempt) => attempt.method === "direct_article")?.detail;
+  if (options.attemptDirect !== false) {
+    const startedAt = Date.now();
     try {
-      const response = await fetchArticleText(`${READER_ENDPOINT}${item.url}`, "text/plain", options.signal);
-      const text = extractReaderText(response.text);
-      if (text.length >= 40) return digestFromArticle(item, text, item.url, now);
-      directFailure = "取得補助から十分な文章を取り出せませんでした。";
+      const response = await fetchArticleText(
+        item.url,
+        "text/html, application/xhtml+xml, text/plain",
+        options.signal
+      );
+      const text = extractArticleText(response.text, response.contentType);
+      const assessment = assessArticleText(text, item.title);
+      trace.attempts.push({
+        method: "direct_article",
+        startedAt,
+        finishedAt: Date.now(),
+        result: assessment.useful ? "success" : "too_short",
+        statusCode: response.statusCode,
+        contentType: response.contentType,
+        extractedCharacters: Array.from(text).length,
+        ...(!assessment.useful ? { detail: assessment.reason } : {})
+      });
+      if (assessment.useful)
+        return finishArticleFetch(digestFromArticle(item, text, response.finalUrl, now), trace, false);
+      directFailure = assessment.reason;
     } catch (error) {
       if (options.signal?.aborted) throw error;
-      directFailure = "記事本文を直接にも取得補助からも読めませんでした。";
+      const failure = articleAttemptFailure(error);
+      directFailure = failure.detail;
+      trace.attempts.push({
+        method: "direct_article",
+        startedAt,
+        finishedAt: Date.now(),
+        result: failure.result,
+        ...(failure.statusCode ? { statusCode: failure.statusCode } : {}),
+        ...(failure.contentType ? { contentType: failure.contentType } : {}),
+        detail: failure.detail
+      });
     }
   }
 
-  return { ...fallback, uncertainties: [...fallback.uncertainties, directFailure].filter(Boolean) };
+  if (!options.useArticleHelper) {
+    const helperTime = Date.now();
+    trace.attempts.push({
+      method: "reader_helper",
+      startedAt: helperTime,
+      finishedAt: helperTime,
+      result: "disabled",
+      detail: "記事取得補助は許可されていません。"
+    });
+    return finishArticleFetch(
+      {
+        ...fallback,
+        uncertainties: [...fallback.uncertainties, directFailure].filter((value): value is string =>
+          Boolean(value)
+        )
+      },
+      trace,
+      true,
+      directFailure
+    );
+  }
+
+  const helperStartedAt = Date.now();
+  try {
+    const response = await fetchArticleText(`${READER_ENDPOINT}${item.url}`, "text/plain", options.signal);
+    const text = extractReaderText(response.text);
+    const assessment = assessArticleText(text, item.title);
+    trace.attempts.push({
+      method: "reader_helper",
+      startedAt: helperStartedAt,
+      finishedAt: Date.now(),
+      result: assessment.useful ? "success" : "too_short",
+      statusCode: response.statusCode,
+      contentType: response.contentType,
+      extractedCharacters: Array.from(text).length,
+      ...(!assessment.useful ? { detail: assessment.reason } : {})
+    });
+    if (assessment.useful)
+      return finishArticleFetch(digestFromArticle(item, text, item.url, now), trace, false);
+    directFailure = assessment.reason;
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    const failure = articleAttemptFailure(error);
+    directFailure = failure.detail;
+    trace.attempts.push({
+      method: "reader_helper",
+      startedAt: helperStartedAt,
+      finishedAt: Date.now(),
+      result: failure.result,
+      ...(failure.statusCode ? { statusCode: failure.statusCode } : {}),
+      ...(failure.contentType ? { contentType: failure.contentType } : {}),
+      detail: failure.detail
+    });
+  }
+
+  return finishArticleFetch(
+    {
+      ...fallback,
+      uncertainties: [...fallback.uncertainties, directFailure].filter((value): value is string =>
+        Boolean(value)
+      )
+    },
+    trace,
+    false,
+    directFailure
+  );
+}
+
+function finishArticleFetch(
+  digest: ArticleDigest,
+  trace: ArticleFetchTrace,
+  needsHelperConsent: boolean,
+  directFailureReason?: string
+): ArticleFetchResult {
+  const fallbackTime = Date.now();
+  if (digest.contentLevel !== "article_extract" && digest.contentLevel !== "feed_content") {
+    trace.attempts.push({
+      method: "fallback_headline",
+      startedAt: fallbackTime,
+      finishedAt: fallbackTime,
+      result: "success",
+      extractedCharacters: digest.keySentences.reduce((sum, entry) => sum + Array.from(entry.text).length, 0),
+      detail:
+        digest.contentLevel === "feed_summary" ? "RSSの短い説明を使用します。" : "見出しだけを使用します。"
+    });
+  }
+  trace.finalContentLevel = digest.contentLevel;
+  return {
+    digest,
+    trace,
+    needsHelperConsent,
+    ...(directFailureReason ? { directFailureReason } : {})
+  };
 }
 
 function digestFromArticle(item: NewsItem, text: string, sourceUrl: string, now: number) {
@@ -124,6 +275,7 @@ function digestFromEvidence(
     )
     .slice(0, 6);
   const entities = extractEntities(combined);
+  const issues = extractArticleIssues(item.id, keyFacts, numericalFacts, entities, uncertainties);
   return {
     newsItemId: item.id,
     contentLevel,
@@ -139,6 +291,7 @@ function digestFromEvidence(
       evidenceId: fact.evidenceId
     })),
     numericalFacts,
+    issues,
     uncertainties,
     tone,
     confidence:
@@ -166,6 +319,124 @@ function comparableText(value: string) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[\s\p{P}\p{S}]/gu, "");
+}
+
+export function assessArticleText(text: string, headline: string) {
+  const cleaned = cleanFeedText(text, MAX_ARTICLE_CHARACTERS);
+  const characters = Array.from(cleaned).length;
+  if (characters < 80) return { useful: false as const, reason: "本文として使える文字数が足りません。" };
+  if (isNearDuplicate(cleaned, headline))
+    return { useful: false as const, reason: "見出しとほぼ同じ内容だけでした。" };
+  const segments = cleaned
+    .split(/(?<=[。！？!?])\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const boilerplate = segments.filter((part) =>
+    /(cookie|クッキー|広告|プライバシー|利用規約|ログイン|会員登録|通知を許可|JavaScriptを有効|サイトについて)/iu.test(
+      part
+    )
+  );
+  if (boilerplate.length > 0 && boilerplate.length / Math.max(1, segments.length) >= 0.6)
+    return { useful: false as const, reason: "広告やサイト案内が中心で、記事本文を確認できませんでした。" };
+  if (segments.length < 2 && characters < 180)
+    return { useful: false as const, reason: "独立した文が一つしかなく、本文として判断できませんでした。" };
+  const hasVerb =
+    /(発表|開始|予定|決定|確認|公開|導入|実施|報告|対応|改善|増加|減少|行う|行った|している|された|となる|なった|する|した|is|are|was|were|will|has|have|said|announced|reported)/iu.test(
+      cleaned
+    );
+  const hasSpecificDetail =
+    /[0-9０-９]|(?:市|県|町|村|駅|大学|会社|庁|省|党|チーム|研究所)|(?:によると|同社|自治体|政府|研究|利用者)/u.test(
+      cleaned
+    );
+  if (!hasVerb || !hasSpecificDetail)
+    return { useful: false as const, reason: "出来事を示す動作や固有情報を十分に確認できませんでした。" };
+  return { useful: true as const, reason: "" };
+}
+
+function extractArticleIssues(
+  itemId: string,
+  facts: ArticleDigest["keyFacts"],
+  numericalFacts: ArticleDigest["numericalFacts"],
+  entities: ArticleDigest["entities"],
+  uncertainties: string[]
+): ArticleIssue[] {
+  const issues: ArticleIssue[] = facts.map((fact, index) => {
+    const kind = issueKind(fact.text);
+    return {
+      id: `${itemId}_issue_${index}`,
+      label: issueLabel(kind),
+      summary: fact.text,
+      evidenceIds: [fact.id, fact.evidenceId],
+      kind,
+      importance: Math.min(1, 0.58 + (/(重要|影響|被害|変更|開始|停止|決定)/u.test(fact.text) ? 0.18 : 0)),
+      relevanceToUser: /(生活|利用者|料金|交通|健康|安全|学校|仕事)/u.test(fact.text) ? 0.78 : 0.48,
+      suitabilityForOpinion: kind === "cause" || kind === "uncertainty" ? 0.45 : 0.72
+    };
+  });
+  for (const [index, numerical] of numericalFacts.entries()) {
+    if (issues.some((issue) => issue.evidenceIds.includes(numerical.evidenceId))) continue;
+    issues.push({
+      id: `${itemId}_issue_number_${index}`,
+      label: "数字と規模",
+      summary: numerical.context,
+      evidenceIds: [numerical.evidenceId],
+      kind: "number",
+      importance: 0.72,
+      relevanceToUser: 0.52,
+      suitabilityForOpinion: 0.68
+    });
+  }
+  for (const [index, entity] of entities.entries()) {
+    if (issues.length >= 5 || entity.kind === "other") continue;
+    issues.push({
+      id: `${itemId}_issue_entity_${index}`,
+      label: entity.kind === "place" ? "関係する場所" : "関係する人や組織",
+      summary: `${entity.name}が記事内で言及されています。`,
+      evidenceIds: [],
+      kind: entity.kind === "place" ? "place" : "person",
+      importance: 0.5,
+      relevanceToUser: 0.42,
+      suitabilityForOpinion: 0.45
+    });
+  }
+  if (issues.length === 0 && uncertainties[0]) {
+    issues.push({
+      id: `${itemId}_issue_uncertainty`,
+      label: "まだ分からないこと",
+      summary: uncertainties[0],
+      evidenceIds: [],
+      kind: "uncertainty",
+      importance: 0.45,
+      relevanceToUser: 0.35,
+      suitabilityForOpinion: 0.25
+    });
+  }
+  return issues.sort((left, right) => right.importance - left.importance).slice(0, 6);
+}
+
+function issueKind(text: string): ArticleIssue["kind"] {
+  if (/(原因|ため|理由|背景|きっかけ)/u.test(text)) return "cause";
+  if (/(影響|結果|ことになる|受ける)/u.test(text)) return "effect";
+  if (/(改善|便利|利点|可能になる|支援)/u.test(text)) return "benefit";
+  if (/(危険|懸念|被害|問題|不足|停止)/u.test(text)) return "risk";
+  if (/(対立|反対|一方|争い|批判)/u.test(text)) return "conflict";
+  if (/[0-9０-９]/u.test(text)) return "number";
+  return "change";
+}
+
+function issueLabel(kind: ArticleIssue["kind"]) {
+  return {
+    change: "起きる変化",
+    cause: "変化の理由",
+    effect: "考えられる影響",
+    benefit: "期待される利点",
+    risk: "気になる点",
+    conflict: "意見が分かれる点",
+    number: "数字と規模",
+    person: "関係する人",
+    place: "関係する場所",
+    uncertainty: "まだ分からないこと"
+  }[kind];
 }
 
 function extractArticleText(source: string, contentType: string) {
@@ -220,9 +491,14 @@ function limitArticleText(parts: string[]) {
 }
 
 async function fetchArticleText(url: string, accept: string, parentSignal?: AbortSignal) {
-  const parsed = new URL(url);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new ArticleRequestError("parse_error", "記事URLを解釈できませんでした。");
+  }
   if (parsed.protocol !== "https:" || parsed.username || parsed.password)
-    throw new Error("公開されたHTTPSの記事だけ取得できます。");
+    throw new ArticleRequestError("parse_error", "公開されたHTTPSの記事だけ取得できます。");
   const controller = new AbortController();
   const onAbort = () => controller.abort(parentSignal?.reason);
   parentSignal?.addEventListener("abort", onAbort, { once: true });
@@ -235,15 +511,30 @@ async function fetchArticleText(url: string, accept: string, parentSignal?: Abor
       referrerPolicy: "no-referrer",
       headers: { Accept: accept }
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!response.ok)
+      throw new ArticleRequestError("http_error", `記事サーバーがHTTP ${response.status}を返しました。`, {
+        statusCode: response.status,
+        contentType
+      });
     const declared = Number(response.headers.get("content-length") ?? 0);
-    if (declared > MAX_ARTICLE_BYTES) throw new Error("記事が大きすぎます。");
+    if (declared > MAX_ARTICLE_BYTES)
+      throw new ArticleRequestError("parse_error", "記事が大きすぎるため読み込みを止めました。", {
+        statusCode: response.status,
+        contentType
+      });
     const text = await readArticleBody(response, controller);
     return {
       text,
       finalUrl: response.url || parsed.href,
-      contentType: response.headers.get("content-type") ?? ""
+      contentType,
+      statusCode: response.status
     };
+  } catch (error) {
+    if (parentSignal?.aborted) throw error;
+    if (controller.signal.aborted && controller.signal.reason === "timeout")
+      throw new ArticleRequestError("timeout", "記事の取得が時間切れになりました。");
+    throw error;
   } finally {
     globalThis.clearTimeout(timer);
     parentSignal?.removeEventListener("abort", onAbort);
@@ -253,7 +544,8 @@ async function fetchArticleText(url: string, accept: string, parentSignal?: Abor
 async function readArticleBody(response: Response, controller: AbortController) {
   if (!response.body) {
     const text = await response.text();
-    if (new Blob([text]).size > MAX_ARTICLE_BYTES) throw new Error("記事が大きすぎます。");
+    if (new Blob([text]).size > MAX_ARTICLE_BYTES)
+      throw new ArticleRequestError("parse_error", "記事が大きすぎるため読み込みを止めました。");
     return text;
   }
   const reader = response.body.getReader();
@@ -266,7 +558,7 @@ async function readArticleBody(response: Response, controller: AbortController) 
     bytes += chunk.value.byteLength;
     if (bytes > MAX_ARTICLE_BYTES) {
       controller.abort("size");
-      throw new Error("記事が大きすぎます。");
+      throw new ArticleRequestError("parse_error", "記事が大きすぎるため読み込みを止めました。");
     }
     text += decoder.decode(chunk.value, { stream: true });
   }
@@ -328,9 +620,33 @@ function extractEntities(text: string) {
   }));
 }
 
-function userArticleFailure(error: unknown) {
+class ArticleRequestError extends Error {
+  constructor(
+    readonly result: ArticleFetchAttempt["result"],
+    message: string,
+    readonly metadata: { statusCode?: number; contentType?: string } = {}
+  ) {
+    super(message);
+  }
+}
+
+function articleAttemptFailure(error: unknown) {
+  if (error instanceof ArticleRequestError) {
+    return {
+      result: error.result,
+      detail: error.message,
+      ...error.metadata
+    };
+  }
   if (error instanceof DOMException && error.name === "AbortError")
-    return "記事の取得が時間切れになりました。";
-  if (error instanceof TypeError) return "ブラウザから記事本文を直接取得できませんでした。";
-  return error instanceof Error ? error.message : "記事本文を取得できませんでした。";
+    return { result: "timeout" as const, detail: "記事の取得が時間切れになりました。" };
+  if (error instanceof TypeError)
+    return {
+      result: "cors_error" as const,
+      detail: "ブラウザの通信制限により記事本文を直接取得できませんでした。"
+    };
+  return {
+    result: "parse_error" as const,
+    detail: error instanceof Error ? error.message : "記事本文を取得できませんでした。"
+  };
 }

@@ -1,6 +1,14 @@
 import type { CharacterEmotion } from "./character";
 import type { RelationType } from "./relation";
 import type { ConceptCategory } from "./concept";
+import type {
+  ArticleContentLevel,
+  ArticleDigest,
+  ArticleFetchTrace,
+  EvolvingNewsOpinion,
+  NewsDiscussionState,
+  NewsResponseIntent
+} from "./news";
 
 export const conversationIntents = [
   "small_talk",
@@ -130,6 +138,7 @@ export type DialogueChoice = {
   label: string;
   effect: "affirm" | "deny" | "curious" | "later";
   answerEffect?: DialogueAnswerEffect;
+  newsResponseIntent?: NewsResponseIntent;
 };
 export type DialogueTurn = {
   id: string;
@@ -159,12 +168,37 @@ export type PendingQuestion = {
   relationDraft?: { fromConceptId: string; toConceptId: string; type: RelationType };
 };
 
-export const CURRENT_DIALOGUE_REVISION = 4 as const;
+export type ConversationOrigin =
+  | { type: "ordinary" }
+  | {
+      type: "news";
+      newsItemId: string;
+      articleDigest: ArticleDigest;
+      sourceUrl: string;
+      contentLevel: ArticleContentLevel;
+      fetchTrace: ArticleFetchTrace;
+      selectedIssueIds: string[];
+      groundedFactIds: string[];
+      conceptIds: string[];
+      memoryIds: string[];
+      discussionState: NewsDiscussionState;
+      evolvingOpinion: EvolvingNewsOpinion;
+      userReaction?: {
+        intent: NewsResponseIntent;
+        conceptIds: string[];
+        recordedAt: number;
+      };
+      startedAt: number;
+      completedAt?: number;
+    };
+
+export const CURRENT_DIALOGUE_REVISION = 5 as const;
 
 export type ConversationSession = {
   schemaVersion: 2;
   dialogueRevision: typeof CURRENT_DIALOGUE_REVISION;
   id: string;
+  origin: ConversationOrigin;
   phase: ConversationPhase;
   intent: ConversationIntent;
   locationId: string;

@@ -144,6 +144,21 @@ for (let seed = 1; seed <= 100; seed += 1) {
     topics: [{ key: topicKey, label: topicLabel }],
     events: [],
     numericalFacts: [],
+    issues:
+      contentLevel === "headline_only"
+        ? []
+        : [
+            {
+              id: `${item.id}_issue`,
+              label: "記事の要点",
+              summary,
+              evidenceIds: [`${item.id}_fact`, `${item.id}_detail`],
+              kind: "change",
+              importance: 0.7,
+              relevanceToUser: 0.5,
+              suitabilityForOpinion: 0.6
+            }
+          ],
     uncertainties: ["記事全体の背景"],
     tone: sensitive ? "sensitive" : "neutral",
     confidence: contentLevel === "headline_only" ? 0.25 : contentLevel === "feed_summary" ? 0.5 : 0.78

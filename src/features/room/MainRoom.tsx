@@ -35,6 +35,8 @@ import { validateConversationSession } from "../../domain/conversation/dialogueV
 import { isCurrentConversationSession } from "../../domain/conversation/sessionMigration";
 import { playGameSound } from "../../infrastructure/audio/gameAudio";
 
+type NewsInvitation = { item: NewsItem; matchedWord?: string | undefined };
+
 export function MainRoom({
   player,
   character,
@@ -74,15 +76,21 @@ export function MainRoom({
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [clock, setClock] = useState(() => Date.now());
+  const [newsInvitation, setNewsInvitation] = useState<NewsInvitation | null>(null);
   const timerRef = useRef<number | null>(null);
   const location = locations.find((item) => item.id === character.currentLocationId) ?? locations[0]!;
   const timeOfDay = getTimeOfDay(clock);
   const weather = Math.floor(clock / 86_400_000) % 5 === 0 ? "rain" : "clear";
   const userWordCount = concepts.filter((concept) => concept.source === "user").length;
-  const unreadNewsCount = newsItems.filter((item) => !item.discussedAt).length;
+  const unreadNewsCount = newsItems.filter(
+    (item) => item.discussionState !== "discussed" && !item.discussedAt
+  ).length;
   const lastTurn = active?.history.at(-1);
-  const dialogueText =
-    rawActive && activeErrors.length > 0
+  const dialogueText = newsInvitation
+    ? newsInvitation.matchedWord
+      ? `そういえばっ、「${newsInvitation.matchedWord}」が出てくるニュースが届いています。一緒に読んでみますかっ？`
+      : "新しいニュースが届いていますっ。一緒に読んでみますかっ？"
+    : rawActive && activeErrors.length > 0
       ? "会話メモを整え直しましたっ。もう一度、話しかけてくださいっ！"
       : active?.phase === "awaiting_answer" && active.pendingQuestion
         ? active.pendingQuestion.prompt
@@ -155,6 +163,42 @@ export function MainRoom({
     };
   }, [active, busy, character, location, saving, settings.autonomousSpeech, speak]);
 
+  useEffect(() => {
+    if (!settings.newsEnabled || rawActive || newsInvitation || newsItems.length === 0) return;
+    const now = Date.now();
+    const promptState = readNewsPromptState();
+    if (now - promptState.lastPromptAt < 6 * 60 * 60 * 1000 || now < promptState.dismissedUntil) return;
+    const unread = newsItems.filter(
+      (item) =>
+        item.discussionState !== "discussed" &&
+        !item.discussedAt &&
+        !promptState.suggestedItemIds.includes(item.id) &&
+        !isSensitiveHeadline(`${item.title} ${item.summary}`)
+    );
+    const learnedMatch = unread
+      .flatMap((item) =>
+        concepts
+          .filter((concept) => concept.source === "user" && concept.active)
+          .map((concept) => ({ item, word: concept.surface }))
+      )
+      .find(({ item, word }) => `${item.title} ${item.summary}`.includes(word));
+    const invitation = learnedMatch
+      ? { item: learnedMatch.item, matchedWord: learnedMatch.word }
+      : unread[0]
+        ? { item: unread[0] }
+        : null;
+    if (!invitation) return;
+    const timer = window.setTimeout(() => {
+      setNewsInvitation(invitation);
+      writeNewsPromptState({
+        ...promptState,
+        lastPromptAt: now,
+        suggestedItemIds: [...promptState.suggestedItemIds, invitation.item.id].slice(-40)
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [concepts, newsInvitation, newsItems, rawActive, settings.newsEnabled]);
+
   async function submitAnswer() {
     if (!active?.pendingQuestion || selection.questionId !== active.pendingQuestion.id || !selection.value)
       return;
@@ -195,7 +239,9 @@ export function MainRoom({
 
   return (
     <main className={`room-screen location-shell-${location.id}`}>
-      <section className={`room-composition${active?.phase === "awaiting_answer" ? " answering" : ""}`}>
+      <section
+        className={`room-composition${active?.phase === "awaiting_answer" ? " answering" : ""}${newsInvitation ? " news-inviting" : ""}`}
+      >
         <CharacterStage
           emotion={lastTurn?.emotion ?? character.emotion}
           locationId={location.id}
@@ -231,6 +277,44 @@ export function MainRoom({
           hasNext={hasNext}
           onNext={() => void speak()}
         />
+
+        {active?.origin.type === "news" ? (
+          <div className="active-news-source">
+            <span>ニュースの記事について会話中</span>
+            <a href={active.origin.sourceUrl} target="_blank" rel="noreferrer">
+              元記事
+            </a>
+          </div>
+        ) : null}
+
+        {newsInvitation ? (
+          <section className="news-invitation-actions" aria-label="ニュースの提案">
+            <button
+              className="primary"
+              type="button"
+              onClick={() => {
+                setNewsInvitation(null);
+                onNavigate("news");
+              }}
+            >
+              ニュースを見る
+            </button>
+            <button
+              className="quiet"
+              type="button"
+              onClick={() => {
+                const promptState = readNewsPromptState();
+                writeNewsPromptState({
+                  ...promptState,
+                  dismissedUntil: Date.now() + 24 * 60 * 60 * 1000
+                });
+                setNewsInvitation(null);
+              }}
+            >
+              今は見ない
+            </button>
+          </section>
+        ) : null}
 
         {active?.phase === "awaiting_answer" && active.pendingQuestion ? (
           <section className="answer-panel">
@@ -315,4 +399,31 @@ export function MainRoom({
       </nav>
     </main>
   );
+}
+
+const NEWS_PROMPT_STORAGE_KEY = "aguri-news-prompt-v1";
+
+function readNewsPromptState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(NEWS_PROMPT_STORAGE_KEY) ?? "{}") as Partial<{
+      lastPromptAt: number;
+      dismissedUntil: number;
+      suggestedItemIds: string[];
+    }>;
+    return {
+      lastPromptAt: Number(parsed.lastPromptAt) || 0,
+      dismissedUntil: Number(parsed.dismissedUntil) || 0,
+      suggestedItemIds: Array.isArray(parsed.suggestedItemIds) ? parsed.suggestedItemIds : []
+    };
+  } catch {
+    return { lastPromptAt: 0, dismissedUntil: 0, suggestedItemIds: [] as string[] };
+  }
+}
+
+function writeNewsPromptState(state: ReturnType<typeof readNewsPromptState>) {
+  localStorage.setItem(NEWS_PROMPT_STORAGE_KEY, JSON.stringify(state));
+}
+
+function isSensitiveHeadline(text: string) {
+  return /(死亡|死者|亡くな|重大事故|災害|地震|戦争|犯罪|逮捕|病気|医療|自傷|自殺|差別)/u.test(text);
 }

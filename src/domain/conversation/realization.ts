@@ -108,6 +108,7 @@ export function realizeCandidate(
   const session: ConversationSession = {
     schemaVersion: 2,
     dialogueRevision: CURRENT_DIALOGUE_REVISION,
+    origin: { type: "ordinary" },
     id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: candidate.template.intent,
@@ -204,6 +205,7 @@ function safeFallbackSession(
   return {
     schemaVersion: 2,
     dialogueRevision: CURRENT_DIALOGUE_REVISION,
+    origin: { type: "ordinary" },
     id: "session_" + crypto.randomUUID(),
     phase: "opening",
     intent: "small_talk",

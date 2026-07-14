@@ -59,6 +59,22 @@ export class AguriDatabase extends Dexie {
           })
       );
     this.version(3).stores(storesV3);
+    this.version(4)
+      .stores(storesV3)
+      .upgrade(async (transaction) => {
+        await transaction
+          .table<ConversationSession>("conversationSessions")
+          .toCollection()
+          .modify((session) => {
+            Object.assign(session, migrateConversationSession(session));
+          });
+        await transaction
+          .table<NewsItem>("newsItems")
+          .toCollection()
+          .modify((item) => {
+            item.discussionState = item.discussedAt ? "discussed" : (item.discussionState ?? "unread");
+          });
+      });
   }
 }
 
