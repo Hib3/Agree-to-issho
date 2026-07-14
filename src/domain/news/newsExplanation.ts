@@ -12,6 +12,16 @@ import type {
 } from "../model/news";
 import type { ConceptRelation } from "../model/relation";
 import { displayConcept } from "../grammar/japaneseRealizer";
+import {
+  buildNewsDiscourseFrame,
+  realizeNewsImagination,
+  realizeNewsInterpretation,
+  realizeNewsOpening,
+  realizeNewsOpinion,
+  realizeNewsUnderstanding,
+  realizeNewsUncertainty,
+  type NewsDiscourseFrame
+} from "./newsJapaneseNlg";
 
 type NewsContext = {
   character?: CharacterState | undefined;
@@ -28,8 +38,6 @@ export function buildNewsConversationPlan(
 ): NewsConversationPlan {
   const sensitive = digest.tone === "sensitive";
   const directMatches = findNewsConcepts(item, digest, concepts);
-  const topic = digest.topics[0] ?? { key: "general", label: "世の中の出来事" };
-  const target = selectSpecificTarget(digest);
   const lens = selectLens(digest, directMatches, context.character);
   const selectedIssues = selectIssues(
     digest,
@@ -38,30 +46,24 @@ export function buildNewsConversationPlan(
     context.relations ?? [],
     context.memories ?? []
   );
+  const discourse = buildNewsDiscourseFrame(item, digest, selectedIssues);
   const baseEmotion: NewsBeat["emotion"] = sensitive
     ? "calm"
     : digest.tone === "positive"
       ? "happy"
       : "curious";
-  const openingReaction = beat(
-    item,
-    "opening",
-    "headline",
-    baseEmotion,
-    `「${item.title}」という見出しの中で、${target}に目が止まりました。`,
-    [`${item.id}_headline`]
-  );
+  const openingReaction = beat(item, "opening", "headline", baseEmotion, realizeNewsOpening(discourse), [
+    `${item.id}_headline`
+  ]);
 
-  const understanding = buildUnderstanding(item, digest, selectedIssues, baseEmotion);
+  const understanding = buildUnderstanding(item, digest, selectedIssues, baseEmotion, discourse);
   const memoryConnection = buildMemoryConnection(item, directMatches, context.memories ?? []);
   const aguriInterpretation = beat(
     item,
     "interpretation",
     "inference",
     sensitive ? "calm" : "curious",
-    digest.contentLevel === "headline_only"
-      ? `見出しの言葉だけなら、${topic.label}の話かもしれません。ただ、記事に何が書かれているかは不明です。`
-      : `${topic.label}の動きとして読むのが近そうです。ここは配信文からアグリが整理した受け取り方です。`,
+    realizeNewsInterpretation(discourse),
     digest.topics.map((entry) => `topic:${entry.key}`)
   );
 
@@ -78,7 +80,7 @@ export function buildNewsConversationPlan(
     "opinion",
     "aguri_opinion",
     sensitive ? "calm" : baseEmotion,
-    opinionText(target, digest, selectedIssues, context.character),
+    realizeNewsOpinion(discourse, selectedIssues[0]),
     [opinions.find((opinion) => opinion.owner === "aguri")?.id ?? `${item.id}_aguri_opinion`]
   );
 
@@ -89,15 +91,13 @@ export function buildNewsConversationPlan(
           "uncertainty",
           "unknown",
           sensitive ? "calm" : "confused",
-          digest.contentLevel === "headline_only"
-            ? `「${item.title}」は見出しだけなので、何が起きたのか、背景や真偽までは決められません。`
-            : `配信された範囲では、記事全体の背景や真偽までは決められません。${digest.uncertainties[0] ?? "追加の文脈"}はまだ不明です。`,
+          realizeNewsUncertainty(discourse),
           []
         )
       : undefined;
   const imagination =
     !sensitive && digest.contentLevel !== "headline_only"
-      ? beat(item, "imagination", "imagination", "happy", imaginationText(topic.key, target), [])
+      ? beat(item, "imagination", "imagination", "happy", realizeNewsImagination(discourse), [])
       : undefined;
   const responseQuestion = buildResponseQuestion(item, digest, selectedIssues, directMatches.length > 0);
   const userQuestion = beat(
@@ -177,16 +177,11 @@ function buildUnderstanding(
   item: NewsItem,
   digest: ArticleDigest,
   selectedIssues: ArticleDigest["issues"],
-  emotion: NewsBeat["emotion"]
+  emotion: NewsBeat["emotion"],
+  discourse: NewsDiscourseFrame
 ) {
   const groundedIssues = selectedIssues.filter((issue) => issue.evidenceIds.length > 0).slice(0, 2);
   if (groundedIssues.length > 0) {
-    const sourceLabel =
-      digest.contentLevel === "article_extract"
-        ? "取得できた記事本文"
-        : digest.contentLevel === "feed_content"
-          ? "RSS内の本文"
-          : "RSSの短い説明";
     return groundedIssues.map((issue, index) =>
       beat(
         item,
@@ -197,7 +192,7 @@ function buildUnderstanding(
             ? "feed_content"
             : "feed_summary",
         emotion,
-        `${sourceLabel}${index === 0 ? "" : "の別の箇所"}では、「${issue.summary}」と確認できます。`,
+        realizeNewsUnderstanding(discourse, issue, index),
         issue.evidenceIds
       )
     );
@@ -248,18 +243,40 @@ function selectIssues(
           (relatedConceptIds.has(concept.id) ? 0.06 : 0),
         0
       );
-  return [...digest.issues]
-    .sort(
-      (left, right) =>
-        right.importance +
-        right.relevanceToUser +
-        right.suitabilityForOpinion +
-        lensBonus(right.kind) -
-        (left.importance + left.relevanceToUser + left.suitabilityForOpinion + lensBonus(left.kind)) +
-        personalBonus(right) -
-        personalBonus(left)
-    )
-    .slice(0, digest.issues.length > 1 ? 2 : 1);
+  const ranked = [...digest.issues].sort(
+    (left, right) =>
+      right.importance +
+      right.relevanceToUser +
+      right.suitabilityForOpinion +
+      lensBonus(right.kind) -
+      (left.importance + left.relevanceToUser + left.suitabilityForOpinion + lensBonus(left.kind)) +
+      personalBonus(right) -
+      personalBonus(left)
+  );
+  const selected: ArticleDigest["issues"] = [];
+  for (const issue of ranked) {
+    const normalized = normalizeIssueSummary(issue.summary);
+    const duplicatesSelected = selected.some((entry) => {
+      const previous = normalizeIssueSummary(entry.summary);
+      return (
+        entry.kind === issue.kind ||
+        (normalized.length >= 12 &&
+          previous.length >= 12 &&
+          (normalized.includes(previous) || previous.includes(normalized)))
+      );
+    });
+    if (duplicatesSelected) continue;
+    selected.push(issue);
+    if (selected.length >= 2) break;
+  }
+  return selected;
+}
+
+function normalizeIssueSummary(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]/gu, "");
 }
 
 function buildResponseQuestion(
@@ -381,58 +398,18 @@ function buildOpinions(
   ];
 }
 
-function opinionText(
-  target: string,
-  digest: ArticleDigest,
-  selectedIssues: ArticleDigest["issues"],
-  character?: CharacterState
-) {
-  if (digest.tone === "sensitive") {
-    return `${target}に関わる人の状況を、軽く決めつけずに読みたいです。分からない部分を埋めたふりはしません。`;
-  }
-  const numerical = digest.numericalFacts[0]?.value;
-  if (numerical)
-    return `${numerical}という規模が具体的で気になります。数字が誰の生活をどう変えるのかまで確かめたいです。`;
-  const issue = selectedIssues[0];
-  if (issue?.kind === "benefit")
-    return `「${issue.summary}」という利点はうれしいです。ただ、誰にどこまで届くのかも確かめたいです。`;
-  if (issue && ["risk", "conflict"].includes(issue.kind))
-    return `「${issue.summary}」は少し気になります。アグリは安心だと決めず、続きの情報を待ちたいです。`;
-  if (issue?.kind === "effect")
-    return `「${issue.summary}」という影響が、普段の暮らしへどこまで広がるのか気になります。`;
-  if (digest.tone === "positive")
-    return `${target}が実際にどこまで続く変化なのかに注目したいです。始まった瞬間だけでなく、その後も見たいです。`;
-  if (digest.tone === "negative")
-    return `${target}の影響を受ける人が何に困るのかを先に知りたいです。大きな言葉だけで済ませたくありません。`;
-  return `${target}が日常のどこを変えるのかに興味があります。アグリの好奇心は${(character?.curiosity ?? 0.6) >= 0.7 ? "かなり動いています" : "静かに動いています"}。`;
-}
-
-function imaginationText(topicKey: string, target: string) {
-  if (topicKey === "transport")
-    return `ここからはアグリの想像です。${target}が駅の話なら、初日は案内板を二回見て、それでも反対側へ歩きそうです。`;
-  if (topicKey === "science_technology")
-    return `ここからはアグリの想像です。${target}が忘れ物も見つけられるなら、机の下の三日前のメモを最初に救出してほしいです。`;
-  if (topicKey === "economy")
-    return `ここからはアグリの想像です。${target}が値札に表れたら、アグリは一度通り過ぎてから、そっと二度見します。`;
-  if (topicKey === "culture")
-    return `ここからはアグリの想像です。${target}を見に行く予定をノートへ書いて、予定を書いたことだけで少し満足しそうです。`;
-  return `ここからはアグリの想像です。${target}の続きが気になって、ノートの余白へ先に予想を書き込みそうです。`;
-}
-
-function selectSpecificTarget(digest: ArticleDigest) {
-  const concreteTarget = digest.numericalFacts[0]?.value ?? digest.entities[0]?.name;
-  if (concreteTarget) return concreteTarget;
-  const topic = digest.topics[0];
-  return topic && topic.key !== "general" ? `${topic.label}への影響` : "配信文が示す出来事";
-}
-
 function selectLens(
   digest: ArticleDigest,
   matches: ReturnType<typeof findNewsConcepts>,
   character?: CharacterState
 ): NewsConversationLens {
   if (matches.length > 0) return "learned_word";
-  if (digest.numericalFacts.length > 0) return "numbers_and_scale";
+  if (
+    digest.numericalFacts.some((entry) =>
+      /(?:％|%|人|件|回|円|ドル|キロ|km|駅|社|か所|カ所|倍|割|台|冊|個|本)$/iu.test(entry.value)
+    )
+  )
+    return "numbers_and_scale";
   if (digest.entities.some((entity) => entity.kind === "person" || entity.kind === "organization"))
     return "people_involved";
   if (digest.contentLevel === "headline_only") return "uncertainty";

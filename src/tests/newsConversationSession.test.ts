@@ -188,6 +188,52 @@ describe("news conversation session", () => {
     expect(updated.origin.articleDigest).toEqual(session.origin.articleDigest);
   });
 
+  it("does not leak raw sensitive facts or internal fetch notes into follow-up speech", () => {
+    const rawFact = "2009年の事件について捜査機関が発表した原文";
+    const internalNote = "取得できた本文の一部だけが使えています。記事全体の文脈は元記事で確認が必要です。";
+    const sensitiveDigest: ArticleDigest = {
+      ...digest,
+      numericalFacts: [{ value: "2009年", context: rawFact, evidenceId: "evidence_1" }],
+      keyFacts: [{ id: "sensitive_fact", text: rawFact, evidenceId: "evidence_1" }],
+      issues: [
+        {
+          ...digest.issues[0]!,
+          id: "sensitive_issue",
+          summary: rawFact,
+          kind: "person"
+        }
+      ],
+      uncertainties: [internalNote],
+      tone: "sensitive"
+    };
+    const plan = buildNewsConversationPlan(item, sensitiveDigest, [], { character, now });
+    const session = {
+      ...createNewsConversationSession({
+        item,
+        digest: sensitiveDigest,
+        plan,
+        character,
+        player,
+        now,
+        fetchTrace: trace
+      }),
+      phase: "awaiting_answer" as const
+    };
+    const choice = {
+      ...session.pendingQuestion!.choices[0]!,
+      id: "choice_ask_more_regression",
+      newsResponseIntent: "ask_more" as const
+    };
+    const updated = applyNewsConversationResponse(session, choice, now + 30);
+    const speech = updated.queuedTurns[0]!.page;
+
+    expect(speech).not.toContain(rawFact);
+    expect(speech).not.toContain(internalNote);
+    expect(speech).not.toContain("2009年に関わる人");
+    expect(speech).not.toContain("。が分かる");
+    expect(updated.queuedTurns[0]!.validationErrors).toEqual([]);
+  });
+
   it("keeps headline-only conversation explicit about not reading the body", () => {
     const headlineDigest: ArticleDigest = {
       ...digest,

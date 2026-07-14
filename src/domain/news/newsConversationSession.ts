@@ -18,6 +18,7 @@ import type {
 } from "../model/news";
 import type { PlayerProfile } from "../model/player";
 import { applyAguriVoice } from "../voice/aguriVoice";
+import { newsResponseSubject, newsUncertaintySubject, validateNewsJapanese } from "./newsJapaneseNlg";
 
 export function createNewsConversationSession(input: {
   item: NewsItem;
@@ -94,7 +95,7 @@ export function createNewsConversationSession(input: {
     pendingQuestion,
     absurdityCount: 0,
     randomSeed: hash(`${item.id}:${now}`),
-    validationErrors: [],
+    validationErrors: plan.pages.flatMap((page) => validateNewsJapanese(page.text)),
     startedAt: now,
     updatedAt: now
   };
@@ -154,7 +155,7 @@ function newsBeatTurn(
     usedWordIds: proposition.wordIds,
     styleBasePage: page.text,
     styledPreview: styled,
-    validationErrors: [],
+    validationErrors: validateNewsJapanese(page.text),
     createdAt: now
   };
 }
@@ -165,11 +166,8 @@ function responseTurn(session: ConversationSession, intent: NewsResponseIntent, 
   const issue = digest.issues.find(
     (entry) => session.origin.type === "news" && session.origin.selectedIssueIds.includes(entry.id)
   );
-  const fact = digest.keyFacts.find(
-    (entry) => session.origin.type === "news" && session.origin.groundedFactIds.includes(entry.id)
-  );
-  const subject = issue?.summary ?? fact?.text ?? `「${digest.keySentences[0]?.text ?? "届いた見出し"}」`;
-  const uncertainty = digest.uncertainties[0] ?? "記事の背景";
+  const subject = newsResponseSubject(digest, issue);
+  const uncertainty = newsUncertaintySubject(digest.contentLevel);
   const base = responseText(intent, subject, uncertainty, digest.contentLevel);
   const emotion = responseEmotion(intent);
   const styled = applyAguriVoice(base, emotion);
@@ -186,7 +184,7 @@ function responseTurn(session: ConversationSession, intent: NewsResponseIntent, 
     usedWordIds: session.origin.conceptIds,
     styleBasePage: base,
     styledPreview: styled,
-    validationErrors: [],
+    validationErrors: validateNewsJapanese(base),
     createdAt: now
   };
 }
@@ -199,19 +197,19 @@ function responseText(
 ) {
   const headlineOnly = contentLevel === "headline_only";
   const lines: Record<NewsResponseIntent, string> = {
-    agree: `見方が近いんですね。アグリも「${subject}」は気になります。でも、${uncertainty}はまだ決めつけません。`,
-    disagree: `受け取り方が違うんですね。アグリは「${subject}」がまだ気になりますが、あなたの考えまでアグリと同じにはしません。`,
+    agree: `見方が近いんですね。アグリも、${subject}が気になります。でも、${uncertainty}はまだ決めつけません。`,
+    disagree: `受け取り方が違うんですね。アグリは${subject}をもう少し考えたいですが、あなたの考えまで同じにはしません。`,
     interested: headlineOnly
       ? `見出しの言葉から考えてみます。ただ、本文を読めていないので、起きたことまでは作りません。`
-      : `もっと知りたいんですね。アグリも「${subject}」の続きと、${uncertainty}を確かめたいです。`,
-    not_interested: `今は遠い話なんですね。アグリは「${subject}」をメモに残しますが、ここで無理に引っぱりません。`,
-    concerned: `心配になりますよね。アグリも「${subject}」を軽く扱わず、${uncertainty}が分からないまま安心だとは言いません。`,
-    surprised: `数字や規模が大きく見えたんですね。アグリも「${subject}」が何と比べて大きいのか、もう少し確かめたいです。`,
+      : `もっと知りたいんですね。アグリも、${subject}と${uncertainty}を確かめたいです。`,
+    not_interested: `今は遠い話なんですね。${subject}はメモに残して、ここで無理に引っぱりません。`,
+    concerned: `心配になりますよね。${subject}を軽く扱わず、${uncertainty}が分からないうちは安心だと言い切りません。`,
+    surprised: `数字や規模が大きく見えたんですね。何と比べて大きいのか、もう少し確かめたいです。`,
     personal_relevance: `あなたの生活にも関係しそうなんですね。それは記事の新しい事実ではなく、あなたの受け取り方として覚えておきます。`,
     correct_aguri: `アグリの受け取り方に直したい所があるんですね。訂正内容を記事の事実に混ぜず、直してほしいという印だけ残します。`,
     ask_more: headlineOnly
       ? `今読めたのは見出しだけです。詳しい理由や結果は、元の記事を開かないと分かりません。`
-      : `もう少し確かめたいんですね。「${subject}」以外に、${uncertainty}が分かる情報を探したいです。`,
+      : `もう少し確かめたいんですね。アグリも、${subject}と${uncertainty}を調べたいです。`,
     close_topic: `分かりました。この話はここで閉じます。読めた範囲と、分からなかった所を混ぜずにしまっておきます。`
   };
   return lines[intent];

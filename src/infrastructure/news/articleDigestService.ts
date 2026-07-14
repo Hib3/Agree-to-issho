@@ -299,6 +299,11 @@ function digestFromEvidence(
         .slice(0, 3)
         .map((match) => ({ value: match[0].trim(), context: entry.text, evidenceId: entry.id }))
     )
+    .filter((entry) =>
+      /(?:％|%|人|件|回|年|月|日|時|分|秒|歳|円|ドル|キロ|km|駅|社|か所|カ所|倍|割|台|冊|個|本)$/iu.test(
+        entry.value
+      )
+    )
     .slice(0, 6);
   const entities = extractEntities(combined);
   const issues = extractArticleIssues(item.id, keyFacts, numericalFacts, entities, uncertainties);
@@ -448,7 +453,12 @@ function issueKind(text: string): ArticleIssue["kind"] {
   if (/(改善|便利|利点|可能になる|支援)/u.test(text)) return "benefit";
   if (/(危険|懸念|被害|問題|不足|停止)/u.test(text)) return "risk";
   if (/(対立|反対|一方|争い|批判)/u.test(text)) return "conflict";
-  if (/[0-9０-９]/u.test(text)) return "number";
+  if (
+    /[0-9０-９][0-9０-９,.，]*\s*(?:％|%|人|件|回|円|ドル|キロ|km|駅|社|か所|カ所|倍|割|台|冊|個|本)(?:\s|[、。！？!?）)]|$)/iu.test(
+      text
+    )
+  )
+    return "number";
   return "change";
 }
 
@@ -692,6 +702,7 @@ function classifyTone(text: string): ArticleTone {
 
 function classifyTopics(text: string) {
   const definitions: Array<[RegExp, string, string]> = [
+    [/(原発|原子力|発電|電力|エネルギー)/u, "energy_environment", "エネルギーと環境"],
     [/(天気|気温|台風|大雨|地震|災害|雪|猛暑)/u, "weather_safety", "天気と安全"],
     [/(選挙|政府|国会|首相|大統領|法律|自治体)/u, "society_politics", "社会と政治"],
     [/(株|市場|経済|企業|物価|円相場|金融)/u, "economy", "経済"],

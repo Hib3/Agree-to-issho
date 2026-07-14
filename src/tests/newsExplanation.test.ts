@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createUserConcept } from "../domain/learning/conceptFactory";
-import type { NewsItem } from "../domain/model/news";
+import type { ArticleDigest, NewsItem } from "../domain/model/news";
 import { buildFeedDigest } from "../infrastructure/news/articleDigestService";
 import {
   buildNewsConversationPlan,
@@ -22,10 +22,12 @@ const item: NewsItem = {
 describe("grounded news explanation", () => {
   it("limits claims to feed fields and states what remains unknown", () => {
     const pages = buildNewsExplanation(item, []);
-    expect(pages.join("\n")).toContain(item.title);
-    expect(pages.join("\n")).toContain(item.summary);
-    expect(pages.join("\n")).toContain("背景や真偽までは決められません");
-    expect(pages.join("\n")).not.toMatch(/undefined|null|まァっ、/u);
+    const transcript = pages.join("\n");
+    expect(transcript).toContain(item.title);
+    expect(transcript).toContain("科学と技術");
+    expect(transcript).toContain("RSSの短い説明まで");
+    expect(transcript).not.toContain(`「${item.summary}」`);
+    expect(transcript).not.toMatch(/undefined|null|まァっ、|記事全体の背景/u);
   });
 
   it("connects only a learned word that actually appears in the feed text", () => {
@@ -91,10 +93,54 @@ describe("grounded news explanation", () => {
     const plan = buildNewsConversationPlan(technical, digest, []);
 
     expect(digest.keyFacts).toEqual([]);
-    expect(plan.openingReaction.text).toContain("配信文が示す出来事");
+    expect(plan.openingReaction.text).toContain("まだ分からない点");
     expect(plan.openingReaction.text).not.toContain(
       "「feat: add punchline story arcs and integra」という変化"
     );
     expect(plan.understanding[0]?.source).toBe("headline");
+  });
+
+  it("does not repeat two issues that have the same discourse role", () => {
+    const digest: ArticleDigest = {
+      ...buildFeedDigest(item, item.fetchedAt),
+      contentLevel: "article_extract",
+      issues: [
+        {
+          id: "change_one",
+          label: "一つ目の変化",
+          summary: "最初の機能が公開された。",
+          evidenceIds: ["fact_one"],
+          kind: "change",
+          importance: 0.9,
+          relevanceToUser: 0.8,
+          suitabilityForOpinion: 0.8
+        },
+        {
+          id: "change_two",
+          label: "二つ目の変化",
+          summary: "別の機能も公開された。",
+          evidenceIds: ["fact_two"],
+          kind: "change",
+          importance: 0.85,
+          relevanceToUser: 0.75,
+          suitabilityForOpinion: 0.75
+        },
+        {
+          id: "risk_one",
+          label: "心配な点",
+          summary: "利用時の記録方法には確認が必要だ。",
+          evidenceIds: ["fact_three"],
+          kind: "risk",
+          importance: 0.7,
+          relevanceToUser: 0.7,
+          suitabilityForOpinion: 0.8
+        }
+      ]
+    };
+    const plan = buildNewsConversationPlan(item, digest, []);
+
+    expect(plan.selectedIssueIds).toHaveLength(2);
+    expect(plan.selectedIssueIds).toContain("risk_one");
+    expect(plan.understanding[0]?.text).not.toBe(plan.understanding[1]?.text);
   });
 });

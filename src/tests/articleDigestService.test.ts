@@ -49,6 +49,22 @@ describe("article digest service", () => {
     expect(result.trace.attempts[0]).toMatchObject({ method: "feed_content", result: "success" });
   });
 
+  it("does not mistake product versions for scale numbers", async () => {
+    const productArticle = [
+      "AppleはiOS 26とmacOS Tahoe 26向けの音声認識機能を公開しました。端末内で長い音声を処理します。",
+      "Fitbit Inspire 3は19％オフで販売され、健康記録を端末で確認できます。"
+    ].join("");
+    const result = await fetchArticleDigest(
+      { ...item, title: "音声認識と健康機器の更新", feedContent: productArticle },
+      { useArticleHelper: false, now }
+    );
+
+    expect(result.digest.numericalFacts.map((entry) => entry.value)).toContain("19％");
+    expect(result.digest.numericalFacts.map((entry) => entry.value)).not.toEqual(
+      expect.arrayContaining(["26", "3"])
+    );
+  });
+
   it("continues to article fetch when RSS content nearly duplicates the headline", async () => {
     const html = `<article><p>${usefulArticle}</p></article>`;
     const fetchMock = vi

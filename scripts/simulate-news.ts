@@ -1,8 +1,10 @@
 import { createUserConcept } from "../src/domain/learning/conceptFactory";
 import type { ArticleContentLevel, ArticleDigest, NewsItem } from "../src/domain/model/news";
 import { buildNewsConversationPlan } from "../src/domain/news/newsExplanation";
+import { validateNewsJapanese } from "../src/domain/news/newsJapaneseNlg";
 
 const now = 1_700_000_000_000;
+const sampleCount = 600;
 const generalTopics = [
   ["宇宙", "研究所が宇宙観測の結果を公開した。", "science_technology", "科学と技術"],
   ["AI", "企業がAIを使った案内機能を三つの駅で試す。", "science_technology", "科学と技術"],
@@ -38,19 +40,26 @@ let headlineBodyClaims = 0;
 let genericInterest = 0;
 let sourceLinkPrompt = 0;
 
-for (let index = 0; index < 150; index += 1) {
-  const sensitive = index >= 100;
+for (let index = 0; index < sampleCount; index += 1) {
+  const sensitive = index % 4 === 3;
   const [word, summary, topicKey, topicLabel] = sensitive
-    ? sensitiveTopics[(index - 100) % sensitiveTopics.length]!
+    ? sensitiveTopics[index % sensitiveTopics.length]!
     : generalTopics[index % generalTopics.length]!;
-  const contentLevel: ArticleContentLevel =
-    index % 3 === 0 ? "headline_only" : index % 3 === 1 ? "feed_summary" : "article_extract";
+  const contentLevels: ArticleContentLevel[] = [
+    "headline_only",
+    "feed_summary",
+    "feed_content",
+    "article_extract"
+  ];
+  const contentLevel = contentLevels[index % contentLevels.length]!;
+  const rawMarker = `RAW_NEWS_SOURCE_${index}`;
+  const internalMarker = `INTERNAL_FETCH_NOTE_${index}`;
   const item: NewsItem = {
     id: `news_sim_${index}`,
     feedId: "news_sim_feed",
     sourceName: "固定検証通信",
     title: `${word}についての更新 ${index + 1}`,
-    summary: contentLevel === "headline_only" ? "" : summary,
+    summary: contentLevel === "headline_only" ? "" : `${summary}${rawMarker}`,
     url: `https://example.com/news/${index}`,
     publishedAt: now + index,
     fetchedAt: now + index
@@ -63,7 +72,7 @@ for (let index = 0; index < 150; index += 1) {
     keyFacts:
       contentLevel === "headline_only"
         ? []
-        : [{ id: `${item.id}_fact`, text: summary, evidenceId: `${item.id}_detail` }],
+        : [{ id: `${item.id}_fact`, text: `${summary}${rawMarker}`, evidenceId: `${item.id}_detail` }],
     keySentences: [
       { id: `${item.id}_headline`, text: item.title, source: "headline" },
       ...(contentLevel === "headline_only"
@@ -71,8 +80,13 @@ for (let index = 0; index < 150; index += 1) {
         : [
             {
               id: `${item.id}_detail`,
-              text: summary,
-              source: contentLevel === "article_extract" ? ("article" as const) : ("feed_summary" as const)
+              text: `${summary}${rawMarker}`,
+              source:
+                contentLevel === "article_extract"
+                  ? ("article" as const)
+                  : contentLevel === "feed_content"
+                    ? ("feed_content" as const)
+                    : ("feed_summary" as const)
             }
           ])
     ],
@@ -87,7 +101,7 @@ for (let index = 0; index < 150; index += 1) {
             {
               id: `${item.id}_issue`,
               label: "記事の要点",
-              summary,
+              summary: `${summary}${rawMarker}`,
               evidenceIds: [`${item.id}_fact`, `${item.id}_detail`],
               kind: "change",
               importance: 0.7,
@@ -95,7 +109,7 @@ for (let index = 0; index < 150; index += 1) {
               suitabilityForOpinion: 0.6
             }
           ],
-    uncertainties: ["記事全体の背景"],
+    uncertainties: [internalMarker],
     tone: sensitive ? "sensitive" : "neutral",
     confidence: contentLevel === "headline_only" ? 0.25 : contentLevel === "feed_summary" ? 0.5 : 0.78
   };
@@ -108,36 +122,41 @@ for (let index = 0; index < 150; index += 1) {
   if (plan.memoryConnection) memoryConnections += 1;
   if (plan.opinions.some((opinion) => opinion.owner === "aguri")) opinionUses += 1;
   if (sensitive && plan.pages.some((page) => page.source === "imagination")) sensitiveImagination += 1;
-  if (contentLevel === "headline_only" && /記事本文|本文を読|本文では/u.test(transcript))
+  if (contentLevel === "headline_only" && /記事本文では|本文によると|本文を読むと/u.test(transcript))
     headlineBodyClaims += 1;
   genericInterest += (transcript.match(/気になります/gu) ?? []).length;
   sourceLinkPrompt += (transcript.match(/元の記事/gu) ?? []).length;
   if (plan.pages.length < 3 || plan.pages.length > 6) failures.push(`${index}:page-count`);
   if (plan.pages.some((page) => !page.source || !page.text)) failures.push(`${index}:missing-grounding`);
   if (/undefined|null|\[object Object\]/u.test(transcript)) failures.push(`${index}:artifact`);
+  if (transcript.includes(rawMarker)) failures.push(`${index}:source-copy`);
+  if (transcript.includes(internalMarker)) failures.push(`${index}:internal-note`);
+  for (const problem of validateNewsJapanese(transcript)) failures.push(`${index}:japanese-${problem}`);
 }
 
 if (sensitiveImagination > 0) failures.push(`sensitive-imagination:${sensitiveImagination}`);
 if (headlineBodyClaims > 0) failures.push(`headline-body-claims:${headlineBodyClaims}`);
+if (transcripts.size !== sampleCount)
+  failures.push(`duplicate-transcripts:${sampleCount - transcripts.size}`);
 if (failures.length > 0) throw new Error(`news simulation failed: ${failures.slice(0, 20).join(" | ")}`);
 
 console.log(
   JSON.stringify(
     {
-      samples: 150,
-      generalSamples: 100,
-      sensitiveSamples: 50,
+      samples: sampleCount,
+      generalSamples: sampleCount * 0.75,
+      sensitiveSamples: sampleCount * 0.25,
       uniqueTranscripts: transcripts.size,
-      completeDuplicateRate: 1 - transcripts.size / 150,
+      completeDuplicateRate: 1 - transcripts.size / sampleCount,
       contentLevelCounts,
       lensCounts,
       sourceCounts,
-      memoryConnectionRate: memoryConnections / 150,
-      characterOpinionRate: opinionUses / 150,
+      memoryConnectionRate: memoryConnections / sampleCount,
+      characterOpinionRate: opinionUses / sampleCount,
       sensitiveImagination,
       headlineBodyClaims,
-      genericInterestRate: genericInterest / 150,
-      sourceLinkPromptRate: sourceLinkPrompt / 150
+      genericInterestRate: genericInterest / sampleCount,
+      sourceLinkPromptRate: sourceLinkPrompt / sampleCount
     },
     null,
     2

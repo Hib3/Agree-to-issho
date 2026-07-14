@@ -5,6 +5,7 @@ import { responsePatterns } from "../data/response-patterns/responsePatterns";
 import { starterConcepts } from "../data/starter/starterConcepts";
 import { planConversation } from "../domain/conversation/planner";
 import { validateConversationSession } from "../domain/conversation/dialogueValidator";
+import { outingOpening } from "../domain/conversation/narrativeGenerator";
 import type { CharacterState } from "../domain/model/character";
 import type { Concept } from "../domain/model/concept";
 import type { ConversationSession } from "../domain/model/conversation";
@@ -32,6 +33,16 @@ function makeOneHundredLearnedWords() {
 }
 
 describe("multi-page narrative conversation", () => {
+  it("uses category-appropriate case particles for outing openings", () => {
+    const place = createDebugLearnedConcepts(1, now)[0]!;
+    const shoppingStreet: Concept = { ...place, surface: "商店街", userCategory: "place" };
+    const train: Concept = { ...place, id: "test-train", surface: "電車", userCategory: "vehicle" };
+
+    expect(outingOpening(shoppingStreet, false)).toContain("「商店街」へ行く");
+    expect(outingOpening(shoppingStreet, false)).not.toContain("を使った");
+    expect(outingOpening(train, true)).toContain("「電車」に乗る");
+  });
+
   it("runs 100 learned words through 1000 deterministic conversations", () => {
     const concepts = makeOneHundredLearnedWords();
     const recent: ConversationSession[] = [];

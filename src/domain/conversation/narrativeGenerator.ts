@@ -242,15 +242,27 @@ function openingForIntent(intent: ConversationIntent, focus: Concept) {
     rumor: `${word}が出てくる、ちょっとした噂の小話を考えましたっ。`,
     observation: `${word}を見ていたら、一つ気づきましたっ。`,
     warning: `${word}のことで、気をつけたい場面がありますっ。`,
-    invitation: `${word}を使ったお出かけを、ひとつ考えましたっ。`,
+    invitation: outingOpening(focus, false),
     discovery: `あっ、${word}から新しい場面を思いつきましたっ！`,
     comparison: `${word}を、もう一つの言葉と比べてみますっ。`,
     daydream: `${word}から、小さな空想が始まりましたっ。`,
     misunderstanding: `${word}の使い方、ちょっと怪しいかもしれませんっ。`,
-    outing_report: `${word}を使った、お出かけの小話を考えましたっ。`,
+    outing_report: outingOpening(focus, true),
     quiet_moment: `静かにしていたら、${word}を思い出しましたっ。`
   };
   return openings[intent];
+}
+
+export function outingOpening(focus: Concept, retrospective: boolean) {
+  const word = quoted(focus);
+  const ending = retrospective ? "お出かけの小話を考えましたっ。" : "お出かけを、ひとつ考えましたっ。";
+  if (focus.userCategory === "place") return `${word}へ行く${ending}`;
+  if (focus.userCategory === "vehicle") return `${word}に乗る${ending}`;
+  if (focus.userCategory === "wearable") return `${word}を身につける${ending}`;
+  if (focus.userCategory === "food_drink") return `${word}を楽しむ${ending}`;
+  if (["person_name", "famous_person", "occupation", "person_descriptor"].includes(focus.userCategory))
+    return `${word}と一緒に行く${ending}`;
+  return `${word}にまつわる${ending}`;
 }
 
 function memoryBeat(concept: Concept) {
