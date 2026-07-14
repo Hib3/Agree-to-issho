@@ -24,6 +24,19 @@ results.push(
     "json"
   )
 );
+for (const [name, siteUrl] of Object.entries({
+  lifehacker: "https://www.lifehacker.jp/",
+  yahoo: "https://news.yahoo.co.jp/"
+})) {
+  results.push(
+    await browserFetch(
+      page,
+      `feedsearch:${name}`,
+      `https://feedsearch.dev/api/v1/search?url=${encodeURIComponent(siteUrl)}&info=true&favicon=false&opml=false`,
+      "json"
+    )
+  );
+}
 results.push(
   await browserFetch(
     page,
@@ -54,8 +67,15 @@ await browser.close();
 console.log(JSON.stringify({ checkedAt: new Date().toISOString(), publicOrigin, results }, null, 2));
 
 const required = new Map(results.map((result) => [result.name, result]));
-for (const name of ["rss2json:gigazine", "rss2json:lifehacker", "jina:yahoo", "feedsearch:gigazine"]) {
-  if (!required.get(name)?.ok) throw new Error(`live RSS helper check failed: ${name}`);
+for (const name of [
+  "rss2json:gigazine",
+  "rss2json:lifehacker",
+  "jina:yahoo",
+  "feedsearch:gigazine",
+  "feedsearch:lifehacker"
+]) {
+  const result = required.get(name);
+  if (!result?.ok || result.entries < 1) throw new Error(`live RSS helper check failed: ${name}`);
 }
 
 async function browserFetch(

@@ -34,6 +34,30 @@ describe("article digest service", () => {
     expect(digest.confidence).toBeLessThan(0.6);
   });
 
+  it("retries the reader helper once after a transient timeout", async () => {
+    const markdown = [`Title: ${item.title}`, "Markdown Content:", `# ${item.title}`, usefulArticle].join(
+      "\n"
+    );
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new DOMException("timed out", "AbortError"))
+      .mockResolvedValueOnce(new Response(markdown, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchArticleDigest(item, {
+      useArticleHelper: true,
+      attemptDirect: false,
+      now
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.digest.contentLevel).toBe("article_extract");
+    expect(result.trace.attempts.filter((attempt) => attempt.method === "reader_helper")).toEqual([
+      expect.objectContaining({ result: "timeout" }),
+      expect.objectContaining({ result: "success" })
+    ]);
+  });
+
   it("does not fetch when RSS content is informative", async () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal("fetch", fetchMock);
@@ -315,6 +339,26 @@ describe("article digest service", () => {
     expect(result.digest.contentLevel).toBe("article_extract");
     expect(facts).toContain("交通局");
     expect(facts).not.toMatch(/Advertisement|Buy PR|https?:|\*\*|Image 18/u);
+  });
+
+  it("does not split a sentence at punctuation inside a Japanese title quote", async () => {
+    const markdown = [
+      `Title: ${item.title}`,
+      "Markdown Content:",
+      "2026年7月14日、飲料会社から「夜の新商品！」が登場しました。クエン酸を配合した炭酸飲料だと説明しています。",
+      "編集部は通常商品と飲み比べ、酸味と甘さの違いを実際に確認しました。"
+    ].join("\n");
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(markdown, { status: 200 })));
+
+    const result = await fetchArticleDigest(item, {
+      useArticleHelper: true,
+      attemptDirect: false,
+      now
+    });
+    const facts = result.digest.keyFacts.map((fact) => fact.text);
+
+    expect(facts).toContain("2026年7月14日、飲料会社から「夜の新商品！」が登場しました。");
+    expect(facts).not.toContain("2026年7月14日、飲料会社から「夜の新商品！");
   });
 
   it("rejects reader output made only of navigation and internal strings", async () => {

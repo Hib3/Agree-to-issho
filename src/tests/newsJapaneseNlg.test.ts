@@ -59,18 +59,21 @@ describe("600-viewpoint Japanese news generation", () => {
     const coveredTones = new Set<string>();
 
     for (let index = 0; index < 600; index += 1) {
-      const topic = topicCases[index % topicCases.length]!;
-      const kind = issueKinds[Math.floor(index / topicCases.length) % issueKinds.length]!;
-      const level = contentLevels[Math.floor(index / 100) % contentLevels.length]!;
-      const tone = tones[Math.floor(index / 100) % tones.length]!;
-      const scenarioKey = `${topic[0]}:${kind}:${level}:${tone}:${index}`;
+      const topicIndex = index % topicCases.length;
+      const kindIndex = Math.floor(index / topicCases.length) % issueKinds.length;
+      const toneIndex = Math.floor(index / (topicCases.length * issueKinds.length));
+      const topic = topicCases[topicIndex]!;
+      const kind = issueKinds[kindIndex]!;
+      const tone = tones[toneIndex]!;
+      const level = contentLevels[(topicIndex + kindIndex + toneIndex) % contentLevels.length]!;
+      const scenarioKey = `${topic[0]}:${kind}:${tone}`;
       const rawMarker = `RAW_SOURCE_MARKER_${index}`;
       const internalMarker = `INTERNAL_UNCERTAINTY_${index}`;
       const item: NewsItem = {
         id: `nlg_case_${index}`,
         feedId: "nlg_matrix",
         sourceName: "検証通信",
-        title: `${topic[2]}について${issueLabel(kind)}を伝える記事 ${index + 1}`,
+        title: `${topic[2]}の${issueLabel(kind)}を${toneLabel(tone)}伝える記事`,
         summary: level === "headline_only" ? "" : `${rawMarker}を含む抽出原文です。`,
         url: `https://example.test/news/${index}`,
         publishedAt: 1_700_000_000_000 + index,
@@ -102,6 +105,7 @@ describe("600-viewpoint Japanese news generation", () => {
 
     expect(scenarioKeys.size).toBe(600);
     expect(transcripts.size).toBe(600);
+    expect(new Set([...transcripts].map(stripIncidentalNumbers)).size).toBe(600);
     expect(coveredKinds.size).toBe(10);
     expect(coveredLevels.size).toBe(4);
     expect(coveredTones.size).toBe(6);
@@ -295,4 +299,19 @@ function issueLabel(kind: ArticleIssue["kind"]) {
     place: "場所",
     uncertainty: "不明点"
   }[kind];
+}
+
+function toneLabel(tone: ArticleTone) {
+  return {
+    neutral: "落ち着いて",
+    positive: "前向きに",
+    negative: "慎重に",
+    sensitive: "注意深く",
+    mixed: "両面から",
+    unknown: "まだ判断せずに"
+  }[tone];
+}
+
+function stripIncidentalNumbers(value: string) {
+  return value.normalize("NFKC").replace(/[0-9０-９]+/gu, "#");
 }

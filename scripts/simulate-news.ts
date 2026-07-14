@@ -1,11 +1,17 @@
 import { createUserConcept } from "../src/domain/learning/conceptFactory";
-import type { ArticleContentLevel, ArticleDigest, NewsItem } from "../src/domain/model/news";
+import type {
+  ArticleContentLevel,
+  ArticleDigest,
+  ArticleIssue,
+  ArticleTone,
+  NewsItem
+} from "../src/domain/model/news";
 import { buildNewsConversationPlan } from "../src/domain/news/newsExplanation";
 import { validateNewsJapanese } from "../src/domain/news/newsJapaneseNlg";
 
 const now = 1_700_000_000_000;
 const sampleCount = 600;
-const generalTopics = [
+const topics = [
   ["宇宙", "研究所が宇宙観測の結果を公開した。", "science_technology", "科学と技術"],
   ["AI", "企業がAIを使った案内機能を三つの駅で試す。", "science_technology", "科学と技術"],
   ["市場", "市場で商品の価格が前月から変化した。", "economy", "経済"],
@@ -16,14 +22,34 @@ const generalTopics = [
   ["天気", "週末は気温が上がる見込みだと発表した。", "weather_safety", "天気"],
   ["図書館", "地域の図書館が開館時間を延長する。", "general", "地域"]
 ] as const;
-const sensitiveTopics = [
+const extraTopics = [
   ["地震", "自治体が地震の被害状況を確認している。", "weather_safety", "災害"],
   ["医療", "医療機関が感染状況を調査している。", "health", "医療"],
   ["選挙", "選挙管理委員会が投票日程を発表した。", "society_politics", "政治"],
   ["事故", "交通機関が事故の影響を確認している。", "transport", "事故"],
   ["犯罪", "警察が事件の経緯を調べている。", "society_politics", "犯罪"]
 ] as const;
-const concepts = [...generalTopics, ...sensitiveTopics]
+const allTopics = [...topics, ...extraTopics] as const;
+const issueKinds: ArticleIssue["kind"][] = [
+  "change",
+  "cause",
+  "effect",
+  "benefit",
+  "risk",
+  "conflict",
+  "number",
+  "person",
+  "place",
+  "uncertainty"
+];
+const tones: ArticleTone[] = ["neutral", "positive", "negative", "sensitive", "mixed", "unknown"];
+const contentLevels: ArticleContentLevel[] = [
+  "headline_only",
+  "feed_summary",
+  "feed_content",
+  "article_extract"
+];
+const concepts = allTopics
   .filter((_, index) => index % 3 === 0)
   .map(([word], index) =>
     createUserConcept({ surface: word, category: "abstract" }, now, `simulation-news-${index}`)
@@ -42,24 +68,21 @@ let sourceLinkPrompt = 0;
 let specificGroundedFacts = 0;
 
 for (let index = 0; index < sampleCount; index += 1) {
-  const sensitive = index % 4 === 3;
-  const [word, summary, topicKey, topicLabel] = sensitive
-    ? sensitiveTopics[index % sensitiveTopics.length]!
-    : generalTopics[index % generalTopics.length]!;
-  const contentLevels: ArticleContentLevel[] = [
-    "headline_only",
-    "feed_summary",
-    "feed_content",
-    "article_extract"
-  ];
-  const contentLevel = contentLevels[index % contentLevels.length]!;
+  const topicIndex = index % 10;
+  const kindIndex = Math.floor(index / 10) % issueKinds.length;
+  const toneIndex = Math.floor(index / 100);
+  const [word, summary, topicKey, topicLabel] = allTopics[topicIndex]!;
+  const kind = issueKinds[kindIndex]!;
+  const tone = tones[toneIndex]!;
+  const sensitive = tone === "sensitive";
+  const contentLevel = contentLevels[(topicIndex + kindIndex + toneIndex) % contentLevels.length]!;
   const rawMarker = `RAW_NEWS_SOURCE_${index}`;
   const internalMarker = `INTERNAL_FETCH_NOTE_${index}`;
   const item: NewsItem = {
     id: `news_sim_${index}`,
     feedId: "news_sim_feed",
     sourceName: "固定検証通信",
-    title: `${word}についての更新 ${index + 1}`,
+    title: `${word}の${issueLabel(kind)}を${toneLabel(tone)}伝える更新`,
     summary: contentLevel === "headline_only" ? "" : `${summary}${rawMarker}`,
     url: `https://example.com/news/${index}`,
     publishedAt: now + index,
@@ -101,17 +124,17 @@ for (let index = 0; index < sampleCount; index += 1) {
         : [
             {
               id: `${item.id}_issue`,
-              label: "記事の要点",
+              label: issueLabel(kind),
               summary: `${summary}${rawMarker}`,
               evidenceIds: [`${item.id}_fact`, `${item.id}_detail`],
-              kind: "change",
+              kind,
               importance: 0.7,
               relevanceToUser: 0.5,
               suitabilityForOpinion: 0.6
             }
           ],
     uncertainties: [internalMarker],
-    tone: sensitive ? "sensitive" : "neutral",
+    tone,
     confidence: contentLevel === "headline_only" ? 0.25 : contentLevel === "feed_summary" ? 0.5 : 0.78
   };
   const plan = buildNewsConversationPlan(item, digest, concepts, { now: item.fetchedAt });
@@ -140,6 +163,9 @@ if (sensitiveImagination > 0) failures.push(`sensitive-imagination:${sensitiveIm
 if (headlineBodyClaims > 0) failures.push(`headline-body-claims:${headlineBodyClaims}`);
 if (transcripts.size !== sampleCount)
   failures.push(`duplicate-transcripts:${sampleCount - transcripts.size}`);
+const semanticTranscripts = new Set([...transcripts].map(stripIncidentalNumbers));
+if (semanticTranscripts.size !== sampleCount)
+  failures.push(`semantic-duplicate-transcripts:${sampleCount - semanticTranscripts.size}`);
 if (specificGroundedFacts < 300) failures.push(`specific-grounded-facts:${specificGroundedFacts}`);
 if (failures.length > 0) throw new Error(`news simulation failed: ${failures.slice(0, 20).join(" | ")}`);
 
@@ -147,9 +173,10 @@ console.log(
   JSON.stringify(
     {
       samples: sampleCount,
-      generalSamples: sampleCount * 0.75,
-      sensitiveSamples: sampleCount * 0.25,
+      generalSamples: sampleCount - sampleCount / tones.length,
+      sensitiveSamples: sampleCount / tones.length,
       uniqueTranscripts: transcripts.size,
+      semanticUniqueTranscripts: semanticTranscripts.size,
       completeDuplicateRate: 1 - transcripts.size / sampleCount,
       contentLevelCounts,
       lensCounts,
@@ -166,3 +193,33 @@ console.log(
     2
   )
 );
+
+function issueLabel(kind: ArticleIssue["kind"]) {
+  return {
+    change: "変化",
+    cause: "理由",
+    effect: "影響",
+    benefit: "利点",
+    risk: "懸念",
+    conflict: "意見の違い",
+    number: "数字",
+    person: "関係者",
+    place: "場所",
+    uncertainty: "不明点"
+  }[kind];
+}
+
+function toneLabel(tone: ArticleTone) {
+  return {
+    neutral: "落ち着いて",
+    positive: "前向きに",
+    negative: "慎重に",
+    sensitive: "注意深く",
+    mixed: "両面から",
+    unknown: "まだ判断せずに"
+  }[tone];
+}
+
+function stripIncidentalNumbers(value: string) {
+  return value.normalize("NFKC").replace(/[0-9０-９]+/gu, "#");
+}

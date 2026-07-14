@@ -92,6 +92,49 @@ describe("RSS parsing", () => {
     expect(parsed.items[0]?.title).toBe("列車の運行情報");
   });
 
+  it("never stringifies object-valued RSS helper fields into visible text", () => {
+    const parsed = parseRss2Json(
+      {
+        status: "ok",
+        feed: { title: "安全な配信元" },
+        items: [
+          {
+            guid: "object-fields",
+            title: "安全なタイトル",
+            link: "https://example.com/object-fields",
+            description: { text: "壊れた説明" },
+            content: { html: "壊れた本文" }
+          }
+        ]
+      },
+      "feed_object_fields",
+      "https://example.com/feed",
+      now
+    );
+    const serialized = JSON.stringify(parsed);
+
+    expect(serialized).not.toContain("[object Object]");
+    expect(serialized).not.toContain("壊れた説明");
+    expect(parsed.items[0]?.title).toBe("安全なタイトル");
+    expect(parsed.items[0]?.summary).toBe("");
+    expect(() =>
+      parseRss2Json(
+        {
+          status: "ok",
+          items: [
+            {
+              title: { rendered: "壊れたタイトル" },
+              link: "https://example.com/object-title"
+            }
+          ]
+        },
+        "feed_object_title",
+        "https://example.com/feed",
+        now
+      )
+    ).toThrow("RSSに読める記事がありませんでした");
+  });
+
   it("reads only compact headline metadata from Reader markdown", () => {
     const parsed = parseReaderMarkdown(
       `Title: 主要ニュース\nURL Source: https://news.example.test/feed.xml\nMarkdown Content:\n### [交通情報を更新](https://news.example.test/articles/one)\n[https://news.example.test/articles/one](https://news.example.test/articles/one)\nMon, 13 Jul 2026 01:00:00 GMT\n短い概要です。\n\n### [天気の見通し](https://news.example.test/articles/two)\nTue, 14 Jul 2026 01:00:00 GMT`,

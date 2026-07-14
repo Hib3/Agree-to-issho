@@ -157,7 +157,9 @@ export async function fetchArticleDigest(
   }
 
   let helperTarget = item.url;
-  for (let hop = 0; hop < 2; hop += 1) {
+  let helperHop = 0;
+  let timeoutRetries = 0;
+  while (helperHop < 2) {
     const helperStartedAt = Date.now();
     try {
       const response = await fetchArticleText(
@@ -165,7 +167,7 @@ export async function fetchArticleDigest(
         "text/plain",
         options.signal
       );
-      const resolvedArticleUrl = hop === 0 ? findReaderArticleUrl(response.text, item.url) : undefined;
+      const resolvedArticleUrl = helperHop === 0 ? findReaderArticleUrl(response.text, item.url) : undefined;
       if (resolvedArticleUrl && resolvedArticleUrl !== helperTarget) {
         const landingText = extractReaderText(response.text, item.title);
         trace.attempts.push({
@@ -179,6 +181,7 @@ export async function fetchArticleDigest(
           detail: "記事一覧ページから、明示された本文リンクを確認しました。"
         });
         helperTarget = resolvedArticleUrl;
+        helperHop += 1;
         continue;
       }
 
@@ -211,6 +214,10 @@ export async function fetchArticleDigest(
         ...(failure.contentType ? { contentType: failure.contentType } : {}),
         detail: failure.detail
       });
+      if (failure.result === "timeout" && timeoutRetries < 1) {
+        timeoutRetries += 1;
+        continue;
+      }
       break;
     }
   }
@@ -726,11 +733,47 @@ async function readArticleBody(response: Response, controller: AbortController) 
 }
 
 function sentences(text: string, limit: number) {
-  return text
-    .split(/(?<=[。！？!?])\s*/u)
+  return splitJapaneseSentences(text)
     .map((part) => cleanFeedText(part, 320))
     .filter((part) => part.length >= 8)
     .slice(0, limit);
+}
+
+function splitJapaneseSentences(text: string) {
+  const pairs: Record<string, string> = { "「": "」", "『": "』", "（": "）", "(": ")" };
+  const stack: string[] = [];
+  const result: string[] = [];
+  let current = "";
+  let quotedTerminal = false;
+  const characters = Array.from(text);
+
+  const flush = () => {
+    const value = current.trim();
+    if (value) result.push(value);
+    current = "";
+    quotedTerminal = false;
+  };
+
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index]!;
+    current += character;
+    const expectedClosing = pairs[character];
+    if (expectedClosing) {
+      stack.push(expectedClosing);
+      continue;
+    }
+    if (stack.at(-1) === character) {
+      stack.pop();
+      const next = characters[index + 1] ?? "";
+      if (stack.length === 0 && quotedTerminal && (!next || /\s/u.test(next))) flush();
+      continue;
+    }
+    if (!/[。！？!?]/u.test(character)) continue;
+    if (stack.length === 0) flush();
+    else quotedTerminal = true;
+  }
+  flush();
+  return result;
 }
 
 function classifyTone(text: string): ArticleTone {
