@@ -19,7 +19,7 @@ async function enterRoom(page: Page) {
   await page.getByRole("button", { name: "覚えた言葉を持って部屋へ戻る" }).click();
 }
 
-async function registerFeed(page: Page, feedUrl: string) {
+async function registerFeed(page: Page, feedUrl: string, expectedNewsCount = 1) {
   await page.getByRole("button", { name: "設定" }).click();
   await page.getByRole("checkbox", { name: "ニュース機能を使う" }).check();
   const autonomous = page.getByRole("checkbox", { name: "アグリちゃんから話しかける" });
@@ -27,7 +27,7 @@ async function registerFeed(page: Page, feedUrl: string) {
   await page.getByRole("textbox", { name: "サイトまたはRSSのURL" }).fill(feedUrl);
   await page.getByRole("button", { name: "探して追加" }).click();
   await page.getByRole("button", { name: "このRSSを追加" }).click();
-  await expect(page.getByRole("status")).toContainText("新しいニュースを1件保存しました");
+  await expect(page.getByRole("status")).toContainText(`新しいニュースを${expectedNewsCount}件保存しました`);
   await page.getByRole("button", { name: "部屋へ戻る" }).click();
   const invitation = page.getByRole("button", { name: "ニュースを見る", exact: true });
   if (await invitation.isVisible()) await invitation.click();
@@ -146,4 +146,103 @@ test("an active ordinary conversation blocks news without closing the news shelf
   await expect(page.getByRole("heading", { name: "ニュース" })).toBeVisible();
   await expect(page.getByText("今の会話を終えてから、ニュースを選んでください。")).toBeVisible();
   await expect(page.getByText("ニュースの記事について会話中")).toHaveCount(0);
+});
+
+test("cancelling helper consent keeps the article unread and creates no conversation", async ({ page }) => {
+  const feedUrl = "https://cancel.example.test/news.xml";
+  const articleUrl = "https://cancel.example.test/articles/one";
+  await page.route(feedUrl, async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/rss+xml",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<?xml version="1.0"?><rss version="2.0"><channel><title>確認通信</title><item><guid>one</guid><title>駅前の予定を発表</title><link>${articleUrl}</link><pubDate>Mon, 13 Jul 2026 09:00:00 GMT</pubDate></item></channel></rss>`
+    })
+  );
+  await page.route(articleUrl, (route) => route.abort("failed"));
+
+  await enterRoom(page);
+  await registerFeed(page, feedUrl);
+  await page.getByRole("button", { name: "アグリと話す" }).click();
+  await expect(page.getByRole("heading", { name: "この記事は直接開けませんでした" })).toBeVisible();
+  await page.getByRole("button", { name: "キャンセル" }).click();
+
+  await expect(page.getByRole("heading", { name: "この記事は直接開けませんでした" })).toHaveCount(0);
+  await expect(page.locator(".news-item").filter({ hasText: "駅前の予定" })).toContainText("未読");
+  await expect(page.getByText("ニュースの記事について会話中")).toHaveCount(0);
+});
+
+test("selecting another article aborts stale preparation and keeps the latest article selected", async ({
+  page
+}) => {
+  const feedUrl = "https://switch.example.test/news.xml";
+  const firstUrl = "https://switch.example.test/articles/first";
+  const secondUrl = "https://switch.example.test/articles/second";
+  await page.route(feedUrl, async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/rss+xml",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<?xml version="1.0"?><rss version="2.0"><channel><title>切替通信</title><item><guid>first</guid><title>一つ目の予定</title><link>${firstUrl}</link><pubDate>Mon, 13 Jul 2026 10:00:00 GMT</pubDate></item><item><guid>second</guid><title>二つ目の予定</title><link>${secondUrl}</link><pubDate>Mon, 13 Jul 2026 09:00:00 GMT</pubDate></item></channel></rss>`
+    })
+  );
+  await page.route(firstUrl, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      headers: { "access-control-allow-origin": "*" },
+      body: "<article><p>一つ目の記事では駅前の予定を更新すると発表しました。詳しい日程は七月から確認され、利用者へ案内される予定です。</p><p>工事中も通路を確保し、週末ごとに進み方を見直します。</p></article>"
+    });
+  });
+  await page.route(secondUrl, (route) => route.abort("failed"));
+
+  await enterRoom(page);
+  await registerFeed(page, feedUrl, 2);
+  const talkButtons = page.getByRole("button", { name: "アグリと話す" });
+  await talkButtons.nth(0).click();
+  await expect(page.getByRole("heading", { name: "アグリが記事を読んでいます…" })).toBeVisible();
+  await talkButtons.nth(1).click();
+  await expect(page.getByRole("heading", { name: "この記事は直接開けませんでした" })).toBeVisible();
+  await expect(page.locator(".news-preparation")).toContainText("二つ目の予定");
+  await page.waitForTimeout(900);
+  await expect(page.locator(".news-preparation")).toContainText("二つ目の予定");
+});
+
+test("an active headline-only news conversation restores while offline", async ({ page, context }) => {
+  const feedUrl = "https://offline.example.test/news.xml";
+  const articleUrl = "https://offline.example.test/articles/one";
+  await page.route(feedUrl, async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/rss+xml",
+      headers: { "access-control-allow-origin": "*" },
+      body: `<?xml version="1.0"?><rss version="2.0"><channel><title>端末通信</title><item><guid>offline</guid><title>週末の交通予定を更新</title><link>${articleUrl}</link><pubDate>Mon, 13 Jul 2026 09:00:00 GMT</pubDate></item></channel></rss>`
+    })
+  );
+  await page.route(articleUrl, (route) => route.abort("failed"));
+
+  await enterRoom(page);
+  await registerFeed(page, feedUrl);
+  await page.getByRole("button", { name: "アグリと話す" }).click();
+  await page.getByRole("button", { name: /許可しない/ }).click();
+  await expect(page.getByText("ニュースの記事について会話中")).toBeVisible();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    return true;
+  });
+  if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)))) {
+    await page.reload();
+    await expect(page.getByText("ニュースの記事について会話中")).toBeVisible();
+  }
+
+  await context.setOffline(true);
+  try {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByText("ニュースの記事について会話中")).toBeVisible();
+    await advanceToChoice(page, "見出しだけでも話す");
+    await expect(page.locator(".dialogue-box")).toContainText("見出し");
+  } finally {
+    await context.setOffline(false);
+  }
 });

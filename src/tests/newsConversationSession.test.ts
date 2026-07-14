@@ -253,4 +253,17 @@ describe("news conversation session", () => {
     const reaction = (await db.memories.where("type").equals("player_choice").first())?.payload;
     expect(reaction).toMatchObject({ kind: "articleReaction", intent: "disagree" });
   });
+
+  it("creates only one session when the same news article is started twice", async () => {
+    await db.player.put(player);
+    await db.character.put(character);
+    await db.newsItems.put(item);
+    const [first, second] = await Promise.all([
+      startNewsConversation({ item, digest, fetchTrace: trace, now }),
+      startNewsConversation({ item, digest, fetchTrace: trace, now })
+    ]);
+    const sessions = await db.conversationSessions.toArray();
+    expect(first.id).toBe(second.id);
+    expect(sessions.filter((session) => session.origin.type === "news")).toHaveLength(1);
+  });
 });
