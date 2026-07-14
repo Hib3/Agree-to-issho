@@ -94,7 +94,7 @@ function debugAttributesFor(concept: Concept): Concept["attributes"] {
     const outside = new Set(["散歩", "買い物", "旅行", "遠足", "登山", "水泳", "走ること", "釣り"]);
     const together = new Set(["相談", "待ち合わせ", "応援", "挨拶", "お祝い", "手伝い", "電話"]);
     return {
-      suruAction: true,
+      suruAction: concept.grammar.suruAction,
       actionContext: outside.has(surface) ? "outside" : "home",
       socialMode: together.has(surface) ? "together" : "either"
     };

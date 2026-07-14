@@ -89,16 +89,16 @@ function attributeSentences(concept: Concept, word: string) {
   if (["action", "required_action", "forbidden_action", "sport", "skill"].includes(concept.userCategory)) {
     const contexts: Record<string, string> = { home: "家や屋内", outside: "外", either: "場所を選ばず" };
     const social: Record<string, string> = {
-      alone: "ひとりで",
-      together: "誰かと一緒に",
-      either: "ひとりでも誰かとでも"
+      alone: "ひとりで取り組む",
+      together: "誰かと一緒に取り組む",
+      either: "ひとりでも誰かとでも取り組める"
     };
     return compact([
       contexts[String(attributes.actionContext)]
-        ? `${word}は、${contexts[String(attributes.actionContext)]}ですることとして覚えていますっ。`
+        ? `${word}は、${contexts[String(attributes.actionContext)]}で行うこととして覚えていますっ。`
         : "",
       social[String(attributes.socialMode)]
-        ? rememberedDetail(concept, `${social[String(attributes.socialMode)]}すること`)
+        ? rememberedDetail(concept, social[String(attributes.socialMode)]!)
         : ""
     ]);
   }

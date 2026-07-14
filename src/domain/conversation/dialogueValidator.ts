@@ -10,11 +10,22 @@ import { CURRENT_DIALOGUE_REVISION } from "../model/conversation";
 const exposedValues = /\{[^}]+\}|undefined|null|NaN|\[object Object\]/u;
 const bareReferences =
   /(こんなふうに|こんな風に|このように|このつながり|この組み合わせ|この二つ|この三つ|^(これ|それ|あれ)[はをが])/u;
+const malformedJapanese: Array<[RegExp, string]> = [
+  [/「[^」]*「/u, "nested_japanese_quote"],
+  [/ですること/u, "malformed_action_context"],
+  [/「(?:手紙|写真|水やり|日記)」を(?:する|して|始める)/u, "broken_action_collocation"],
+  [/(?:をを|がが|にはは|ではは)/u, "duplicate_particle"]
+];
+
+function validateJapaneseSurface(text: string) {
+  return malformedJapanese.filter(([pattern]) => pattern.test(text)).map(([, code]) => code);
+}
 
 export function validateDialogueTurn(turn: DialogueTurn, proposition: CompositionProposition) {
   const errors: string[] = [];
   if (!turn.page.trim()) errors.push("empty_text");
   if (exposedValues.test(turn.page)) errors.push("exposed_runtime_value");
+  errors.push(...validateJapaneseSurface(turn.page));
   if (bareReferences.test(turn.page) && !/「[^」]+」/u.test(turn.page)) errors.push("bare_reference");
   if (turn.requiresAnswer && proposition.questionIntent === "none")
     errors.push("answer_without_question_intent");
@@ -101,6 +112,7 @@ export function validateConversationSession(session: ConversationSession) {
     }
   }
   if (session.pendingQuestion) {
+    errors.push(...validateJapaneseSurface(session.pendingQuestion.prompt));
     if (session.pendingQuestion.questionIntent !== session.questionIntent)
       errors.push("pending_question_intent_mismatch");
     if (

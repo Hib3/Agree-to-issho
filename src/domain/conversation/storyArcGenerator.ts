@@ -6,12 +6,12 @@ import {
 } from "../../data/story-arcs/storyArcCatalog";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
-import { displayConcept } from "../grammar/japaneseRealizer";
+import { displayConcept, doPhrase } from "../grammar/japaneseRealizer";
 import { isPersonCategory, type Concept, type ConceptCategory } from "../model/concept";
 import type { PunchlineMechanism } from "../model/conversation";
 
 type PunchlineGroup = "person" | "food" | "place" | "action" | "living" | "thing" | "idea";
-type PunchlineRenderer = (word: string) => string;
+type PunchlineRenderer = (word: string, concept: Concept) => string;
 
 export type RenderedStoryArc = {
   id: string;
@@ -26,10 +26,7 @@ export function renderStoryArc(input: { focus: Concept; random: RandomSource }):
   const variant = pickOne(storyArcVariants, input.random) ?? storyArcVariants[0]!;
   const word = `「${displayConcept(input.focus)}」`;
   const turn = ensureCallback(renderTurn(variant, word), word);
-  const punchline = ensureCallback(
-    renderPunchline(input.focus.userCategory, variant.punchlineIndex, word),
-    word
-  );
+  const punchline = ensureCallback(renderPunchline(input.focus, variant.punchlineIndex, word), word);
   return {
     id: variant.id,
     mechanism: storyArcPunchlineIds[variant.punchlineIndex]!,
@@ -59,14 +56,16 @@ function renderTurn(variant: StoryArcVariant, word: string) {
   return `${cadence}${turns[variant.turnIndex] ?? turns[0]}`;
 }
 
-function renderPunchline(category: ConceptCategory, index: number, word: string) {
+function renderPunchline(concept: Concept, index: number, word: string) {
   if (index === 10) {
     return `${word}の話へ戻ってノートの線をたどったら、出発点にも同じ印をつけていましたっ！`;
   }
-  const group = punchlineGroupFor(category);
+  const group = punchlineGroupFor(concept.userCategory);
   const renderers = punchlines[group];
   const renderer = renderers[index] ?? renderers[0];
-  return renderer ? renderer(word) : `${word}の続きを考えたら、ノートの余白だけ先になくなりましたっ！`;
+  return renderer
+    ? renderer(word, concept)
+    : `${word}の続きを考えたら、ノートの余白だけ先になくなりましたっ！`;
 }
 
 function punchlineGroupFor(category: ConceptCategory): PunchlineGroup {
@@ -121,14 +120,15 @@ const punchlines: Record<PunchlineGroup, PunchlineRenderer[]> = {
     () => "最後に地図をたたんだら、大切な印だけ内側へ隠れましたっ！"
   ],
   action: [
-    (word) => `${word}の準備を完璧にしたら、始める前に休憩の時間になりましたっ！`,
+    (_word, concept) => `${doPhrase(concept)}準備を完璧にしたら、始める前に休憩の時間になりましたっ！`,
     () => "手順を短くするための手順が、いちばん長くなっていましたっ！",
-    (word) => `${word}を一度だけ練習したら、アグリの中ではもう本番を終えた顔になりましたっ！`,
+    (_word, concept) =>
+      `${doPhrase(concept)}練習を一度だけしたら、アグリの中ではもう本番を終えた顔になりましたっ！`,
     () => "開始の印をつける場所を迷って、紙の四隅が全部開始地点になりましたっ！",
     () => "急がない計画を立てるのに、なぜか急いで鉛筆を走らせていましたっ！",
     () => "できた所へ丸をつけたら、最初の「準備」だけ花丸になりましたっ！",
     () => "失敗しない方法を考えすぎて、まだ一回も失敗できていませんでしたっ！",
-    (word) => `${word}を忘れない掛け声を作ったら、掛け声の方が長くなりましたっ！`,
+    (_word, concept) => `${doPhrase(concept)}時の掛け声を作ったら、掛け声の方が長くなりましたっ！`,
     () => "終わった後のごほうびだけ、予定より先に決まりましたっ！",
     () => "結局、最初の一歩は「ノートを閉じる」ことになりましたっ！"
   ],

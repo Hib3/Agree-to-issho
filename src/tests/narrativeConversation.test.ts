@@ -33,6 +33,32 @@ function makeOneHundredLearnedWords() {
 }
 
 describe("multi-page narrative conversation", () => {
+  it("keeps action collocations natural in questions and story pages", () => {
+    const concepts = makeOneHundredLearnedWords();
+    const letter = concepts.find((concept) => concept.surface === "手紙")!;
+    const template = dialogueTemplates.find(
+      (entry) => entry.id === "dialogue_ask_meaning_action_small_goal"
+    )!;
+    const session = planConversation({
+      templates: [template],
+      responsePatterns,
+      concepts: [letter],
+      relations: [],
+      recentSessions: [],
+      character,
+      locationId: template.locations[0] ?? "room",
+      now,
+      random: new SeededRandom(3),
+      randomSeed: 3
+    });
+    const transcript = session.queuedTurns.map((turn) => turn.page).join("\n");
+
+    expect(transcript).toContain("手紙を書く");
+    expect(transcript).not.toMatch(/「手紙」を(?:する|して|始め)/u);
+    expect(session.pendingQuestion?.prompt).toContain("『する』");
+    expect(session.pendingQuestion?.prompt).not.toContain("「言葉の後ろに「する」");
+  });
+
   it("uses category-appropriate case particles for outing openings", () => {
     const place = createDebugLearnedConcepts(1, now)[0]!;
     const shoppingStreet: Concept = { ...place, surface: "商店街", userCategory: "place" };

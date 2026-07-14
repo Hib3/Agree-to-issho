@@ -1,5 +1,6 @@
 import type { Concept, ConceptCategory } from "../../domain/model/concept";
 import { grammarForCategory, lexicalProfileForCategory } from "../../domain/learning/conceptFactory";
+import { applyKnownActionGrammar, knownActionLexicalProfile } from "../../domain/grammar/actionLexicon";
 
 const containerWords = new Set([
   "かばん",
@@ -366,7 +367,10 @@ const groups: Array<{ category: ConceptCategory; words: string[] }> = [
 export const starterConcepts: Concept[] = groups.flatMap(({ category, words }) =>
   words.map((surface, index) => {
     const isContainer = category === "usable_object" && containerWords.has(surface);
-    const grammar = grammarForCategory(category);
+    const actionLike = ["action", "required_action", "forbidden_action", "sport", "skill"].includes(category);
+    const grammar = actionLike
+      ? applyKnownActionGrammar(grammarForCategory(category), surface)
+      : grammarForCategory(category);
     if (isContainer) grammar.canBeContainer = true;
     return {
       id: `starter_${category}_${index + 1}`,
@@ -378,7 +382,8 @@ export const starterConcepts: Concept[] = groups.flatMap(({ category, words }) =
       systemHintCategory: category,
       categoryConfidence: 1,
       grammar,
-      lexicalProfile: lexicalProfileForCategory(category),
+      lexicalProfile:
+        (actionLike ? knownActionLexicalProfile(surface) : undefined) ?? lexicalProfileForCategory(category),
       attributes: isContainer ? { usageMode: "contain" } : {},
       learnedAt: 0,
       usageCount: 0,

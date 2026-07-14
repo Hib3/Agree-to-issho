@@ -503,7 +503,7 @@ export function findReaderArticleUrl(markdown: string, sourceUrl: string) {
       match[1]?.trim() ?? ""
     )
   );
-  const target = explicit?.[2];
+  const target = explicit?.[2] ?? findYahooPickupArticle(markdown, sourceUrl);
   if (!target) return undefined;
   try {
     const resolved = new URL(target);
@@ -514,6 +514,42 @@ export function findReaderArticleUrl(markdown: string, sourceUrl: string) {
   } catch {
     return undefined;
   }
+}
+
+function findYahooPickupArticle(markdown: string, sourceUrl: string) {
+  let source: URL;
+  try {
+    source = new URL(sourceUrl);
+  } catch {
+    return undefined;
+  }
+  if (source.hostname !== "news.yahoo.co.jp" || !source.pathname.startsWith("/pickup/")) return undefined;
+  const title = markdown.match(/^Title:\s*(.+)$/imu)?.[1]?.trim() ?? "";
+  const content = markdown.split(/^Markdown Content:\s*$/imu).at(-1) ?? markdown;
+  const pointSection = content.match(/###\s*ココがポイント\s*([\s\S]*?)(?=^##\s|(?![\s\S]))/imu)?.[1] ?? "";
+  const candidates = pointSection.split(/\r?\n/u).flatMap((line) => {
+    const articleUrl = line.match(/https:\/\/news\.yahoo\.co\.jp\/articles\/[a-z0-9]+/iu)?.[0];
+    return articleUrl ? [{ line, articleUrl }] : [];
+  });
+  if (candidates.length === 0) return undefined;
+  const ranked = candidates
+    .map((candidate, index) => ({
+      url: candidate.articleUrl,
+      score: japaneseOverlapScore(title, candidate.line),
+      index
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  return ranked[0]?.url;
+}
+
+function japaneseOverlapScore(left: string, right: string) {
+  const leftSet = new Set(
+    Array.from(comparableText(left)).filter((character) => /[ぁ-んァ-ヶ一-龠]/u.test(character))
+  );
+  const rightSet = new Set(
+    Array.from(comparableText(right)).filter((character) => /[ぁ-んァ-ヶ一-龠]/u.test(character))
+  );
+  return Array.from(leftSet).filter((character) => rightSet.has(character)).length;
 }
 
 function extractReaderText(markdown: string, headline: string) {

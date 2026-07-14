@@ -9,7 +9,7 @@ import type { Concept } from "../model/concept";
 import type { CharacterState } from "../model/character";
 import type { RandomSource } from "../../infrastructure/random/random";
 import { pickOne } from "../../infrastructure/random/random";
-import { displayConcept } from "../grammar/japaneseRealizer";
+import { displayConcept, doPhrase } from "../grammar/japaneseRealizer";
 import { controlledPremise } from "./absurdityController";
 import type { ScoredCandidate } from "./scorer";
 import { attributeMemoryBeat } from "./attributeNarration";
@@ -288,6 +288,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
     const concept = candidate.slots[name];
     return concept ? quoted(concept) : "";
   };
+  const action = candidate.slots.action;
+  const actionDo = action ? doPhrase(action) : "その動作をする";
   const outcomes: Record<string, string[]> = {
     person_daily_encounter: [
       `${value("person")}へ挨拶したあと、どんな話をするか少し迷いそうですっ。`,
@@ -303,7 +305,7 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
     ],
     object_missing_plan: objectMissingOutcome(candidate),
     action_small_goal: [
-      `${value("action")}を始める時間を短く決めたら、取りかかりやすそうですっ。`,
+      `${actionDo}時間を短く決めたら、取りかかりやすそうですっ。`,
       `できた所まで印をつければ、${value("action")}の続きも忘れませんっ。`
     ],
     living_quiet_observation: [
@@ -311,8 +313,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("living")}の様子が変わったら、あとでノートに描いておきたいですっ。`
     ],
     person_action_place: [
-      `ところがっ、${value("person")}は終わったはずの${value("action")}を、${value("place")}の端でもう一度始めたんですっ！`,
-      `${value("person")}が${value("action")}を終えるころ、${value("place")}は最初より少しにぎやかになっていそうですっ！`
+      `ところがっ、${value("person")}は${value("place")}の端で、${actionDo}ことをもう一度始めたんですっ！`,
+      `${value("person")}が${actionDo}ころ、${value("place")}は最初より少しにぎやかになっていそうですっ！`
     ],
     person_food_observation: [
       `${value("person")}は${value("food")}を見て、ちょっと機嫌がよくなりそうですっ。`,
@@ -327,8 +329,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("vehicle")}が動き出す前に、${value("container")}を確かめたいですっ。`
     ],
     action_body_warning: [
-      `${value("body")}が疲れる前に、${value("action")}をいったん休みますっ。`,
-      `${value("action")}を続けるなら、${value("body")}の様子も見ておきたいですっ。`
+      `${value("body")}が疲れる前に、${actionDo}のをいったんやめますっ。`,
+      `${actionDo}なら、${value("body")}の様子も見ておきたいですっ。`
     ],
     person_object_rumor: [
       `${value("person")}が${value("object")}を大事にする理由まで、アグリはまだ知りませんっ。`,
@@ -343,8 +345,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("place")}へ着いたら、まず${value("food")}を探したくなりそうですっ！`
     ],
     object_action_plan: [
-      `${value("object")}が見つからなかったら、${value("action")}を始める前に少し困りそうですっ。`,
-      `${value("action")}の準備として、${value("object")}を見える所へ置きますっ。`
+      `${value("object")}が見つからなかったら、${actionDo}前に少し困りそうですっ。`,
+      `${actionDo}ために、${value("object")}を見える所へ置きますっ。`
     ],
     wearable_person_comparison: [
       `${value("person")}が${value("wearable")}を選んだ理由も、ちょっと聞いてみたいですっ。`,
@@ -363,8 +365,8 @@ function outcomeForFrame(candidate: ScoredCandidate, random: RandomSource) {
       `${value("person")}の話をすると、今度は${value("music")}を聞きたくなりそうですっ。`
     ],
     body_action_discovery: [
-      `${value("action")}を続けるたび、${value("body")}の新しい使い方に気づきそうですっ。`,
-      `${value("body")}がびっくりしないように、${value("action")}はゆっくり始めますっ。`
+      `${actionDo}たび、${value("body")}の新しい使い方に気づきそうですっ。`,
+      `${value("body")}がびっくりしないように、${actionDo}時はゆっくり始めますっ。`
     ],
     vehicle_place_outing: [
       `${value("place")}へ着いたら、帰りの${value("vehicle")}も忘れずに確かめますっ。`,

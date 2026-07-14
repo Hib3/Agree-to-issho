@@ -212,6 +212,21 @@ describe("article digest service", () => {
     expect(findReaderArticleUrl(markdown, item.url)).toBeUndefined();
   });
 
+  it("selects the most relevant article from a Yahoo pickup point section", () => {
+    const pickupUrl = "https://news.yahoo.co.jp/pickup/123?source=rss";
+    const markdown = [
+      "Title: 政府 国会会期1週間ほど延長検討",
+      "Markdown Content:",
+      "### ココがポイント",
+      "* [官房長官が会期延長について説明](https://news.yahoo.co.jp/articles/relevant)",
+      "* [別の地域で新しい公園が開業](https://news.yahoo.co.jp/articles/unrelated)",
+      "## あわせて読みたい記事",
+      "* [人気の記事](https://news.yahoo.co.jp/articles/ranking)"
+    ].join("\n");
+
+    expect(findReaderArticleUrl(markdown, pickupUrl)).toBe("https://news.yahoo.co.jp/articles/relevant");
+  });
+
   it.each([
     {
       name: "GIGAZINE-like article",

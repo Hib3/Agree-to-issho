@@ -178,13 +178,17 @@ export function questionForProposition(proposition: CompositionProposition, conc
         : `${word}の種類を、もう一度教えてもらえますか？`;
     case "attribute_confirmation":
       return proposition.attributeClaim
-        ? `${word}のメモを確かめます。「${proposition.attributeClaim.prompt}」には「${proposition.attributeClaim.answerLabel}」と答えてくれました。今も合っていますか？`
+        ? `${word}のメモを確かめます。${quoteQuestion(proposition.attributeClaim.prompt)}には「${proposition.attributeClaim.answerLabel}」と答えてくれました。今も合っていますか？`
         : `${word}の覚え方を、もう一度教えてもらえますか？`;
     case "situation_question":
       return namedTopics + "を使った場面として、今の想像は近いですか？";
     default:
       return "";
   }
+}
+
+function quoteQuestion(value: string) {
+  return `「${value.replaceAll("「", "『").replaceAll("」", "』")}」`;
 }
 
 export function answerSchemaFor(

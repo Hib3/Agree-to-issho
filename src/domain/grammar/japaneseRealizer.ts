@@ -37,7 +37,7 @@ export function realize(template: string, slots: Record<string, Concept>) {
 export function doingPhrase(concept: Concept) {
   if (canUseExplicitInflection(concept) && concept.grammar.teForm) return `${concept.grammar.teForm}いる`;
   if (lexicalProfile(concept).partOfSpeech === "verbal_noun" && !/こと$/u.test(displayConcept(concept))) {
-    return `「${displayConcept(concept)}」をしている`;
+    return `${displayConcept(concept)}をしている`;
   }
   return `「${displayConcept(concept)}」を続けている`;
 }
@@ -47,7 +47,7 @@ export function doPhrase(concept: Concept) {
     return concept.grammar.verbDictionaryForm;
   }
   if (lexicalProfile(concept).partOfSpeech === "verbal_noun" && !/こと$/u.test(displayConcept(concept))) {
-    return `「${displayConcept(concept)}」をする`;
+    return `${displayConcept(concept)}をする`;
   }
   return `「${displayConcept(concept)}」を始める`;
 }

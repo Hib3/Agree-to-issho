@@ -34,6 +34,14 @@ const lensCounts: Record<string, number> = {};
 const mechanismCounts: Record<string, number> = {};
 let callbackMismatch = 0;
 let missingNarrativeBeat = 0;
+const malformedJapaneseCounts: Record<string, number> = {};
+
+const malformedJapanesePatterns: Array<[string, RegExp]> = [
+  ["nested_japanese_quote", /「[^」]*「/u],
+  ["malformed_action_context", /ですること/u],
+  ["broken_action_collocation", /「(?:手紙|写真|水やり|日記)」を(?:する|して|始める)/u],
+  ["duplicate_particle", /(?:をを|がが|にはは|ではは)/u]
+];
 
 const character: CharacterState = {
   id: "aguri",
@@ -70,6 +78,12 @@ for (let seed = 1; seed <= sessionCount; seed += 1) {
   const errors = [...validateConversationSession(session), ...session.validationErrors];
   if (errors.length > 0) failures.push(`${seed}:${errors.join(",")}`);
   const transcript = session.queuedTurns.map((turn) => turn.styledPreview).join("\n");
+  const japaneseAuditTarget = `${transcript}\n${session.pendingQuestion?.prompt ?? ""}`;
+  for (const [code, pattern] of malformedJapanesePatterns) {
+    if (!pattern.test(japaneseAuditTarget)) continue;
+    malformedJapaneseCounts[code] = (malformedJapaneseCounts[code] ?? 0) + 1;
+    failures.push(`${seed}:${code}`);
+  }
   transcripts.add(transcript);
   intentCounts[session.intent] = (intentCounts[session.intent] ?? 0) + 1;
   if (session.queuedTurns.length >= 3) multiPage += 1;
@@ -141,6 +155,7 @@ console.log(
       mechanismCounts,
       missingNarrativeBeat,
       callbackMismatch,
+      malformedJapaneseCounts,
       samples
     },
     null,

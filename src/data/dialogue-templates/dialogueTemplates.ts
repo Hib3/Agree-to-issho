@@ -54,7 +54,7 @@ const frames: Frame[] = [
   {
     id: "action_small_goal",
     slots: [slot("action", [...actions], "action")],
-    text: "今日は少しだけ{action:do}、という小さな目標を考えましたっ。",
+    text: "今日は「少しだけ{action:do}」という小さな目標を考えましたっ。",
     intents: ["small_talk", "discovery", "daydream", "ask_meaning", "ask_preference"],
     asksSituationFor: ["daydream"]
   },

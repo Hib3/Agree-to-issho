@@ -9,6 +9,7 @@ import { createUserConcept } from "../domain/learning/conceptFactory";
 import { createLearningSession, transitionLearning } from "../domain/learning/learningMachine";
 import type { CharacterState } from "../domain/model/character";
 import { starterConcepts } from "../data/starter/starterConcepts";
+import { createDebugLearnedConcepts } from "../data/debug/createDebugLearnedConcepts";
 import { SeededRandom } from "../infrastructure/random/random";
 
 const now = 1_700_000_000_000;
@@ -29,6 +30,16 @@ const character: CharacterState = {
 };
 
 describe("typed learning attributes", () => {
+  it("keeps debug action attributes consistent with known inflection", () => {
+    const letter = createDebugLearnedConcepts(100, now).find((concept) => concept.surface === "手紙");
+    expect(letter).toBeDefined();
+    expect(letter?.grammar.verbDictionaryForm).toBe("手紙を書く");
+    expect(letter?.grammar.suruAction).toBe(false);
+    expect(letter?.attributes.suruAction).toBe(false);
+    expect(attributeMemoryBeat(letter!)).not.toContain("ですること");
+    expect(attributeMemoryBeat(letter!)).toContain("取り組める");
+  });
+
   it("defines multiple category-specific questions", () => {
     expect(attributeQuestionsForCategory("person_name").map((item) => item.id)).toEqual([
       "honorific",

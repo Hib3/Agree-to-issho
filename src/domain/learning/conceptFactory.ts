@@ -1,4 +1,5 @@
 import { duplicateKey, normalizeJapanese } from "../grammar/japaneseNormalizer";
+import { applyKnownActionGrammar, knownActionLexicalProfile } from "../grammar/actionLexicon";
 import type {
   Concept,
   ConceptAttributes,
@@ -75,7 +76,18 @@ export function createUserConcept(
   id: string = crypto.randomUUID()
 ): Concept {
   const surface = normalizeJapanese(draft.surface);
-  const grammar = grammarForCategory(draft.category);
+  const actionLike = ["action", "required_action", "forbidden_action", "sport", "skill"].includes(
+    draft.category
+  );
+  const knownGrammar = actionLike
+    ? applyKnownActionGrammar(grammarForCategory(draft.category), surface)
+    : grammarForCategory(draft.category);
+  const knownProfile = actionLike ? knownActionLexicalProfile(surface) : undefined;
+  const rawSuru = draft.attributes?.suruAction;
+  const explicitSuru = typeof rawSuru === "boolean" ? rawSuru : undefined;
+  const { grammar, inferredProfile } = actionLike
+    ? applyUserActionPreference(surface, knownGrammar, knownProfile, explicitSuru)
+    : { grammar: knownGrammar, inferredProfile: undefined };
   if (draft.attributes?.usageMode === "contain" || draft.attributes?.objectKind === "container") {
     grammar.canBeContainer = true;
   }
@@ -88,7 +100,7 @@ export function createUserConcept(
     userCategory: draft.category,
     categoryConfidence: 1,
     grammar,
-    lexicalProfile: draft.lexicalProfile ?? lexicalProfileForCategory(draft.category),
+    lexicalProfile: draft.lexicalProfile ?? inferredProfile ?? lexicalProfileForCategory(draft.category),
     attributes: draft.attributes ?? {},
     learnedAt: now,
     usageCount: 0,
@@ -100,4 +112,44 @@ export function createUserConcept(
   if (draft.reading) concept.reading = normalizeJapanese(draft.reading);
   if (draft.preference !== undefined) concept.preference = draft.preference;
   return concept;
+}
+
+function applyUserActionPreference(
+  surface: string,
+  knownGrammar: ConceptGrammar,
+  knownProfile: LexicalProfile | undefined,
+  explicitSuru: boolean | undefined
+) {
+  if (explicitSuru === true) {
+    return {
+      grammar: {
+        ...grammarForCategory("action"),
+        suruAction: true,
+        verbDictionaryForm: `${surface}する`,
+        teForm: `${surface}して`,
+        pastForm: `${surface}した`,
+        negativeForm: `${surface}しない`,
+        potentialForm: `${surface}できる`
+      },
+      inferredProfile: {
+        partOfSpeech: "verbal_noun",
+        conjugation: "suru",
+        quotePolicy: "allow_inflection",
+        honorificPolicy: "none",
+        confidence: 1
+      } satisfies LexicalProfile
+    };
+  }
+  if (explicitSuru === false && knownGrammar.suruAction) {
+    return {
+      grammar: { ...grammarForCategory("action"), suruAction: false },
+      inferredProfile: {
+        partOfSpeech: "unknown",
+        quotePolicy: "mention_only",
+        honorificPolicy: "none",
+        confidence: 0.9
+      } satisfies LexicalProfile
+    };
+  }
+  return { grammar: knownGrammar, inferredProfile: knownProfile };
 }
