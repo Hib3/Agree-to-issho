@@ -7,7 +7,14 @@ import type {
   NewsItem
 } from "../domain/model/news";
 import { buildNewsConversationPlan } from "../domain/news/newsExplanation";
-import { validateNewsJapanese } from "../domain/news/newsJapaneseNlg";
+import {
+  buildNewsDiscourseFrame,
+  newsResponseSubject,
+  realizeNewsOpening,
+  realizeNewsOpinion,
+  realizeNewsUnderstanding,
+  validateNewsJapanese
+} from "../domain/news/newsJapaneseNlg";
 
 const topicCases = [
   ["transport", "交通", "駅の案内表示"],
@@ -85,6 +92,9 @@ describe("600-viewpoint Japanese news generation", () => {
       expect(transcript).not.toContain(internalMarker);
       expect(transcript).not.toContain("2009年に関わる人");
       expect(transcript).not.toMatch(/取得できた記事本文では、「|RSS内の本文では、「/u);
+      expect(transcript).not.toMatch(
+        /(?:について|では?|から)(?:何が|なぜ|どこへ|どんな)[^。！？!?]{0,28}が(?:報じ|伝え)/u
+      );
       if (tone === "sensitive") expect(plan.pages.some((page) => page.source === "imagination")).toBe(false);
     }
 
@@ -106,6 +116,93 @@ describe("600-viewpoint Japanese news generation", () => {
         "取得できた本文の一部だけが使えています。記事全体の文脈は元記事で確認が必要です。が分かる情報"
       )
     ).toEqual(expect.arrayContaining(["artifact", "broken-connective"]));
+    expect(validateNewsJapanese("交通についてどこへ影響するのかが報じられています。")).toContain(
+      "embedded-question-clause"
+    );
+  });
+
+  it.each(issueKinds)("realizes %s as a noun phrase when explaining an issue", (kind) => {
+    const item: NewsItem = {
+      id: `noun_phrase_${kind}`,
+      feedId: "noun_phrase",
+      sourceName: "検証通信",
+      title: "地域の更新",
+      summary: "検証用の説明です。",
+      url: `https://example.test/${kind}`,
+      publishedAt: 1_700_000_000_000,
+      fetchedAt: 1_700_000_000_000
+    };
+    const digest = makeDigest(
+      item,
+      "article_extract",
+      "neutral",
+      kind,
+      "transport",
+      "交通",
+      "RAW_NOUN_PHRASE",
+      "INTERNAL_NOUN_PHRASE"
+    );
+    const issue = digest.issues[0]!;
+    const frame = buildNewsDiscourseFrame(item, digest, [issue]);
+    const explanation = realizeNewsUnderstanding(frame, issue, 0);
+    const responseSubject = newsResponseSubject(digest, issue);
+
+    expect(validateNewsJapanese(explanation)).toEqual([]);
+    expect(explanation).not.toMatch(/について(?:何が|なぜ|どこへ|どんな)/u);
+    expect(responseSubject).not.toMatch(/(?:何が|なぜ|どこへ|どんな)/u);
+  });
+
+  it("uses outer book-title quotes when a headline already contains Japanese quotes", () => {
+    const item: NewsItem = {
+      id: "nested_quote",
+      feedId: "nested_quote",
+      sourceName: "検証通信",
+      title: "音声認識API「SpeechAnalyzer」を更新",
+      summary: "音声認識機能の更新です。",
+      url: "https://example.test/nested-quote",
+      publishedAt: 1_700_000_000_000,
+      fetchedAt: 1_700_000_000_000
+    };
+    const digest = makeDigest(
+      item,
+      "article_extract",
+      "neutral",
+      "change",
+      "science_technology",
+      "科学と技術",
+      "RAW_NESTED_QUOTE",
+      "INTERNAL_NESTED_QUOTE"
+    );
+    const frame = buildNewsDiscourseFrame(item, digest, digest.issues);
+
+    expect(realizeNewsOpening(frame)).toContain("『音声認識API「SpeechAnalyzer」を更新』");
+  });
+
+  it("uses topic-specific comparison and opinion language", () => {
+    const item: NewsItem = {
+      id: "topic_specific_language",
+      feedId: "topic_specific_language",
+      sourceName: "検証通信",
+      title: "旅行用バッグを更新",
+      summary: "旅行用バッグの容量を比較した記事です。",
+      url: "https://example.test/topic-specific",
+      publishedAt: 1_700_000_000_000,
+      fetchedAt: 1_700_000_000_000
+    };
+    const digest = makeDigest(
+      item,
+      "article_extract",
+      "neutral",
+      "number",
+      "lifestyle_product",
+      "暮らしと道具",
+      "RAW_TOPIC_SPECIFIC",
+      "INTERNAL_TOPIC_SPECIFIC"
+    );
+    const frame = buildNewsDiscourseFrame(item, digest, digest.issues);
+
+    expect(realizeNewsUnderstanding(frame, digest.issues[0]!, 0)).toContain("使いやすさや容量を比べる条件");
+    expect(realizeNewsOpinion(frame)).toBe("実際に使う場面で、手間がどれくらい減るのか知りたいです。");
   });
 });
 

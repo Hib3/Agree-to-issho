@@ -65,6 +65,22 @@ describe("article digest service", () => {
     );
   });
 
+  it("does not classify 本当に or RAIL as culture or AI", async () => {
+    const lifestyleArticle = [
+      "このバッグは本当に便利で、旅行のパッキングに使える生活用品です。容量は25Lから60Lまで変わります。",
+      "RAILという商品名ですが、収納方法と持ち運び方を紹介する記事です。"
+    ].join("");
+    const result = await fetchArticleDigest(
+      { ...item, title: "旅行用バッグの収納方法", feedContent: lifestyleArticle },
+      { useArticleHelper: false, now }
+    );
+    const topicKeys = result.digest.topics.map((topic) => topic.key);
+
+    expect(topicKeys[0]).toBe("lifestyle_product");
+    expect(topicKeys).not.toContain("culture");
+    expect(topicKeys).not.toContain("science_technology");
+  });
+
   it("continues to article fetch when RSS content nearly duplicates the headline", async () => {
     const html = `<article><p>${usefulArticle}</p></article>`;
     const fetchMock = vi
